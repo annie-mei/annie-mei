@@ -1,16 +1,17 @@
 use std::env;
 
 use dotenv::dotenv;
-use log::{debug, error, info, log_enabled, Level};
 use serenity::{
     async_trait,
     client::{Client, Context, EventHandler},
     framework::standard::{
-        macros::{command, group},
+        macros::{command, group, hook},
         CommandResult, StandardFramework,
     },
-    model::{channel::Message, gateway::Ready},
+    model::{channel::Message, event::ResumedEvent, gateway::Ready},
+    utils::MessageBuilder,
 };
+use tracing::{debug, error, info, instrument};
 
 const HELP_MESSAGE: &str = "
           Hello there, Human!
@@ -33,33 +34,44 @@ const HELP_MESSAGE: &str = "
 
 // const HELP_COMMAND: &str = "!help";
 
+#[hook]
+#[instrument]
+async fn before(_: &Context, msg: &Message, command_name: &str) -> bool {
+    info!(
+        "Got command '{}' by user '{}'",
+        command_name, msg.author.name
+    );
+
+    true
+}
+
 #[group]
-#[commands(help)]
+#[commands(help, ping)]
 struct General;
 
 struct Handler;
 
 #[async_trait]
 impl EventHandler for Handler {
-    // async fn message(&self, ctx: Context, msg: Message) {
-    //     if msg.content == HELP_COMMAND {
-    //         if let Err(why) = msg.channel_id.say(&ctx.http, HELP_MESSAGE).await {
-    //             println!("Error sending message: {:?}", why);
-    //         }
-    //     }
-    // }
-
     async fn ready(&self, _: Context, ready: Ready) {
         println!("{} is connected!", ready.user.name);
+    }
+
+    #[instrument(skip(self, _ctx))]
+    async fn resume(&self, _ctx: Context, resume: ResumedEvent) {
+        debug!("Resumed; trace: {:?}", resume.trace);
     }
 }
 
 #[tokio::main]
+#[instrument]
 async fn main() {
     dotenv().ok();
+    tracing_subscriber::fmt::init();
 
     let framework = StandardFramework::new()
-        .configure(|c| c.prefix("!")) // set the bot's prefix to "~"
+        .configure(|c| c.prefix("!"))
+        .before(before)
         .group(&GENERAL_GROUP);
     let token = env::var("DISCORD_TOKEN").expect("Expected a token in the environment");
 
@@ -76,7 +88,18 @@ async fn main() {
 
 #[command]
 async fn help(ctx: &Context, msg: &Message) -> CommandResult {
-    msg.reply(ctx, HELP_MESSAGE).await?;
+    if let Err(why) = msg.channel_id.say(&ctx.http, HELP_MESSAGE).await {
+        error!("Error sending message: {:?}", why);
+    }
+
+    Ok(())
+}
+
+#[command]
+async fn ping(ctx: &Context, msg: &Message) -> CommandResult {
+    if let Err(why) = msg.channel_id.say(&ctx.http, "Pong! : )").await {
+        error!("Error sending message: {:?}", why);
+    }
 
     Ok(())
 }
