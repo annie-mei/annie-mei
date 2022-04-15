@@ -1,3 +1,5 @@
+mod commands;
+
 use std::env;
 
 use dotenv::dotenv;
@@ -5,34 +7,15 @@ use serenity::{
     async_trait,
     client::{Client, Context, EventHandler},
     framework::standard::{
-        macros::{command, group, hook},
-        CommandResult, StandardFramework,
+        macros::{group, hook},
+        StandardFramework,
     },
     model::{channel::Message, event::ResumedEvent, gateway::Ready},
-    utils::MessageBuilder,
 };
-use tracing::{debug, error, info, instrument};
+use tracing::{debug, info, instrument};
 
-const HELP_MESSAGE: &str = "
-          Hello there, Human!
+use commands::{ping::*, help::*};
 
-          You have summoned me. Let's see about getting you what you need.
-
-          ? Need technical help?
-          => Post in the <#CHANNEL_ID> channel and other humans will assist you.
-          
-          ? Looking for the Code of Conduct?
-          => Here it is: <https://opensource.facebook.com/code-of-conduct> 
-          
-          ? Something wrong?
-          => You can flag an admin with @admin
-          
-          I hope that resolves your issue!
-          -- Helpbot
-          
-          ";
-
-// const HELP_COMMAND: &str = "!help";
 
 #[hook]
 #[instrument]
@@ -86,20 +69,3 @@ async fn main() {
     }
 }
 
-#[command]
-async fn help(ctx: &Context, msg: &Message) -> CommandResult {
-    if let Err(why) = msg.channel_id.say(&ctx.http, HELP_MESSAGE).await {
-        error!("Error sending message: {:?}", why);
-    }
-
-    Ok(())
-}
-
-#[command]
-async fn ping(ctx: &Context, msg: &Message) -> CommandResult {
-    if let Err(why) = msg.channel_id.say(&ctx.http, "Pong! : )").await {
-        error!("Error sending message: {:?}", why);
-    }
-
-    Ok(())
-}
