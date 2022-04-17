@@ -5,17 +5,37 @@ use serenity::{
         CommandResult,
     },
     model::channel::Message,
-    // utils::MessageBuilder,
 };
-use tracing::error;
 
-const HELP_MESSAGE: &str = "
-          Hello there, Human!          
-          ";
+use tracing::error;
 
 #[command]
 async fn help(ctx: &Context, msg: &Message) -> CommandResult {
-    if let Err(why) = msg.channel_id.say(&ctx.http, HELP_MESSAGE).await {
+
+    let msg = msg
+                .channel_id
+                .send_message(&ctx.http, |m| {
+                    m.content("Hello, World!")
+                        .embed(|e| {
+                            e
+                                .title("This is a title")
+                                .description("This is a description")
+                                .image("attachment://mai.jpg")
+                                .fields(vec![
+                                    ("This is the first field", "This is a field body", true),
+                                    ("This is the second field", "Both fields are inline", true),
+                                ])
+                                .field("This is the third field", "This is not an inline field", false)
+                                .footer(|f| f.text("This is a footer"))
+                                .timestamp(chrono::Utc::now())
+                                .colour(0x00ff00)
+                                .thumbnail("attachment://mai.jpg")
+                        })
+                        .add_file("./mai.jpg")
+                })
+                .await;
+
+    if let Err(why) = msg {
         error!("Error sending message: {:?}", why);
     }
 
