@@ -7,6 +7,8 @@ use serenity::{
     async_trait,
     client::{Client, Context, EventHandler},
     framework::standard::{
+        CommandResult,
+        DispatchError,
         macros::{group, hook},
         StandardFramework,
     },
@@ -24,8 +26,42 @@ async fn before(_: &Context, msg: &Message, command_name: &str) -> bool {
         "Got command '{}' by user '{}'",
         command_name, msg.author.name
     );
-
     true
+}
+
+#[hook]
+#[instrument]
+async fn after(_: &Context, _msg: &Message, command_name: &str, command_result: CommandResult) {
+    match command_result {
+        Ok(()) => info!("Processed command '{}'", command_name),
+        Err(why) => info!("Command '{}' returned error {:?}", command_name, why),
+    }
+}
+
+#[hook]
+#[instrument]
+async fn unknown_command(_: &Context, _msg: &Message, unknown_command_name: &str) {
+    info!("Could not find command named '{}'", unknown_command_name);
+}
+
+// TODO: Figure out how to use this
+#[hook]
+async fn delay_action(ctx: &Context, msg: &Message) {
+    // You may want to handle a Discord rate limit if this fails.
+    let _ = msg.react(ctx, '⏱').await;
+}
+
+#[hook]
+async fn dispatch_error(ctx: &Context, msg: &Message, error: DispatchError) {
+    if let DispatchError::Ratelimited(info) = error {
+        // We notify them only once.
+        if info.is_first_try {
+            let _ = msg
+                .channel_id
+                .say(&ctx.http, &format!("Try this again in {} seconds.", info.as_secs()))
+                .await;
+        }
+    }
 }
 
 #[group]
@@ -55,6 +91,9 @@ async fn main() {
     let framework = StandardFramework::new()
         .configure(|c| c.prefix("!"))
         .before(before)
+        .after(after)
+        .unrecognised_command(unknown_command)
+        .on_dispatch_error(dispatch_error)
         .group(&GENERAL_GROUP);
     let token = env::var("DISCORD_TOKEN").expect("Expected a token in the environment");
 

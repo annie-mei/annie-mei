@@ -18,6 +18,7 @@ async fn help(ctx: &Context, msg: &Message) -> CommandResult {
                     m.content("Hello, World!")
                         .embed(|e| {
                             e
+                                .colour(0x00ff00)
                                 .title("This is a title")
                                 .description("This is a description")
                                 .image("attachment://mai.jpg")
@@ -28,7 +29,6 @@ async fn help(ctx: &Context, msg: &Message) -> CommandResult {
                                 .field("This is the third field", "This is not an inline field", false)
                                 .footer(|f| f.text("This is a footer"))
                                 .timestamp(chrono::Utc::now())
-                                .colour(0x00ff00)
                                 .thumbnail("attachment://mai.jpg")
                         })
                         .add_file("./mai.jpg")
