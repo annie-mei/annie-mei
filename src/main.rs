@@ -7,17 +7,14 @@ use serenity::{
     async_trait,
     client::{Client, Context, EventHandler},
     framework::standard::{
-        CommandResult,
-        DispatchError,
         macros::{group, hook},
-        StandardFramework,
+        CommandResult, DispatchError, StandardFramework,
     },
     model::{channel::Message, event::ResumedEvent, gateway::Ready},
 };
 use tracing::{debug, info, instrument};
 
-use commands::{ping::*, help::*};
-
+use commands::{anime::anime::*, help::*, ping::*};
 
 #[hook]
 #[instrument]
@@ -58,14 +55,17 @@ async fn dispatch_error(ctx: &Context, msg: &Message, error: DispatchError) {
         if info.is_first_try {
             let _ = msg
                 .channel_id
-                .say(&ctx.http, &format!("Try this again in {} seconds.", info.as_secs()))
+                .say(
+                    &ctx.http,
+                    &format!("Try this again in {} seconds.", info.as_secs()),
+                )
                 .await;
         }
     }
 }
 
 #[group]
-#[commands(help, ping)]
+#[commands(help, ping, anime)]
 struct General;
 
 struct Handler;
@@ -107,4 +107,3 @@ async fn main() {
         println!("Client error: {:?}", why);
     }
 }
-
