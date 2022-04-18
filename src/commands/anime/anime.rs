@@ -1,6 +1,6 @@
 use serenity::{
     client::Context,
-    framework::standard::{macros::command, CommandResult},
+    framework::standard::{macros::command, Args, CommandResult, Delimiter},
     model::channel::Message,
 };
 use tokio::task;
@@ -10,7 +10,8 @@ use super::fetcher::fetcher;
 
 #[command]
 async fn anime(ctx: &Context, msg: &Message) -> CommandResult {
-    let response = task::spawn_blocking(|| fetcher()).await?;
+    let args = Args::new(&msg.content, &[Delimiter::Single(' ')]);
+    let response = task::spawn_blocking(|| fetcher(args)).await?;
 
     let title = response
         .get("data")
