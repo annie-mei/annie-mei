@@ -13,13 +13,7 @@ async fn anime(ctx: &Context, msg: &Message) -> CommandResult {
     let args = Args::new(&msg.content, &[Delimiter::Single(' ')]);
     let response = task::spawn_blocking(|| fetcher(args)).await?;
 
-    // TODO: Handle response in fetcher
-    let title = response
-        .get("data")
-        .and_then(|value| value.get("Media"))
-        .and_then(|value| value.get("title"))
-        .and_then(|value| value.get("romaji"))
-        .unwrap();
+    let title = response.title.romaji;
 
     if let Err(why) = msg.channel_id.say(&ctx.http, title).await {
         error!("Error sending message: {:?}", why);

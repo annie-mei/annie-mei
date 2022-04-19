@@ -26,6 +26,7 @@ dependencies = [
  "env_logger",
  "log",
  "reqwest",
+ "serde",
  "serde_json",
  "serenity",
  "tokio",

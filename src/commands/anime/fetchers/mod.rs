@@ -2,7 +2,7 @@ use reqwest::Client;
 use serde_json::{json, Value};
 use tracing::info;
 
-async fn send_request(json: Value) -> serde_json::Value {
+async fn send_request(json: Value) -> String {
     let client = Client::new();
     let response = client
         .post("https://graphql.anilist.co/")
@@ -15,8 +15,9 @@ async fn send_request(json: Value) -> serde_json::Value {
         .text()
         .await;
 
-    let result: serde_json::Value = serde_json::from_str(&response.unwrap()).unwrap();
-    result
+    let result = &response.unwrap();
+
+    result.to_string()
 }
 
 const FETCH_BY_ID_QUERY: &str = "
@@ -33,11 +34,11 @@ query ($id: Int) {
 ";
 
 #[tokio::main]
-pub async fn fetch_by_id(id: u32) -> serde_json::Value {
+pub async fn fetch_by_id(id: u32) -> String {
     // TODO: unwrap this using structs
     // https://ectobit.com/blog/parsing-json-in-rust/
     let json = json!({"query": FETCH_BY_ID_QUERY, "variables": {"id":id}});
-    let result: serde_json::Value = send_request(json).await;
+    let result: String = send_request(json).await;
 
     info!("Fetched By ID: {:#?}", result);
 
@@ -58,11 +59,11 @@ query ($search: String) {
 ";
 
 #[tokio::main]
-pub async fn fetch_by_name(name: String) -> serde_json::Value {
+pub async fn fetch_by_name(name: String) -> String {
     // TODO: unwrap this using structs
     // https://ectobit.com/blog/parsing-json-in-rust/
     let json = json!({"query": FETCH_BY_SEARCH_QUERY, "variables": {"search":name}});
-    let result: serde_json::Value = send_request(json).await;
+    let result: String = send_request(json).await;
 
     info!("Fetched By Name: {:#?}", result);
 
