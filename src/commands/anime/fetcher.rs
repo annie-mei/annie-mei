@@ -1,5 +1,4 @@
-use crate::commands::anime::fetchers::fetch_by_id::fetch_by_id;
-use crate::commands::anime::fetchers::fetch_by_name::fetch_by_name;
+use crate::commands::anime::fetchers::{fetch_by_id, fetch_by_name};
 
 use tokio::task;
 
@@ -8,7 +7,7 @@ enum Argument {
     Search(String),
 }
 
-// TODO: DIfferent fetchers for AniList and MAL
+// TODO: Different fetchers for AniList and MAL
 // MAL has song data
 impl Argument {
     fn fetch(&self) -> serde_json::Value {
@@ -37,7 +36,6 @@ pub async fn fetcher(mut args: serenity::framework::standard::Args) -> serde_jso
     let result = task::spawn_blocking(move || argument.fetch())
         .await
         .expect("Fetching Panicked");
-    println!("{:#?}", result);
 
     result
 }
