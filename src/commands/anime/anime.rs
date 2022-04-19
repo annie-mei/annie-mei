@@ -13,6 +13,7 @@ async fn anime(ctx: &Context, msg: &Message) -> CommandResult {
     let args = Args::new(&msg.content, &[Delimiter::Single(' ')]);
     let response = task::spawn_blocking(|| fetcher(args)).await?;
 
+    // TODO: Handle response in fetcher
     let title = response
         .get("data")
         .and_then(|value| value.get("Media"))
