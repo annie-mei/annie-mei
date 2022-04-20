@@ -2,6 +2,8 @@ use reqwest::Client;
 use serde_json::{json, Value};
 use tracing::info;
 
+pub mod queries;
+
 async fn send_request(json: Value) -> String {
     let client = Client::new();
     let response = client
@@ -20,24 +22,9 @@ async fn send_request(json: Value) -> String {
     result.to_string()
 }
 
-const FETCH_BY_ID_QUERY: &str = "
-query ($id: Int) {
-  Media (id: $id, type: ANIME) {
-    id
-    title {
-      romaji
-      english
-      native
-    }
-  }
-}
-";
-
 #[tokio::main]
-pub async fn fetch_by_id(id: u32) -> String {
-    // TODO: unwrap this using structs
-    // https://ectobit.com/blog/parsing-json-in-rust/
-    let json = json!({"query": FETCH_BY_ID_QUERY, "variables": {"id":id}});
+pub async fn fetch_by_id(query: String, id: u32) -> String {
+    let json = json!({"query": query, "variables": {"id":id}});
     let result: String = send_request(json).await;
 
     info!("Fetched By ID: {:#?}", result);
@@ -45,24 +32,9 @@ pub async fn fetch_by_id(id: u32) -> String {
     result
 }
 
-const FETCH_BY_SEARCH_QUERY: &str = "
-query ($search: String) {
-  Media (search: $search, type: ANIME) {
-    id
-    title {
-      romaji
-      english
-      native
-    }
-  }
-}
-";
-
 #[tokio::main]
-pub async fn fetch_by_name(name: String) -> String {
-    // TODO: unwrap this using structs
-    // https://ectobit.com/blog/parsing-json-in-rust/
-    let json = json!({"query": FETCH_BY_SEARCH_QUERY, "variables": {"search":name}});
+pub async fn fetch_by_name(query: String, name: String) -> String {
+    let json = json!({"query": query, "variables": {"search":name}});
     let result: String = send_request(json).await;
 
     info!("Fetched By Name: {:#?}", result);

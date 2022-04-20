@@ -1,5 +1,5 @@
 use super::{
-    fetchers::{fetch_by_id, fetch_by_name},
+    fetchers::{fetch_by_id, fetch_by_name, queries::*},
     model::Anime,
 };
 
@@ -15,8 +15,10 @@ enum Argument {
 impl Argument {
     fn fetch_and_unwrap(&self) -> Anime {
         let fetched_data = match self {
-            Self::Id(value) => fetch_by_id(*value),
-            Self::Search(value) => fetch_by_name(value.to_string()),
+            Self::Id(value) => fetch_by_id(FETCH_BY_ID_QUERY.to_string(), *value),
+            Self::Search(value) => {
+                fetch_by_name(FETCH_BY_SEARCH_QUERY.to_string(), value.to_string())
+            }
         };
         let serialized_content: serde_json::Value = serde_json::from_str(&fetched_data).unwrap();
         let serialized_result = serialized_content
