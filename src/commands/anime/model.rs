@@ -8,6 +8,7 @@ pub struct Anime {
     pub id_mal: u32,
     pub title: Title,
     pub season: String,
+    pub season_year: String,
     pub format: String,
     pub status: String,
     pub episodes: Option<u32>,
@@ -90,5 +91,20 @@ impl Anime {
         }
 
         main_studios
+    }
+
+    pub fn transform_trailer(&self) -> String {
+        match &self.trailer {
+            None => String::from("None"),
+            Some(trailer) => format!("https://www.{}.com/watch?v={}", trailer.site, trailer.id),
+        }
+    }
+
+    pub fn transform_color(&self) -> i32 {
+        i32::from_str_radix(&self.cover_image.color.trim_start_matches("#"), 16).unwrap_or(0x0000ff)
+    }
+
+    pub fn transform_season(&self) -> String {
+        format!("{} {}", &self.season, &self.season_year)
     }
 }
