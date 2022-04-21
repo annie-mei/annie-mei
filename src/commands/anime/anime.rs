@@ -13,9 +13,10 @@ async fn anime(ctx: &Context, msg: &Message) -> CommandResult {
     let args = Args::new(&msg.content, &[Delimiter::Single(' ')]);
     let response = task::spawn_blocking(|| fetcher(args)).await?;
 
-    let title = response.description;
+    // let title: String = response.title.romaji.to_string();
+    let studios: Vec<String> = response.transform_studios();
 
-    if let Err(why) = msg.channel_id.say(&ctx.http, title).await {
+    if let Err(why) = msg.channel_id.say(&ctx.http, studios[0].to_string()).await {
         error!("Error sending message: {:?}", why);
     }
 

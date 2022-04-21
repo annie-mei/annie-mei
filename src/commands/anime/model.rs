@@ -1,4 +1,4 @@
-use serde::{de::Error, Deserialize, Deserializer};
+use serde::Deserialize;
 
 #[derive(Deserialize, Debug)]
 #[serde(rename_all = "camelCase")]
@@ -10,16 +10,15 @@ pub struct Anime {
     pub season: String,
     pub format: String,
     pub status: String,
-    pub episodes: u32,
-    pub duration: u32,
+    pub episodes: Option<u32>,
+    pub duration: Option<u32>,
     pub genres: Vec<String>,
     pub source: String,
     pub cover_image: CoverImage,
-    pub average_score: u32,
+    pub average_score: Option<u32>,
     pub studios: Studios,
     pub site_url: String,
-    pub external_links: Vec<ExternalLinks>,
-    #[serde(deserialize_with = "deserialize_trailer")]
+    pub external_links: Option<Vec<ExternalLinks>>,
     pub trailer: Option<Trailer>,
     pub description: String,
 }
@@ -72,9 +71,24 @@ pub struct Trailer {
     pub site: String,
 }
 
-fn deserialize_trailer<'de, D>(d: D) -> Result<Option<Trailer>, D::Error>
-where
-    D: Deserializer<'de>,
-{
-    Deserialize::deserialize(d).map(|x: Option<_>| x.unwrap_or(None))
+impl Anime {
+    pub fn transform_studios(&self) -> Vec<String> {
+        let studios = &self.studios;
+        // let main_studio_index = studios.edges.iter().position(|edge| edge.is_main);
+        let mut main_studio_indices: Vec<usize> = Vec::new();
+
+        for (index, edge) in studios.edges.iter().enumerate() {
+            if edge.is_main {
+                main_studio_indices.push(index);
+            }
+        }
+
+        let mut main_studios: Vec<String> = Vec::new();
+
+        for main_studio_index in main_studio_indices {
+            main_studios.push(studios.nodes[main_studio_index].name.to_string())
+        }
+
+        main_studios
+    }
 }
