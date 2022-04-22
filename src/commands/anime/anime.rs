@@ -1,4 +1,7 @@
+use super::{fetcher::fetcher, model::Anime};
+
 use serenity::{
+    builder::CreateEmbed,
     client::Context,
     framework::standard::{macros::command, Args, CommandResult, Delimiter},
     model::channel::Message,
@@ -6,49 +9,51 @@ use serenity::{
 use tokio::task;
 use tracing::error;
 
-use super::fetcher::fetcher;
-
 #[command]
 async fn anime(ctx: &Context, msg: &Message) -> CommandResult {
     let args = Args::new(&msg.content, &[Delimiter::Single(' ')]);
     let response = task::spawn_blocking(|| fetcher(args)).await?;
 
-    // let title: String = response.title.romaji.to_string();
-    let studios: Vec<String> = response.transform_studios();
+    let msg = msg
+        .channel_id
+        .send_message(&ctx.http, |m| {
+            m.embed(|e| build_message_from_anime(response, e))
+        })
+        .await;
 
-    if let Err(why) = msg.channel_id.say(&ctx.http, studios[0].to_string()).await {
+    if let Err(why) = msg {
         error!("Error sending message: {:?}", why);
     }
 
-    // let msg = msg
-    //     .channel_id
-    //     .send_message(&ctx.http, |m| {
-    //         m.content("Hello, World!")
-    //             .embed(|e| {
-    //                 e.colour(0x00ff00)
-    //                     .title("This is a title")
-    //                     .description("This is a description")
-    //                     .image("attachment://mai.jpg")
-    //                     .fields(vec![
-    //                         ("This is the first field", "This is a field body", true),
-    //                         ("This is the second field", "Both fields are inline", true),
-    //                     ])
-    //                     .field(
-    //                         "This is the third field",
-    //                         "This is not an inline field",
-    //                         false,
-    //                     )
-    //                     .footer(|f| f.text("This is a footer"))
-    //                     .timestamp(chrono::Utc::now())
-    //                     .thumbnail("attachment://mai.jpg")
-    //             })
-    //             .add_file("./mai.jpg")
-    //     })
-    //     .await;
-
-    // if let Err(why) = msg {
-    //     error!("Error sending message: {:?}", why);
-    // }
-
     Ok(())
+}
+
+fn build_message_from_anime(anime: Anime, embed: &mut CreateEmbed) -> &mut CreateEmbed {
+    embed
+        .colour(anime.transform_color())
+        .title(anime.transform_title())
+        .description(anime.transform_description())
+        // .image(anime.cover_image.large.to_string())
+        .fields(vec![
+            ("Type", "Anime", true),
+            ("Status", &anime.transform_status(), true),
+            ("Season", &anime.transform_season(), true),
+        ])
+        .fields(vec![
+            ("Format", &anime.transform_format(), true),
+            ("Episodes", &anime.transform_episodes(), true),
+            ("Duration", &anime.transform_duration(), true),
+        ])
+        .fields(vec![
+            ("Source", &anime.transform_source(), true),
+            ("Average Score", &anime.transform_score(), true),
+        ])
+        .field("Genres", &anime.transform_genres(), false)
+        .field("Studios", &anime.transform_studios(), false)
+        .field("Anilist", &anime.transform_anilist(), false)
+        .field("Streaming At", &anime.transform_links(), false)
+        .field("Trailer", &anime.transform_trailer(), false)
+        .footer(|f| f.text(anime.transform_mal_id()))
+        // .timestamp(chrono::Utc::now())
+        .thumbnail(anime.transform_thumbnail())
 }
