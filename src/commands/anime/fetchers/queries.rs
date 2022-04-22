@@ -9,6 +9,7 @@ query ($id: Int) {
       native
     }
     season
+    seasonYear
     format
     status
     episodes
@@ -57,6 +58,7 @@ query ($search: String) {
       native
     }
     season
+    seasonYear
     format
     status
     episodes
