@@ -1,8 +1,6 @@
-use super::{
-    fetchers::{fetch_by_id, fetch_by_name, queries::*},
-    model::Anime,
-};
-
+use super::fetchers::{fetch_by_id, fetch_by_name, queries::*};
+use crate::models::anime::Anime;
+use crate::models::fetch::FetchResponse;
 use tokio::task;
 
 enum Argument {
@@ -22,12 +20,8 @@ impl Argument {
         };
 
         // TODO: Levenshtein this Shit
-        let serialized_content: serde_json::Value = serde_json::from_str(&fetched_data).unwrap();
-        let serialized_result = serialized_content
-            .get("data")
-            .and_then(|value| value.get("Media"))
-            .unwrap();
-        let result: Anime = serde_json::from_str(&serialized_result.to_string()).unwrap();
+        let fetch_response: FetchResponse = serde_json::from_str(&fetched_data).unwrap();
+        let result: Anime = fetch_response.data.unwrap().media.unwrap();
         result
     }
 }
