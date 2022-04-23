@@ -1,4 +1,5 @@
 mod commands;
+pub mod utils;
 
 use std::env;
 
@@ -15,6 +16,8 @@ use serenity::{
 use tracing::{debug, info, instrument};
 
 use commands::{anime::anime::*, help::*, ping::*};
+
+// TODO: Clean Runtimes
 
 #[hook]
 #[instrument]
@@ -35,6 +38,7 @@ async fn after(_: &Context, _msg: &Message, command_name: &str, command_result: 
     }
 }
 
+// TODO: Add reaction when incorrect
 #[hook]
 #[instrument]
 async fn unknown_command(_: &Context, _msg: &Message, unknown_command_name: &str) {

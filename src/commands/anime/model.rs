@@ -1,5 +1,8 @@
+use html2md::parse_html;
 use serde::Deserialize;
 use titlecase::titlecase;
+
+use crate::utils::formatter::{code, linker};
 
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -20,7 +23,7 @@ pub struct Anime {
     average_score: Option<u32>,
     studios: Option<Studios>,
     site_url: String,
-    pub external_links: Option<Vec<ExternalLinks>>,
+    external_links: Option<Vec<ExternalLinks>>,
     trailer: Option<Trailer>,
     description: String,
 }
@@ -98,20 +101,31 @@ impl Anime {
             None => "".to_string(),
         };
 
-        let return_string = vec![season, year];
-        titlecase(&return_string.join(" ").trim().to_string())
+        let built_string = vec![season, year];
+        let return_string = titlecase(&built_string.join(" ").trim().to_string());
+
+        match return_string {
+            _ if return_string == "" => "-".to_string(),
+            _ => return_string,
+        }
     }
 
     pub fn transform_format(&self) -> String {
         match &self.format {
-            Some(format) => format!("{}", titlecase(&format.to_string())),
+            Some(format) => match format.to_string() {
+                _ if format.to_string() == "TV" => format!("{}", &format.to_string()),
+                _ => format!("{}", titlecase(&format.to_string())),
+            },
             None => format!("-"),
         }
     }
 
     pub fn transform_status(&self) -> String {
         match &self.status {
-            Some(status) => format!("{}", titlecase(&status.to_string())),
+            Some(status) => match status {
+                _ if status.starts_with("NOT") => titlecase(&"Not Released".to_string()),
+                _ => titlecase(&status.to_string()),
+            },
             None => format!("-"),
         }
     }
@@ -131,7 +145,13 @@ impl Anime {
     }
 
     pub fn transform_genres(&self) -> String {
-        titlecase(&self.genres.join(" "))
+        let genres = self
+            .genres
+            .clone()
+            .into_iter()
+            .map(|genre| code(titlecase(&genre)))
+            .collect::<Vec<String>>();
+        genres.join(" - ")
     }
 
     pub fn transform_source(&self) -> String {
@@ -177,7 +197,13 @@ impl Anime {
             main_studios.push(studios.nodes[main_studio_index].name.to_string())
         }
 
-        titlecase(&main_studios.join(" "))
+        let main_studios = main_studios
+            .clone()
+            .into_iter()
+            .map(|studio| code(titlecase(&studio)))
+            .collect::<Vec<String>>();
+
+        main_studios.join(" x ")
     }
 
     pub fn transform_anilist(&self) -> String {
@@ -185,7 +211,6 @@ impl Anime {
     }
 
     pub fn transform_links(&self) -> String {
-        println!("{:#?}", &self.external_links);
         match &self.external_links {
             Some(links) => {
                 if links.is_empty() {
@@ -204,6 +229,16 @@ impl Anime {
                             _ => false,
                         })
                         .collect::<Vec<String>>()
+                        .into_iter()
+                        .map(|link| match link {
+                            _ if link.contains("hbo") => linker("HBO".to_string(), link),
+                            _ if link.contains("netflix") => linker("Netflix".to_string(), link),
+                            _ if link.contains("crunchyroll") => {
+                                linker("Crunchyroll".to_string(), link)
+                            }
+                            _ => "Invalid".to_string(),
+                        })
+                        .collect::<Vec<String>>()
                         .join(" ")
                         .to_string()
                 }
@@ -215,12 +250,15 @@ impl Anime {
     pub fn transform_trailer(&self) -> String {
         match &self.trailer {
             None => String::from("None"),
-            Some(trailer) => format!("https://www.{}.com/watch?v={}", trailer.site, trailer.id),
+            Some(trailer) => {
+                let url: String =
+                    format!("https://www.{}.com/watch?v={}", trailer.site, trailer.id);
+                linker("YouTube".to_string(), url)
+            }
         }
     }
 
     pub fn transform_description(&self) -> String {
-        // self.description.to_string()
-        "Needs HTML Parsing Work".to_string()
+        parse_html(&self.description.to_string())
     }
 }

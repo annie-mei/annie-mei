@@ -28,6 +28,8 @@ async fn anime(ctx: &Context, msg: &Message) -> CommandResult {
     Ok(())
 }
 
+// TODO: Maybe use https://docs.rs/serenity/latest/serenity/model/channel/struct.Message.html
+// and send proper embeds
 fn build_message_from_anime(anime: Anime, embed: &mut CreateEmbed) -> &mut CreateEmbed {
     embed
         .colour(anime.transform_color())
@@ -50,10 +52,11 @@ fn build_message_from_anime(anime: Anime, embed: &mut CreateEmbed) -> &mut Creat
         ])
         .field("Genres", &anime.transform_genres(), false)
         .field("Studios", &anime.transform_studios(), false)
-        .field("Anilist", &anime.transform_anilist(), false)
-        .field("Streaming At", &anime.transform_links(), false)
-        .field("Trailer", &anime.transform_trailer(), false)
+        .fields(vec![
+            ("Streaming", &anime.transform_links(), true),
+            ("Trailer", &anime.transform_trailer(), true),
+        ])
         .footer(|f| f.text(anime.transform_mal_id()))
-        // .timestamp(chrono::Utc::now())
+        .url(&anime.transform_anilist())
         .thumbnail(anime.transform_thumbnail())
 }
