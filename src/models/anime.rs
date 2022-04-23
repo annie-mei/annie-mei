@@ -102,10 +102,10 @@ impl Anime {
         };
 
         let built_string = vec![season, year];
-        let return_string = titlecase(&built_string.join(" ").trim().to_string());
+        let return_string = titlecase(built_string.join(" ").trim());
 
         match return_string {
-            _ if return_string == "" => "-".to_string(),
+            _ if return_string.is_empty() => "-".to_string(),
             _ => return_string,
         }
     }
@@ -113,34 +113,34 @@ impl Anime {
     pub fn transform_format(&self) -> String {
         match &self.format {
             Some(format) => match format.to_string() {
-                _ if format.to_string() == "TV" => format!("{}", &format.to_string()),
-                _ => format!("{}", titlecase(&format.to_string())),
+                _ if *format == "TV" => format.to_string(),
+                _ => titlecase(format),
             },
-            None => format!("-"),
+            None => "-".to_string(),
         }
     }
 
     pub fn transform_status(&self) -> String {
         match &self.status {
             Some(status) => match status {
-                _ if status.starts_with("NOT") => titlecase(&"Not Released".to_string()),
-                _ => titlecase(&status.to_string()),
+                _ if status.starts_with("NOT") => titlecase("Not Released"),
+                _ => titlecase(status),
             },
-            None => format!("-"),
+            None => "-".to_string(),
         }
     }
 
     pub fn transform_episodes(&self) -> String {
         match &self.episodes {
-            Some(episodes) => format!("{}", episodes.to_string()),
-            None => format!("-"),
+            Some(episodes) => episodes.to_string(),
+            None => "-".to_string(),
         }
     }
 
     pub fn transform_duration(&self) -> String {
         match &self.duration {
-            Some(duration) => format!("{} mins", duration.to_string()),
-            None => format!("-"),
+            Some(duration) => format!("{} mins", duration),
+            None => "-".to_string(),
         }
     }
 
@@ -156,14 +156,14 @@ impl Anime {
 
     pub fn transform_source(&self) -> String {
         match &self.source {
-            Some(source) => format!("{}", titlecase(&source.to_string())),
-            None => format!("-"),
+            Some(source) => titlecase(source),
+            None => "-".to_string(),
         }
     }
 
     // CoverImage Transformers
     pub fn transform_color(&self) -> i32 {
-        i32::from_str_radix(&self.cover_image.color.trim_start_matches("#"), 16).unwrap_or(0x0000ff)
+        i32::from_str_radix(self.cover_image.color.trim_start_matches('#'), 16).unwrap_or(0x0000ff)
     }
 
     pub fn transform_thumbnail(&self) -> String {
@@ -172,8 +172,8 @@ impl Anime {
 
     pub fn transform_score(&self) -> String {
         match &self.average_score {
-            Some(score) => format!("{}/100", score.to_string()),
-            None => format!("-"),
+            Some(score) => format!("{}/100", score),
+            None => "-".to_string(),
         }
     }
 
@@ -217,7 +217,7 @@ impl Anime {
                     "-".to_string()
                 } else {
                     links
-                        .into_iter()
+                        .iter()
                         .filter(|link| link.url_type.to_lowercase() == "streaming")
                         .map(|link| link.url.to_string())
                         .collect::<Vec<String>>()
@@ -240,7 +240,6 @@ impl Anime {
                         })
                         .collect::<Vec<String>>()
                         .join(" ")
-                        .to_string()
                 }
             }
             None => "-".to_string(),

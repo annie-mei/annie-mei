@@ -16,7 +16,7 @@ use serenity::{
 };
 use tracing::{debug, info, instrument};
 
-use commands::{anime::anime::*, help::*, ping::*};
+use commands::{anime::command::*, help::*, ping::*};
 
 // TODO: Clean Runtimes
 

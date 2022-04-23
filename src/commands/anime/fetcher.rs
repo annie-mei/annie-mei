@@ -27,11 +27,10 @@ impl Argument {
 }
 
 fn return_argument(arg: &str) -> Argument {
-    let result = match arg.parse::<u32>() {
+    match arg.parse::<u32>() {
         Ok(id) => Argument::Id(id),
         Err(_e) => Argument::Search(arg.to_string()),
-    };
-    result
+    }
 }
 
 #[tokio::main]
