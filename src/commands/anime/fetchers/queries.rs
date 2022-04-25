@@ -58,6 +58,7 @@ query ($page: Int, $perPage: Int, $search: String) {
       perPage
     }
     media(search: $search) {
+      type
       id
       idMal
       title {

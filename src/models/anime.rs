@@ -4,10 +4,12 @@ use titlecase::titlecase;
 
 use crate::utils::formatter::{code, linker};
 
-#[derive(Deserialize)]
+#[derive(Deserialize, Debug, Clone)]
 #[serde(rename_all = "camelCase")]
 
 pub struct Anime {
+    #[serde(rename = "type")]
+    media_type: Option<String>,
     id: u32,
     id_mal: u32,
     title: Title,
@@ -28,14 +30,15 @@ pub struct Anime {
     description: String,
 }
 
-#[derive(Deserialize, Debug)]
+#[derive(Deserialize, Debug, Clone)]
+
 pub struct Title {
     pub romaji: Option<String>,
     pub english: Option<String>,
     pub native: Option<String>,
 }
 
-#[derive(Deserialize, Debug)]
+#[derive(Deserialize, Debug, Clone)]
 #[serde(rename_all = "camelCase")]
 
 pub struct CoverImage {
@@ -45,41 +48,70 @@ pub struct CoverImage {
     pub color: String,
 }
 
-#[derive(Deserialize, Debug)]
+#[derive(Deserialize, Debug, Clone)]
+
 pub struct Studios {
     pub edges: Vec<Edges>,
     pub nodes: Vec<Nodes>,
 }
-#[derive(Deserialize, Debug)]
+#[derive(Deserialize, Debug, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct Edges {
     pub id: u32,
     pub is_main: bool,
 }
 
-#[derive(Deserialize, Debug)]
+#[derive(Deserialize, Debug, Clone)]
+
 pub struct Nodes {
     pub id: u32,
     pub name: String,
 }
 
-#[derive(Deserialize, Debug)]
+#[derive(Deserialize, Debug, Clone)]
+
 pub struct ExternalLinks {
     pub url: String,
     #[serde(alias = "type")]
     pub url_type: String,
 }
 
-#[derive(Deserialize, Debug)]
+#[derive(Deserialize, Debug, Clone)]
+
 pub struct Trailer {
     pub id: String,
     pub site: String,
 }
 
 impl Anime {
+    pub fn get_type(&self) -> String {
+        self.media_type.as_ref().unwrap().to_string()
+    }
+
     pub fn transform_mal_id(&self) -> String {
         format!("https://www.myanimelist.com/anime/{}", self.id_mal)
     }
+
+    pub fn get_english_title(&self) -> String {
+        self.title
+            .english
+            .as_ref()
+            .unwrap_or(&"".to_string())
+            .to_string()
+    }
+
+    pub fn get_romaji_title(&self) -> String {
+        self.title
+            .romaji
+            .as_ref()
+            .unwrap_or(&"".to_string())
+            .to_string()
+    }
+
+    // Will fuzzy work with this?
+    // pub fn get_native_title(&self) -> String {
+    //     self.title.native.unwrap_or("".to_string())
+    // }
 
     pub fn transform_title(&self) -> String {
         match &self.title.romaji {
