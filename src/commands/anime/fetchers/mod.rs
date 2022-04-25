@@ -10,7 +10,7 @@ pub async fn fetch_by_id(query: String, id: u32) -> String {
     let json = json!({"query": query, "variables": {"id":id}});
     let result: String = send_request(json).await;
 
-    info!("Fetched By ID: {:#?}", result);
+    info!("Fetched By ID: {:#?}", id);
 
     result
 }
@@ -20,7 +20,7 @@ pub async fn fetch_by_name(query: String, name: String) -> String {
     let json = json!({"query": query, "variables": {"search":name}});
     let result: String = send_request(json).await;
 
-    info!("Fetched By Name: {:#?}", result);
+    info!("Fetched By Name: {:#?}", name);
 
     result
 }

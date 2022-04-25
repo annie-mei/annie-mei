@@ -1,11 +1,12 @@
 use super::anime::Anime;
+use serde::Deserialize;
 
-#[derive(serde::Deserialize)]
+#[derive(Deserialize, Debug)]
 pub struct FetchResponse {
     pub data: Option<FetchData>,
 }
 
-#[derive(serde::Deserialize)]
+#[derive(Deserialize, Debug)]
 pub struct FetchData {
     #[serde(rename = "Media")]
     pub media: Option<Anime>,

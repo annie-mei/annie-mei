@@ -85,7 +85,7 @@ pub struct Trailer {
 
 impl Anime {
     pub fn get_type(&self) -> String {
-        self.media_type.as_ref().unwrap().to_string()
+        self.media_type.as_ref().unwrap().to_string().to_lowercase()
     }
 
     pub fn transform_mal_id(&self) -> String {
@@ -98,6 +98,7 @@ impl Anime {
             .as_ref()
             .unwrap_or(&"".to_string())
             .to_string()
+            .to_lowercase()
     }
 
     pub fn get_romaji_title(&self) -> String {
@@ -106,6 +107,7 @@ impl Anime {
             .as_ref()
             .unwrap_or(&"".to_string())
             .to_string()
+            .to_lowercase()
     }
 
     // Will fuzzy work with this?
