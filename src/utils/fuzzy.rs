@@ -1,12 +1,13 @@
 use ngrammatic::{CorpusBuilder, Pad, SearchResult};
 use tracing::info;
 
+#[derive(Debug)]
 pub struct FuzzyResponse {
     pub index: usize,
     pub result: SearchResult,
 }
 
-pub fn fuzzy_match_title(
+pub fn fuzzy_matcher(
     pattern: String,
     string_list: Vec<String>,
     threshold: f32,
@@ -22,17 +23,18 @@ pub fn fuzzy_match_title(
         .case_insensitive()
         .finish();
 
-    for title in string_list.iter() {
-        corpus.add_text(title)
+    for string in string_list.iter() {
+        corpus.add_text(string)
     }
 
     let results = corpus.search(&pattern, threshold);
 
     let response: Option<FuzzyResponse> = if results.first().is_some() {
         let top_match = results.first();
+        info!("Top Match: {:#?}", top_match);
         let top_match_index = string_list
             .iter()
-            .position(|title| *title == top_match.unwrap().text)
+            .position(|string| *string.to_lowercase() == top_match.unwrap().text.to_lowercase())
             .unwrap();
         info!("Top Match Index: {:#?}", top_match_index);
         info!("Top Match Similarity: {:#?}", top_match.unwrap().similarity);
@@ -45,4 +47,28 @@ pub fn fuzzy_match_title(
     };
 
     response
+}
+
+pub fn fuzzy_matcher_synonyms(
+    pattern: String,
+    synonyms_list: Vec<Vec<String>>,
+) -> Option<FuzzyResponse> {
+    info!(
+        "Matching {:#?} against Synonyms: {:#?}",
+        pattern, synonyms_list
+    );
+
+    let results: Vec<Option<FuzzyResponse>> = synonyms_list
+        .iter()
+        .map(|synonyms| fuzzy_matcher(pattern.clone(), synonyms.to_vec(), 1.0))
+        .collect();
+
+    let match_index = results.iter().position(|result| result.is_some());
+
+    info!("Synonyms Results:  {:#?}", results);
+
+    match_index.map(|top_match_index| FuzzyResponse {
+        index: top_match_index,
+        result: results[top_match_index].as_ref().unwrap().result.clone(),
+    })
 }

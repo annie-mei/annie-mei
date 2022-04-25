@@ -1,8 +1,7 @@
-use crate::utils::fuzzy::fuzzy_match_title;
-
 use super::anime::Anime;
+use crate::utils::fuzzy::{fuzzy_matcher, fuzzy_matcher_synonyms};
+use log::info;
 use serde::Deserialize;
-use tracing::info;
 
 #[derive(Deserialize, Debug)]
 pub struct FetchResponse {
@@ -53,20 +52,49 @@ impl FetchResponse {
             .collect()
     }
 
-    // TODO: Match Using Synonyms
     pub fn fuzzy_match(&self, user_input: String) -> Anime {
         let name = user_input.to_lowercase();
         let media_list = &self.filter_anime();
         let english_titles: Vec<String> = media_list
             .iter()
-            .filter_map(|media| match media.get_type() {
-                _ if media.get_type() == "anime" => Some(media.get_english_title()),
-                _ => None,
-            })
+            .map(|media| media.get_english_title())
+            .collect();
+        let romaji_titles: Vec<String> = media_list
+            .iter()
+            .map(|media| media.get_romaji_title())
+            .collect();
+        let synonyms: Vec<Vec<String>> = media_list
+            .iter()
+            .map(|media| media.get_synonyms())
             .collect();
 
-        let top_match = fuzzy_match_title(name, english_titles, 0.5).unwrap();
+        let top_english_title_match = fuzzy_matcher(name.clone(), english_titles, 0.5);
+        info!(
+            "English Title match says: {:#?}",
+            media_list[top_english_title_match.as_ref().unwrap().index].get_english_title()
+        );
+        let top_romaji_title_match = fuzzy_matcher(name.clone(), romaji_titles, 0.5);
+        info!(
+            "Romaji Title match says: {:#?}",
+            media_list[top_romaji_title_match.as_ref().unwrap().index].get_english_title()
+        );
+        let top_synonym_match = fuzzy_matcher_synonyms(name, synonyms);
+        info!(
+            "Synonyms match says: {:#?}",
+            media_list[top_synonym_match.as_ref().unwrap().index].get_english_title()
+        );
 
-        media_list[top_match.index].clone()
+        let media_index: usize = match top_english_title_match {
+            Some(match_response) => match match_response.result.similarity {
+                _ if match_response.result.similarity > 0.90 => match_response.index,
+                _ => match top_synonym_match {
+                    Some(synonym_match_response) => synonym_match_response.index,
+                    None => match_response.index,
+                },
+            },
+            None => todo!(),
+        };
+
+        media_list[media_index].clone()
     }
 }
