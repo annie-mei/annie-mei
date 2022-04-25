@@ -1,4 +1,4 @@
-pub const FETCH_BY_ID_QUERY: &str = "
+pub const FETCH_ANIME_BY_ID: &str = "
 query ($id: Int) {
   Media (id: $id, type: ANIME) {
     id
@@ -47,51 +47,61 @@ query ($id: Int) {
 }
 ";
 
-pub const FETCH_BY_SEARCH_QUERY: &str = "
-query ($search: String) {
-  Media (search: $search, type: ANIME) {
-    id
-    idMal
-    title {
-      romaji
-      english
-      native
+pub const FETCH_ANIME: &str = "
+query ($page: Int, $perPage: Int, $search: String) {
+  Page(page: $page, perPage: $perPage) {
+    pageInfo {
+      total
+      currentPage
+      lastPage
+      hasNextPage
+      perPage
     }
-    season
-    seasonYear
-    format
-    status
-    episodes
-    duration
-    genres
-    source
-    coverImage {
-      extraLarge
-      large
-      medium
-      color
-    }
-    averageScore
-    studios {
-      edges {
-        id
-        isMain
-      }
-      nodes {
-        id
-        name
-      }
-    }
-    siteUrl
-    externalLinks {
-      url
-      type
-    }
-    trailer {
+    media(search: $search) {
       id
-      site
+      idMal
+      title {
+        romaji
+        english
+        native
+      }
+      season
+      seasonYear
+      format
+      status
+      episodes
+      duration
+      genres
+      source
+      coverImage {
+        extraLarge
+        large
+        medium
+        color
+      }
+      averageScore
+      studios {
+        edges {
+          id
+          isMain
+        }
+        nodes {
+          id
+          name
+        }
+      }
+      siteUrl
+      externalLinks {
+        url
+        type
+      }
+      trailer {
+        id
+        site
+      }
+      description
     }
-    description
   }
 }
+
 ";

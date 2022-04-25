@@ -1,2 +1,3 @@
 pub mod anime;
-pub mod fetch;
+pub mod anime_id_response;
+pub mod media_list_response;
