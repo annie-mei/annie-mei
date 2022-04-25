@@ -66,6 +66,7 @@ query ($page: Int, $perPage: Int, $search: String) {
         english
         native
       }
+      synonyms
       season
       seasonYear
       format

@@ -13,6 +13,7 @@ pub struct Anime {
     id: u32,
     id_mal: u32,
     title: Title,
+    synonyms: Option<Vec<String>>,
     season: Option<String>,
     season_year: Option<u32>,
     format: Option<String>,
@@ -123,6 +124,10 @@ impl Anime {
                 None => self.title.native.as_ref().unwrap().to_string(),
             },
         }
+    }
+
+    pub fn get_synonyms(&self) -> Vec<String> {
+        self.synonyms.as_ref().unwrap_or(&[].to_vec()).to_vec()
     }
 
     pub fn transform_season(&self) -> String {

@@ -1,5 +1,6 @@
+use crate::utils::fuzzy::fuzzy_match_title;
+
 use super::anime::Anime;
-use ngrammatic::{CorpusBuilder, Pad};
 use serde::Deserialize;
 use tracing::info;
 
@@ -52,10 +53,9 @@ impl FetchResponse {
             .collect()
     }
 
-    // Match Using Synonyms
+    // TODO: Match Using Synonyms
     pub fn fuzzy_match(&self, user_input: String) -> Anime {
         let name = user_input.to_lowercase();
-        info!("{:#?}", self);
         let media_list = &self.filter_anime();
         let english_titles: Vec<String> = media_list
             .iter()
@@ -65,24 +65,8 @@ impl FetchResponse {
             })
             .collect();
 
-        let mut corpus = CorpusBuilder::new().arity(2).pad_full(Pad::Auto).finish();
+        let top_match = fuzzy_match_title(name, english_titles, 0.5).unwrap();
 
-        for title in english_titles.iter() {
-            corpus.add_text(title)
-        }
-
-        let results = corpus.search(&name, 0.25);
-        let top_match = results.first();
-        info!("English Titles: {:#?}", english_titles);
-        info!("Search Results: {:#?}", results);
-        info!("Matching Against: {:#?}", name);
-        info!("Top Match Sim: {:#?}", top_match.unwrap().similarity);
-
-        let top_match_media_index = english_titles
-            .iter()
-            .position(|title| *title == top_match.unwrap().text)
-            .unwrap();
-
-        media_list[top_match_media_index].clone()
+        media_list[top_match.index].clone()
     }
 }
