@@ -11,7 +11,7 @@ pub struct Anime {
     #[serde(rename = "type")]
     media_type: Option<String>,
     id: u32,
-    id_mal: u32,
+    id_mal: Option<u32>,
     title: Title,
     synonyms: Option<Vec<String>>,
     season: Option<String>,
@@ -28,7 +28,7 @@ pub struct Anime {
     site_url: String,
     external_links: Option<Vec<ExternalLinks>>,
     trailer: Option<Trailer>,
-    description: String,
+    description: Option<String>,
 }
 
 #[derive(Deserialize, Debug, Clone)]
@@ -43,10 +43,10 @@ pub struct Title {
 #[serde(rename_all = "camelCase")]
 
 pub struct CoverImage {
-    pub extra_large: String,
-    pub large: String,
-    pub medium: String,
-    pub color: String,
+    pub extra_large: Option<String>,
+    pub large: Option<String>,
+    pub medium: Option<String>,
+    pub color: Option<String>,
 }
 
 #[derive(Deserialize, Debug, Clone)]
@@ -90,7 +90,10 @@ impl Anime {
     }
 
     pub fn transform_mal_id(&self) -> String {
-        format!("https://www.myanimelist.com/anime/{}", self.id_mal)
+        match self.id_mal {
+            Some(mal_id) => format!("https://www.myanimelist.com/anime/{}", mal_id),
+            None => "No MALID".to_string(),
+        }
     }
 
     pub fn get_english_title(&self) -> String {
@@ -116,10 +119,20 @@ impl Anime {
     //     self.title.native.unwrap_or("".to_string())
     // }
 
-    pub fn transform_title(&self) -> String {
+    pub fn transform_romaji_title(&self) -> String {
         match &self.title.romaji {
             Some(title) => title.to_string(),
             None => match &self.title.english {
+                Some(title) => title.to_string(),
+                None => self.title.native.as_ref().unwrap().to_string(),
+            },
+        }
+    }
+
+    pub fn transform_english_title(&self) -> String {
+        match &self.title.english {
+            Some(title) => title.to_string(),
+            None => match &self.title.romaji {
                 Some(title) => title.to_string(),
                 None => self.title.native.as_ref().unwrap().to_string(),
             },
@@ -202,11 +215,31 @@ impl Anime {
 
     // CoverImage Transformers
     pub fn transform_color(&self) -> i32 {
-        i32::from_str_radix(self.cover_image.color.trim_start_matches('#'), 16).unwrap_or(0x0000ff)
+        i32::from_str_radix(
+            self.cover_image
+                .color
+                .as_ref()
+                .unwrap_or(&"#0000ff".to_string())
+                .trim_start_matches('#'),
+            16,
+        )
+        .unwrap_or(0x0000ff)
     }
 
     pub fn transform_thumbnail(&self) -> String {
-        self.cover_image.large.to_string()
+        let extra_large = self.cover_image.extra_large.as_ref();
+        let large = self.cover_image.large.as_ref();
+        let medium = self.cover_image.medium.as_ref();
+
+        if let Some(value) = extra_large {
+            return value.to_string();
+        }
+
+        if let Some(value) = large {
+            return value.to_string();
+        }
+
+        medium.unwrap().to_string()
     }
 
     pub fn transform_score(&self) -> String {
@@ -297,6 +330,10 @@ impl Anime {
     }
 
     pub fn transform_description(&self) -> String {
-        parse_html(&self.description.to_string())
+        parse_html(
+            self.description
+                .as_ref()
+                .unwrap_or(&"<i>No Description Yet<i>".to_string()),
+        )
     }
 }

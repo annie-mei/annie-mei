@@ -29,7 +29,7 @@ impl Argument {
                 let fetch_response: MediaListResponse =
                     serde_json::from_str(&fetched_data).unwrap();
                 info!("Deserialized response: {:#?}", fetch_response);
-                let result: Anime = fetch_response.fuzzy_match(value.to_string());
+                let result: Anime = fetch_response.fuzzy_match(value);
                 info!("Fuzzy Response: {:#?}", result);
                 result
             }

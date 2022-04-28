@@ -33,7 +33,7 @@ async fn anime(ctx: &Context, msg: &Message) -> CommandResult {
 fn build_message_from_anime(anime: Anime, embed: &mut CreateEmbed) -> &mut CreateEmbed {
     embed
         .colour(anime.transform_color())
-        .title(anime.transform_title())
+        .title(anime.transform_romaji_title())
         .description(anime.transform_description())
         // .image(anime.cover_image.large.to_string())
         .fields(vec![
@@ -56,7 +56,7 @@ fn build_message_from_anime(anime: Anime, embed: &mut CreateEmbed) -> &mut Creat
             ("Streaming", &anime.transform_links(), true),
             ("Trailer", &anime.transform_trailer(), true),
         ])
-        .footer(|f| f.text(anime.transform_mal_id()))
+        .footer(|f| f.text(anime.transform_english_title()))
         .url(&anime.transform_anilist())
         .thumbnail(anime.transform_thumbnail())
 }
