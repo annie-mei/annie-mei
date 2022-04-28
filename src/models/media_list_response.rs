@@ -97,7 +97,10 @@ impl FetchResponse {
                 .collect();
             let top_synonym_match = fuzzy_matcher_synonyms(&*name, synonyms).unwrap_or_default();
             match top_synonym_match.index {
-                usize::MAX => media_list[top_match.index].clone(),
+                usize::MAX => match top_match.index {
+                    usize::MAX => media_list[0].clone(),
+                    _ => media_list[top_match.index].clone(),
+                },
                 _ => {
                     info!(
                         "Synonym match says: {:#?}  at Index: {:#?}",
