@@ -76,17 +76,6 @@ impl FetchResponse {
         let need_to_match_synonyms = !(is_english_match_available || is_romaji_match_available)
             || !(is_english_match_good || is_romaji_match_good);
 
-        info!(
-            "English Title match says:  at Index: {:#?}",
-            // media_list[top_english_title_match.index].get_english_title(),
-            top_english_title_match.index
-        );
-        info!(
-            "Romaji Title match says:  at Index: {:#?}",
-            // media_list[top_romaji_title_match.index].get_romaji_title(),
-            top_romaji_title_match.index
-        );
-
         let english_score = top_english_title_match.result.similarity;
         let romaji_score = top_romaji_title_match.result.similarity;
         let top_match = match english_score < romaji_score {
@@ -95,6 +84,11 @@ impl FetchResponse {
         };
 
         if !need_to_match_synonyms {
+            info!(
+                "Title match says: {:#?} at Index: {:#?}",
+                media_list[top_match.index].get_english_title(),
+                top_match.index
+            );
             media_list[top_match.index].clone()
         } else {
             let synonyms: Vec<Vec<String>> = media_list
@@ -114,13 +108,5 @@ impl FetchResponse {
                 }
             }
         }
-
-        // TODO: Return the correct thing
-
-        // info!(
-        //     "Returning: {:#?}",
-        //     media_list[top_english_title_match.index].get_english_title()
-        // );
-        // media_list[top_english_title_match.index].clone()
     }
 }
