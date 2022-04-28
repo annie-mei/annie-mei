@@ -1,14 +1,25 @@
 use ngrammatic::{CorpusBuilder, Pad, SearchResult};
 use tracing::info;
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct FuzzyResponse {
-    pub index: usize,
     pub result: SearchResult,
+    pub index: usize,
+}
+impl Default for FuzzyResponse {
+    fn default() -> Self {
+        FuzzyResponse {
+            index: usize::MAX,
+            result: SearchResult {
+                text: "".to_string(),
+                similarity: 0.0,
+            },
+        }
+    }
 }
 
 pub fn fuzzy_matcher(
-    pattern: String,
+    pattern: &str,
     string_list: Vec<String>,
     threshold: f32,
 ) -> Option<FuzzyResponse> {
@@ -27,7 +38,7 @@ pub fn fuzzy_matcher(
         corpus.add_text(string)
     }
 
-    let results = corpus.search(&pattern, threshold);
+    let results = corpus.search(pattern, threshold);
 
     let response: Option<FuzzyResponse> = if results.first().is_some() {
         let top_match = results.first();
@@ -50,7 +61,7 @@ pub fn fuzzy_matcher(
 }
 
 pub fn fuzzy_matcher_synonyms(
-    pattern: String,
+    pattern: &str,
     synonyms_list: Vec<Vec<String>>,
 ) -> Option<FuzzyResponse> {
     info!(
@@ -60,7 +71,7 @@ pub fn fuzzy_matcher_synonyms(
 
     let results: Vec<Option<FuzzyResponse>> = synonyms_list
         .iter()
-        .map(|synonyms| fuzzy_matcher(pattern.clone(), synonyms.to_vec(), 1.0))
+        .map(|synonyms| fuzzy_matcher(pattern, synonyms.to_vec(), 1.0))
         .collect();
 
     let match_index = results.iter().position(|result| result.is_some());

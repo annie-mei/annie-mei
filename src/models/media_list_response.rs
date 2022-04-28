@@ -52,7 +52,7 @@ impl FetchResponse {
             .collect()
     }
 
-    pub fn fuzzy_match(&self, user_input: String) -> Anime {
+    pub fn fuzzy_match(&self, user_input: &str) -> Anime {
         let name = user_input.to_lowercase();
         let media_list = &self.filter_anime();
         let english_titles: Vec<String> = media_list
@@ -63,38 +63,64 @@ impl FetchResponse {
             .iter()
             .map(|media| media.get_romaji_title())
             .collect();
-        let synonyms: Vec<Vec<String>> = media_list
-            .iter()
-            .map(|media| media.get_synonyms())
-            .collect();
 
-        let top_english_title_match = fuzzy_matcher(name.clone(), english_titles, 0.5);
+        let top_english_title_match =
+            fuzzy_matcher(&*name, english_titles, 0.5).unwrap_or_default();
+        let top_romaji_title_match = fuzzy_matcher(&*name, romaji_titles, 0.5).unwrap_or_default();
+
+        let is_english_match_available = top_english_title_match.index != usize::MAX;
+        let is_english_match_good = top_english_title_match.result.similarity != 0.85;
+        let is_romaji_match_available = top_romaji_title_match.index != usize::MAX;
+        let is_romaji_match_good = top_romaji_title_match.result.similarity != 0.85;
+
+        let need_to_match_synonyms = !(is_english_match_available || is_romaji_match_available)
+            || !(is_english_match_good || is_romaji_match_good);
+
         info!(
-            "English Title match says: {:#?}",
-            media_list[top_english_title_match.as_ref().unwrap().index].get_english_title()
+            "English Title match says:  at Index: {:#?}",
+            // media_list[top_english_title_match.index].get_english_title(),
+            top_english_title_match.index
         );
-        let top_romaji_title_match = fuzzy_matcher(name.clone(), romaji_titles, 0.5);
         info!(
-            "Romaji Title match says: {:#?}",
-            media_list[top_romaji_title_match.as_ref().unwrap().index].get_english_title()
-        );
-        let top_synonym_match = fuzzy_matcher_synonyms(name, synonyms);
-        info!(
-            "Synonyms match says: {:#?}",
-            media_list[top_synonym_match.as_ref().unwrap().index].get_english_title()
+            "Romaji Title match says:  at Index: {:#?}",
+            // media_list[top_romaji_title_match.index].get_romaji_title(),
+            top_romaji_title_match.index
         );
 
-        let media_index: usize = match top_english_title_match {
-            Some(match_response) => match match_response.result.similarity {
-                _ if match_response.result.similarity > 0.90 => match_response.index,
-                _ => match top_synonym_match {
-                    Some(synonym_match_response) => synonym_match_response.index,
-                    None => match_response.index,
-                },
-            },
-            None => todo!(),
+        let english_score = top_english_title_match.result.similarity;
+        let romaji_score = top_romaji_title_match.result.similarity;
+        let top_match = match english_score < romaji_score {
+            true => top_romaji_title_match,
+            false => top_english_title_match,
         };
 
-        media_list[media_index].clone()
+        if !need_to_match_synonyms {
+            media_list[top_match.index].clone()
+        } else {
+            let synonyms: Vec<Vec<String>> = media_list
+                .iter()
+                .map(|media| media.get_synonyms())
+                .collect();
+            let top_synonym_match = fuzzy_matcher_synonyms(&*name, synonyms).unwrap_or_default();
+            match top_synonym_match.index {
+                usize::MAX => media_list[top_match.index].clone(),
+                _ => {
+                    info!(
+                        "Synonym match says: {:#?}  at Index: {:#?}",
+                        media_list[top_synonym_match.index].get_romaji_title(),
+                        top_synonym_match.index
+                    );
+                    media_list[top_synonym_match.index].clone()
+                }
+            }
+        }
+
+        // TODO: Return the correct thing
+
+        // info!(
+        //     "Returning: {:#?}",
+        //     media_list[top_english_title_match.index].get_english_title()
+        // );
+        // media_list[top_english_title_match.index].clone()
     }
 }
