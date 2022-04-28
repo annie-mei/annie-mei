@@ -288,7 +288,7 @@ impl Anime {
                 if links.is_empty() {
                     "-".to_string()
                 } else {
-                    links
+                    let parsed_links = links
                         .iter()
                         .filter(|link| link.url_type.to_lowercase() == "streaming")
                         .map(|link| link.url.to_string())
@@ -311,7 +311,12 @@ impl Anime {
                             _ => "Invalid".to_string(),
                         })
                         .collect::<Vec<String>>()
-                        .join(" ")
+                        .join(" ");
+                    if !parsed_links.is_empty() {
+                        parsed_links
+                    } else {
+                        "-".to_string()
+                    }
                 }
             }
             None => "-".to_string(),
