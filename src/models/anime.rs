@@ -91,11 +91,9 @@ impl Anime {
         self.media_type.as_ref().unwrap().to_string().to_lowercase()
     }
 
-    pub fn transform_mal_id(&self) -> String {
-        match self.id_mal {
-            Some(mal_id) => format!("https://www.myanimelist.com/anime/{}", mal_id),
-            None => "No MALID".to_string(),
-        }
+    pub fn transform_mal_id(&self) -> Option<String> {
+        self.id_mal
+            .map(|mal_id| format!("https://www.myanimelist.net/anime/{}", mal_id))
     }
 
     pub fn get_english_title(&self) -> String {
@@ -331,10 +329,21 @@ impl Anime {
     }
 
     pub fn transform_description(&self) -> String {
-        parse_html(
+        let description = parse_html(
             self.description
                 .as_ref()
                 .unwrap_or(&"<i>No Description Yet<i>".to_string()),
-        )
+        );
+
+        let url = self.transform_mal_id();
+
+        match url {
+            Some(link) => format!(
+                "{}\n\n**{}**",
+                description,
+                linker("MyAnimeList".to_string(), link),
+            ),
+            None => description,
+        }
     }
 }

@@ -43,7 +43,6 @@ fn build_message_from_anime(anime: Anime, embed: &mut CreateEmbed) -> &mut Creat
         .colour(anime.transform_color())
         .title(anime.transform_romaji_title())
         .description(anime.transform_description())
-        // .image(anime.cover_image.large.to_string())
         .fields(vec![
             ("Type", "Anime", true),
             ("Status", &anime.transform_status(), true),
