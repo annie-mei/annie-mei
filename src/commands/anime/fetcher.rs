@@ -15,21 +15,21 @@ enum Argument {
 // TODO: Different fetchers for AniList and MAL
 // MAL has song data
 impl Argument {
-    fn fetch_and_unwrap(&self) -> Anime {
+    fn fetch_and_unwrap(&self) -> Option<Anime> {
         match self {
             Self::Id(value) => {
                 let fetched_data = fetch_by_id(FETCH_ANIME_BY_ID.to_string(), *value);
                 let fetch_response: AnimeIdResponse = serde_json::from_str(&fetched_data).unwrap();
                 info!("Deserialized response: {:#?}", fetch_response);
                 let result: Anime = fetch_response.data.unwrap().media.unwrap();
-                result
+                Some(result)
             }
             Self::Search(value) => {
                 let fetched_data = fetch_by_name(FETCH_ANIME.to_string(), value.to_string());
                 let fetch_response: MediaListResponse =
                     serde_json::from_str(&fetched_data).unwrap();
                 info!("Deserialized response: {:#?}", fetch_response);
-                let result: Anime = fetch_response.fuzzy_match(value);
+                let result: Option<Anime> = fetch_response.fuzzy_match(value);
                 info!("Fuzzy Response: {:#?}", result);
                 result
             }
@@ -66,7 +66,7 @@ fn return_argument(arg: &str) -> Argument {
 // }
 
 #[tokio::main]
-pub async fn fetcher(mut args: serenity::framework::standard::Args) -> Anime {
+pub async fn fetcher(mut args: serenity::framework::standard::Args) -> Option<Anime> {
     // Skips over the first arg because this is the command name
     args.single::<String>().unwrap();
     let args = args.remains().unwrap();

@@ -14,12 +14,20 @@ async fn anime(ctx: &Context, msg: &Message) -> CommandResult {
     let args = Args::new(&msg.content, &[Delimiter::Single(' ')]);
     let response = task::spawn_blocking(|| fetcher(args)).await?;
 
-    let msg = msg
-        .channel_id
-        .send_message(&ctx.http, |m| {
-            m.embed(|e| build_message_from_anime(response, e))
-        })
-        .await;
+    let msg = match response {
+        None => {
+            msg.channel_id
+                .send_message(&ctx.http, |m| m.content("No anime with that name found :("))
+                .await
+        }
+        Some(anime) => {
+            msg.channel_id
+                .send_message(&ctx.http, |m| {
+                    m.embed(|e| build_message_from_anime(anime, e))
+                })
+                .await
+        }
+    };
 
     if let Err(why) = msg {
         error!("Error sending message: {:?}", why);

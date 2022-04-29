@@ -32,6 +32,22 @@ pub struct PageInfo {
 }
 
 impl FetchResponse {
+    pub fn no_results(&self) -> bool {
+        let media_list = self
+            .data
+            .as_ref()
+            .unwrap()
+            .page
+            .as_ref()
+            .unwrap()
+            .media_list
+            .as_ref()
+            .unwrap()
+            .clone();
+
+        media_list.is_empty()
+    }
+
     pub fn filter_anime(&self) -> Vec<Anime> {
         let media_list = self
             .data
@@ -52,7 +68,13 @@ impl FetchResponse {
             .collect()
     }
 
-    pub fn fuzzy_match(&self, user_input: &str) -> Anime {
+    pub fn fuzzy_match(&self, user_input: &str) -> Option<Anime> {
+        let no_result = &self.no_results();
+
+        if *no_result {
+            return None;
+        }
+
         let name = user_input.to_lowercase();
         let media_list = &self.filter_anime();
         let english_titles: Vec<String> = media_list
@@ -89,7 +111,7 @@ impl FetchResponse {
                 media_list[top_match.index].get_english_title(),
                 top_match.index
             );
-            media_list[top_match.index].clone()
+            Some(media_list[top_match.index].clone())
         } else {
             let synonyms: Vec<Vec<String>> = media_list
                 .iter()
@@ -98,8 +120,8 @@ impl FetchResponse {
             let top_synonym_match = fuzzy_matcher_synonyms(&*name, synonyms).unwrap_or_default();
             match top_synonym_match.index {
                 usize::MAX => match top_match.index {
-                    usize::MAX => media_list[0].clone(),
-                    _ => media_list[top_match.index].clone(),
+                    usize::MAX => Some(media_list[0].clone()),
+                    _ => Some(media_list[top_match.index].clone()),
                 },
                 _ => {
                     info!(
@@ -107,7 +129,7 @@ impl FetchResponse {
                         media_list[top_synonym_match.index].get_romaji_title(),
                         top_synonym_match.index
                     );
-                    media_list[top_synonym_match.index].clone()
+                    Some(media_list[top_synonym_match.index].clone())
                 }
             }
         }
