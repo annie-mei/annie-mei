@@ -1,8 +1,10 @@
+use crate::utils::{
+    formatter::{code, linker, remove_underscores_and_titlecase},
+    EMPTY_STR,
+};
 use html2md::parse_html;
 use serde::Deserialize;
 use titlecase::titlecase;
-
-use crate::utils::formatter::{code, linker};
 
 #[derive(Deserialize, Debug, Clone)]
 #[serde(rename_all = "camelCase")]
@@ -157,42 +159,36 @@ impl Anime {
         let return_string = titlecase(built_string.join(" ").trim());
 
         match return_string {
-            _ if return_string.is_empty() => "-".to_string(),
+            _ if return_string.is_empty() => EMPTY_STR.to_string(),
             _ => return_string,
         }
     }
 
     pub fn transform_format(&self) -> String {
         match &self.format {
-            Some(format) => match format.to_string() {
-                _ if *format == "TV" => format.to_string(),
-                _ => titlecase(format),
-            },
-            None => "-".to_string(),
+            Some(format) => remove_underscores_and_titlecase(format),
+            None => EMPTY_STR.to_string(),
         }
     }
 
     pub fn transform_status(&self) -> String {
         match &self.status {
-            Some(status) => match status {
-                _ if status.starts_with("NOT") => titlecase("Not Released"),
-                _ => titlecase(status),
-            },
-            None => "-".to_string(),
+            Some(status) => remove_underscores_and_titlecase(status),
+            None => EMPTY_STR.to_string(),
         }
     }
 
     pub fn transform_episodes(&self) -> String {
         match &self.episodes {
             Some(episodes) => episodes.to_string(),
-            None => "-".to_string(),
+            None => EMPTY_STR.to_string(),
         }
     }
 
     pub fn transform_duration(&self) -> String {
         match &self.duration {
             Some(duration) => format!("{} mins", duration),
-            None => "-".to_string(),
+            None => EMPTY_STR.to_string(),
         }
     }
 
@@ -208,8 +204,8 @@ impl Anime {
 
     pub fn transform_source(&self) -> String {
         match &self.source {
-            Some(source) => titlecase(source),
-            None => "-".to_string(),
+            Some(source) => remove_underscores_and_titlecase(source),
+            None => EMPTY_STR.to_string(),
         }
     }
 
@@ -245,13 +241,13 @@ impl Anime {
     pub fn transform_score(&self) -> String {
         match &self.average_score {
             Some(score) => format!("{}/100", score),
-            None => "-".to_string(),
+            None => EMPTY_STR.to_string(),
         }
     }
 
     pub fn transform_studios(&self) -> String {
         if self.studios.is_none() {
-            return "-".to_string();
+            return EMPTY_STR.to_string();
         }
 
         let studios = &self.studios.as_ref().unwrap();
@@ -286,7 +282,7 @@ impl Anime {
         match &self.external_links {
             Some(links) => {
                 if links.is_empty() {
-                    "-".to_string()
+                    EMPTY_STR.to_string()
                 } else {
                     let parsed_links = links
                         .iter()
@@ -315,11 +311,11 @@ impl Anime {
                     if !parsed_links.is_empty() {
                         parsed_links
                     } else {
-                        "-".to_string()
+                        EMPTY_STR.to_string()
                     }
                 }
             }
-            None => "-".to_string(),
+            None => EMPTY_STR.to_string(),
         }
     }
 
