@@ -56,6 +56,8 @@ fn build_message_from_anime(anime: Anime, embed: &mut CreateEmbed) -> &mut Creat
         .fields(vec![
             ("Source", &anime.transform_source(), true),
             ("Average Score", &anime.transform_score(), true),
+            // ("\u{200b}", &"\u{200b}".to_string(), true),
+            ("Top Tag", &anime.transform_tags(), true),
         ])
         .field("Genres", &anime.transform_genres(), false)
         .field("Studios", &anime.transform_studios(), false)

@@ -1,5 +1,5 @@
 use crate::utils::{
-    formatter::{code, linker, remove_underscores_and_titlecase},
+    formatter::{code, italics, linker, remove_underscores_and_titlecase},
     EMPTY_STR,
 };
 use html2md::parse_html;
@@ -31,6 +31,7 @@ pub struct Anime {
     external_links: Option<Vec<ExternalLinks>>,
     trailer: Option<Trailer>,
     description: Option<String>,
+    tags: Vec<Tag>,
 }
 
 #[derive(Deserialize, Debug, Clone)]
@@ -84,6 +85,11 @@ pub struct ExternalLinks {
 pub struct Trailer {
     pub id: String,
     pub site: String,
+}
+
+#[derive(Deserialize, Debug, Clone)]
+pub struct Tag {
+    pub name: String,
 }
 
 impl Anime {
@@ -344,6 +350,16 @@ impl Anime {
                 linker("MyAnimeList".to_string(), link),
             ),
             None => description,
+        }
+    }
+
+    pub fn transform_tags(&self) -> String {
+        let tags_list = &self.tags;
+
+        if tags_list.is_empty() {
+            EMPTY_STR.to_string()
+        } else {
+            italics(tags_list.first().unwrap().name.to_string())
         }
     }
 }

@@ -102,6 +102,9 @@ query ($page: Int, $perPage: Int, $search: String) {
         site
       }
       description
+      tags {
+        name
+      }
     }
   }
 }
