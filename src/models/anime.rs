@@ -263,6 +263,10 @@ impl Anime {
             }
         }
 
+        if main_studio_indices.is_empty() {
+            main_studio_indices.push(0_usize);
+        }
+
         let mut main_studios: Vec<String> = Vec::new();
 
         for main_studio_index in main_studio_indices {
