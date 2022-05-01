@@ -4,7 +4,6 @@ use crate::models::{
     anime_id_response::FetchResponse as AnimeIdResponse,
     media_list_response::FetchResponse as MediaListResponse,
 };
-use tokio::task;
 use tracing::info;
 
 enum Argument {
@@ -65,17 +64,13 @@ fn return_argument(arg: &str) -> Argument {
 //     }
 // }
 
-#[tokio::main]
-pub async fn fetcher(mut args: serenity::framework::standard::Args) -> Option<Anime> {
+pub fn fetcher(mut args: serenity::framework::standard::Args) -> Option<Anime> {
     // Skips over the first arg because this is the command name
     args.single::<String>().unwrap();
     let args = args.remains().unwrap();
     info!("Found Args: {}", args);
 
     let argument = return_argument(args);
-    let result = task::spawn_blocking(move || argument.fetch_and_unwrap())
-        .await
-        .expect("Fetching Thread Panicked");
 
-    result
+    argument.fetch_and_unwrap()
 }

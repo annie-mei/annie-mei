@@ -1,7 +1,7 @@
-use reqwest::Client;
+use reqwest::blocking::Client;
 use serde_json::Value;
 
-pub async fn send_request(json: Value) -> String {
+pub fn send_request(json: Value) -> String {
     let client = Client::new();
     let response = client
         .post("https://graphql.anilist.co/")
@@ -9,10 +9,8 @@ pub async fn send_request(json: Value) -> String {
         .header("Accept", "application/json")
         .body(json.to_string())
         .send()
-        .await
         .unwrap()
-        .text()
-        .await;
+        .text();
 
     let result = &response.unwrap();
 

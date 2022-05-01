@@ -18,8 +18,6 @@ use tracing::{debug, info, instrument};
 
 use commands::{anime::command::*, help::*, ping::*};
 
-// TODO: Clean Runtimes
-
 #[hook]
 #[instrument]
 async fn before(_: &Context, msg: &Message, command_name: &str) -> bool {
