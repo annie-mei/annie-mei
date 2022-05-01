@@ -60,6 +60,7 @@ fn build_message_from_anime(anime: Anime, embed: &mut CreateEmbed) -> &mut Creat
             ("Top Tag", &anime.transform_tags(), true),
         ])
         .field("Genres", &anime.transform_genres(), false)
+        // TODO: Handle no studios
         .field("Studios", &anime.transform_studios(), false)
         .fields(vec![
             ("Streaming", &anime.transform_links(), true),

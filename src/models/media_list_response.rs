@@ -91,12 +91,18 @@ impl FetchResponse {
         let top_romaji_title_match = fuzzy_matcher(&*name, romaji_titles, 0.5).unwrap_or_default();
 
         let is_english_match_available = top_english_title_match.index != usize::MAX;
-        let is_english_match_good = top_english_title_match.result.similarity != 0.85;
+        let is_english_match_good = top_english_title_match.result.similarity >= 0.85;
         let is_romaji_match_available = top_romaji_title_match.index != usize::MAX;
-        let is_romaji_match_good = top_romaji_title_match.result.similarity != 0.85;
+        let is_romaji_match_good = top_romaji_title_match.result.similarity >= 0.85;
 
-        let need_to_match_synonyms = !(is_english_match_available || is_romaji_match_available)
-            || !(is_english_match_good || is_romaji_match_good);
+        let need_to_match_synonyms = !((is_english_match_available && is_english_match_good)
+            || (is_romaji_match_available && is_romaji_match_good));
+
+        info!("English Match - {:#?}", is_english_match_available);
+        info!("Romaji Match - {:#?}", is_romaji_match_available);
+        info!("English Match Good - {:#?}", is_english_match_good);
+        info!("Romaji Match Good - {:#?}", is_romaji_match_good);
+        info!("Matching Synonyms - {:#?}", need_to_match_synonyms);
 
         let english_score = top_english_title_match.result.similarity;
         let romaji_score = top_romaji_title_match.result.similarity;
