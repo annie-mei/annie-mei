@@ -1,6 +1,7 @@
 pub const FETCH_ANIME_BY_ID: &str = "
 query ($id: Int) {
   Media (id: $id, type: ANIME) {
+    type
     id
     idMal
     title {
@@ -8,6 +9,7 @@ query ($id: Int) {
       english
       native
     }
+    synonyms
     season
     seasonYear
     format
@@ -43,6 +45,9 @@ query ($id: Int) {
       site
     }
     description
+    tags {
+      name
+    }
   }
 }
 ";
