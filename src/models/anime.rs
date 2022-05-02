@@ -286,8 +286,14 @@ impl Anime {
         self.site_url.to_string()
     }
 
+    fn build_animixplay_link(&self) -> Option<String> {
+        self.id_mal
+            .as_ref()
+            .map(|id| format!("https://animixplay.to/anime/{}", id))
+    }
+
     pub fn transform_links(&self) -> String {
-        match &self.external_links {
+        let mut return_string: String = match &self.external_links {
             Some(links) => {
                 if links.is_empty() {
                     EMPTY_STR.to_string()
@@ -324,7 +330,16 @@ impl Anime {
                 }
             }
             None => EMPTY_STR.to_string(),
+        };
+        let animix_link = self.build_animixplay_link();
+        if let Some(url) = animix_link {
+            if return_string == *EMPTY_STR {
+                return_string = linker("AniMixPlay".to_string(), url);
+            } else {
+                return_string.push_str(&format!(" {}", &linker("AniMixPlay".to_string(), url)));
+            }
         }
+        return_string
     }
 
     pub fn transform_trailer(&self) -> String {
