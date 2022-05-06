@@ -13,6 +13,7 @@ use serenity::{
         CommandResult, DispatchError, StandardFramework,
     },
     model::{channel::Message, event::ResumedEvent, gateway::Ready},
+    prelude::*,
 };
 use tracing::{debug, info, instrument};
 
@@ -52,7 +53,7 @@ async fn delay_action(ctx: &Context, msg: &Message) {
 }
 
 #[hook]
-async fn dispatch_error(ctx: &Context, msg: &Message, error: DispatchError) {
+async fn dispatch_error(ctx: &Context, msg: &Message, error: DispatchError, _command_name: &str) {
     if let DispatchError::Ratelimited(info) = error {
         // We notify them only once.
         if info.is_first_try {
@@ -99,8 +100,11 @@ async fn main() {
         .on_dispatch_error(dispatch_error)
         .group(&GENERAL_GROUP);
     let token = env::var("DISCORD_TOKEN").expect("Expected a token in the environment");
+    let intents = GatewayIntents::GUILD_MESSAGES
+        | GatewayIntents::DIRECT_MESSAGES
+        | GatewayIntents::MESSAGE_CONTENT;
 
-    let mut client = Client::builder(&token)
+    let mut client = Client::builder(&token, intents)
         .event_handler(Handler)
         .framework(framework)
         .await
