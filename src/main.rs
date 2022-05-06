@@ -4,7 +4,10 @@ pub mod utils;
 
 use std::env;
 
+use commands::{anime::command::*, help::*, ping::*};
 use dotenv::dotenv;
+use tracing::{debug, info, instrument};
+
 use serenity::{
     async_trait,
     client::{Client, Context, EventHandler},
@@ -14,10 +17,8 @@ use serenity::{
     },
     model::{channel::Message, event::ResumedEvent, gateway::Ready},
     prelude::*,
+    utils::parse_emoji,
 };
-use tracing::{debug, info, instrument};
-
-use commands::{anime::command::*, help::*, ping::*};
 
 #[hook]
 #[instrument]
@@ -41,10 +42,11 @@ async fn after(_: &Context, _msg: &Message, command_name: &str, command_result: 
 // TODO: Add reaction when incorrect
 #[hook]
 #[instrument]
-async fn unknown_command(_: &Context, _msg: &Message, unknown_command_name: &str) {
+async fn unknown_command(ctx: &Context, msg: &Message, unknown_command_name: &str) {
     info!("Could not find command named '{}'", unknown_command_name);
+    let reaction = parse_emoji("<:wtf:953730408158228570>").unwrap();
+    let _ = msg.react(ctx, reaction).await;
 }
-
 // TODO: Figure out how to use this
 #[hook]
 async fn delay_action(ctx: &Context, msg: &Message) {
