@@ -37,6 +37,7 @@ async fn anime(ctx: &Context, msg: &Message) -> CommandResult {
 }
 
 // TODO: Maybe use https://docs.rs/serenity/latest/serenity/model/channel/struct.Message.html
+//                 https://docs.rs/serenity/latest/serenity/model/channel/struct.Embed.html
 // and send proper embeds
 fn build_message_from_anime(anime: Anime, embed: &mut CreateEmbed) -> &mut CreateEmbed {
     embed
@@ -44,27 +45,26 @@ fn build_message_from_anime(anime: Anime, embed: &mut CreateEmbed) -> &mut Creat
         .title(anime.transform_romaji_title())
         .description(anime.transform_description())
         .fields(vec![
-            ("Type", "Anime", true),
-            ("Status", &anime.transform_status(), true),
-            ("Season", &anime.transform_season(), true),
+            ("Type", "Anime", true),                     // Field 0
+            ("Status", &anime.transform_status(), true), // Field 1
+            ("Season", &anime.transform_season(), true), // Field 2
         ])
         .fields(vec![
-            ("Format", &anime.transform_format(), true),
-            ("Episodes", &anime.transform_episodes(), true),
-            ("Duration", &anime.transform_duration(), true),
+            ("Format", &anime.transform_format(), true), // Field 3
+            ("Episodes", &anime.transform_episodes(), true), // Field 4
+            ("Duration", &anime.transform_duration(), true), // Field 5
         ])
         .fields(vec![
-            ("Source", &anime.transform_source(), true),
-            ("Average Score", &anime.transform_score(), true),
-            // ("\u{200b}", &"\u{200b}".to_string(), true),
-            ("Top Tag", &anime.transform_tags(), true),
+            ("Source", &anime.transform_source(), true), // Field 6
+            ("Average Score", &anime.transform_score(), true), // Field 7
+            // ("\u{200b}", &"\u{200b}".to_string(), true), // Would add a blank field
+            ("Top Tag", &anime.transform_tags(), true), // Field 8
         ])
-        .field("Genres", &anime.transform_genres(), false)
-        // TODO: Handle no studios
-        .field("Studios", &anime.transform_studios(), false)
+        .field("Genres", &anime.transform_genres(), false) // Field 9
+        .field("Studios", &anime.transform_studios(), false) // Field 10
         .fields(vec![
-            ("Streaming", &anime.transform_links(), true),
-            ("Trailer", &anime.transform_trailer(), true),
+            ("Streaming", &anime.transform_links(), true), // Field 11
+            ("Trailer", &anime.transform_trailer(), true), // Field 12
         ])
         .footer(|f| f.text(anime.transform_english_title()))
         .url(&anime.transform_anilist())

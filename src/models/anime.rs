@@ -12,6 +12,7 @@ use titlecase::titlecase;
 pub struct Anime {
     #[serde(rename = "type")]
     media_type: Option<String>,
+    #[allow(dead_code)]
     id: u32,
     id_mal: Option<u32>,
     title: Title,

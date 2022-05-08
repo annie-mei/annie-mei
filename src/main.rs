@@ -39,7 +39,7 @@ async fn after(_: &Context, _msg: &Message, command_name: &str, command_result: 
     }
 }
 
-// TODO: Add reaction when incorrect
+// TODO: Add default reaction
 #[hook]
 #[instrument]
 async fn unknown_command(ctx: &Context, msg: &Message, unknown_command_name: &str) {
