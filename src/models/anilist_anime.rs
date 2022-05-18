@@ -98,6 +98,10 @@ impl Anime {
         self.media_type.as_ref().unwrap().to_string().to_lowercase()
     }
 
+    pub fn get_mal_id(&self) -> u32 {
+        self.id_mal.unwrap()
+    }
+
     pub fn transform_mal_id(&self) -> Option<String> {
         self.id_mal
             .map(|mal_id| format!("https://www.myanimelist.net/anime/{}", mal_id))
