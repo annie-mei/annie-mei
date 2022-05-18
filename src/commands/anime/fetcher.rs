@@ -1,5 +1,5 @@
 use super::fetchers::{fetch_by_id, fetch_by_name, queries::*};
-use crate::models::anime::Anime;
+use crate::models::anilist_anime::Anime;
 use crate::models::{
     anime_id_response::FetchResponse as AnimeIdResponse,
     media_list_response::FetchResponse as MediaListResponse,

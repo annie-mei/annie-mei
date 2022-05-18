@@ -1,5 +1,5 @@
 use super::fetcher::fetcher;
-use crate::models::anime::Anime;
+use crate::models::anilist_anime::Anime;
 use serenity::{
     builder::CreateEmbed,
     client::Context,

@@ -1,4 +1,4 @@
-use super::anime::Anime;
+use super::anilist_anime::Anime;
 use crate::utils::fuzzy::{fuzzy_matcher, fuzzy_matcher_synonyms};
 use log::info;
 use serde::Deserialize;

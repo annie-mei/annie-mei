@@ -1,4 +1,4 @@
-use super::anime::Anime;
+use super::anilist_anime::Anime;
 use serde::Deserialize;
 
 #[derive(Deserialize, Debug)]

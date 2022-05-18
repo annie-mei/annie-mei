@@ -204,7 +204,12 @@ impl Anime {
             .into_iter()
             .map(|genre| code(titlecase(&genre)))
             .collect::<Vec<String>>();
-        genres.join(" - ")
+        let genres = genres.join(" - ");
+
+        match genres.is_empty() {
+            true => EMPTY_STR.to_string(),
+            false => genres,
+        }
     }
 
     pub fn transform_source(&self) -> String {
