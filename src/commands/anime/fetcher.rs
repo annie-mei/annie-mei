@@ -43,6 +43,17 @@ fn return_argument(arg: &str) -> Argument {
     }
 }
 
+pub fn fetcher(mut args: serenity::framework::standard::Args) -> Option<Anime> {
+    // Skips over the first arg because this is the command name
+    args.single::<String>().unwrap();
+    let args = args.remains().unwrap();
+    info!("Found Args: {}", args);
+
+    let argument = return_argument(args);
+    argument.fetch_and_unwrap()
+}
+
+// TODO: Custom deserializer?
 // impl serde::Serialize for Argument {
 //     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
 //     where
@@ -63,14 +74,3 @@ fn return_argument(arg: &str) -> Argument {
 //         request.end()
 //     }
 // }
-
-pub fn fetcher(mut args: serenity::framework::standard::Args) -> Option<Anime> {
-    // Skips over the first arg because this is the command name
-    args.single::<String>().unwrap();
-    let args = args.remains().unwrap();
-    info!("Found Args: {}", args);
-
-    let argument = return_argument(args);
-
-    argument.fetch_and_unwrap()
-}
