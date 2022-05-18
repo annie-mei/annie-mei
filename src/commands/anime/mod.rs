@@ -1,3 +1,3 @@
 pub mod command;
-mod fetcher;
+pub(crate) mod fetcher;
 mod fetchers;

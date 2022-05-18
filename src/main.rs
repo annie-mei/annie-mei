@@ -4,7 +4,7 @@ pub mod utils;
 
 use std::env;
 
-use commands::{anime::command::*, help::*, ping::*};
+use commands::{anime::command::*, help::*, ping::*, songs::command::*};
 use dotenv::dotenv;
 use tracing::{debug, info, instrument};
 
@@ -71,7 +71,7 @@ async fn dispatch_error(ctx: &Context, msg: &Message, error: DispatchError, _com
 }
 
 #[group]
-#[commands(help, ping, anime)]
+#[commands(help, ping, anime, songs)]
 struct General;
 
 struct Handler;

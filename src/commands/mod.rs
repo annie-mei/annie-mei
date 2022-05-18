@@ -1,3 +1,4 @@
+pub mod anime;
 pub mod help;
 pub mod ping;
-pub mod anime;
+pub mod songs;
