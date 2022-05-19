@@ -21,14 +21,11 @@ async fn songs(ctx: &Context, msg: &Message) -> CommandResult {
                 .send_message(&ctx.http, |m| m.content("No anime with that name found :("))
                 .await
         }
-        Some(anime) => {
-            // msg.channel_id
-            //     .send_message(&ctx.http, |m| {
-            //         m.embed(|e| build_message_from_anime(anime, e))
-            //     })
-            //     .await
+        Some(song_response) => {
             msg.channel_id
-                .send_message(&ctx.http, |m| m.content("YOYO Honey Sing :("))
+                .send_message(&ctx.http, |m| {
+                    m.embed(|e| build_message_from_song_response(song_response, e))
+                })
                 .await
         }
     };
@@ -43,37 +40,16 @@ async fn songs(ctx: &Context, msg: &Message) -> CommandResult {
 // TODO: Maybe use https://docs.rs/serenity/latest/serenity/model/channel/struct.Message.html
 //                 https://docs.rs/serenity/latest/serenity/model/channel/struct.Embed.html
 // and send proper embeds
-// fn build_message_from_mal_response(
-//     mal_response: MalResponse,
-//     embed: &mut CreateEmbed,
-// ) -> &mut CreateEmbed {
-//     embed
-//         .colour(anime.transform_color())
-//         .title(anime.transform_romaji_title())
-//         .description(anime.transform_description())
-//         .fields(vec![
-//             ("Type", "Anime", true),                     // Field 0
-//             ("Status", &anime.transform_status(), true), // Field 1
-//             ("Season", &anime.transform_season(), true), // Field 2
-//         ])
-//         .fields(vec![
-//             ("Format", &anime.transform_format(), true), // Field 3
-//             ("Episodes", &anime.transform_episodes(), true), // Field 4
-//             ("Duration", &anime.transform_duration(), true), // Field 5
-//         ])
-//         .fields(vec![
-//             ("Source", &anime.transform_source(), true), // Field 6
-//             ("Average Score", &anime.transform_score(), true), // Field 7
-//             // ("\u{200b}", &"\u{200b}".to_string(), true), // Would add a blank field
-//             ("Top Tag", &anime.transform_tags(), true), // Field 8
-//         ])
-//         .field("Genres", &anime.transform_genres(), false) // Field 9
-//         .field("Studios", &anime.transform_studios(), false) // Field 10
-//         .fields(vec![
-//             ("Streaming", &anime.transform_links(), true), // Field 11
-//             ("Trailer", &anime.transform_trailer(), true), // Field 12
-//         ])
-//         .footer(|f| f.text(anime.transform_english_title()))
-//         .url(&anime.transform_anilist())
-//         .thumbnail(anime.transform_thumbnail())
-// }
+fn build_message_from_song_response(
+    mal_response: MalResponse,
+    embed: &mut CreateEmbed,
+) -> &mut CreateEmbed {
+    embed
+        .title(mal_response.transform_title())
+        .field("Openings", "\u{200b}", false)
+        .fields(mal_response.transform_openings())
+        .field("\u{200b}", "\u{200b}", false)
+        .field("Endings", "\u{200b}", false)
+        .fields(mal_response.transform_endings())
+        .thumbnail(mal_response.transform_thumbnail())
+}
