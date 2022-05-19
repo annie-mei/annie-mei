@@ -363,7 +363,7 @@ impl Anime {
         }
     }
 
-    pub fn transform_description(&self) -> String {
+    pub fn transform_description_and_mal_link(&self) -> String {
         let description = parse_html(
             self.description
                 .as_ref()

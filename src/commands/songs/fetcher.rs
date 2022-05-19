@@ -4,9 +4,9 @@ use crate::{
 };
 use tracing::info;
 
-pub fn fetcher(mut args: serenity::framework::standard::Args) -> Option<MalResponse> {
+pub fn fetcher(args: serenity::framework::standard::Args) -> Option<MalResponse> {
     let anime_response = anime_fetcher(args);
-    let mut anime = anime_response.as_ref().unwrap();
+    let anime = anime_response.as_ref().unwrap();
     let mal_fetcher_response: String = my_anime_list::send_request(anime.get_mal_id());
     let mal_response: MalResponse = serde_json::from_str(&mal_fetcher_response).unwrap();
 
