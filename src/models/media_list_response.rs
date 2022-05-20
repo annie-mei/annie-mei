@@ -126,7 +126,10 @@ impl FetchResponse {
             let top_synonym_match = fuzzy_matcher_synonyms(&*name, synonyms).unwrap_or_default();
             match top_synonym_match.index {
                 usize::MAX => match top_match.index {
-                    usize::MAX => Some(media_list[0].clone()),
+                    usize::MAX => match media_list.is_empty() {
+                        true => None,
+                        false => Some(media_list[0].clone()),
+                    },
                     _ => Some(media_list[top_match.index].clone()),
                 },
                 _ => {

@@ -11,8 +11,6 @@ enum Argument {
     Search(String),
 }
 
-// TODO: Different fetchers for AniList and MAL
-// MAL has song data
 impl Argument {
     fn fetch_and_unwrap(&self) -> Option<Anime> {
         match self {
