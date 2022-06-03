@@ -1,9 +1,7 @@
+use crate::utils::formatter::linker;
 use serde::Deserialize;
 
-use crate::commands::songs;
-
 #[derive(Deserialize, Debug, Clone)]
-
 pub struct MalResponse {
     id: u32,
     title: String,
@@ -13,16 +11,16 @@ pub struct MalResponse {
 }
 
 #[derive(Deserialize, Debug, Clone)]
-
 struct MalPicture {
     medium: Option<String>,
     large: Option<String>,
 }
 
 #[derive(Deserialize, Debug, Clone)]
-
 struct SongInfo {
+    #[allow(dead_code)]
     id: u32,
+    #[allow(dead_code)]
     anime_id: u32,
     text: String,
 }
@@ -69,5 +67,10 @@ impl MalResponse {
         }
 
         medium.unwrap().to_string()
+    }
+
+    pub fn transform_mal_link(&self) -> String {
+        let link = format!("https://www.myanimelist.net/anime/{}", self.id);
+        linker("MyAnimeList".to_string(), link)
     }
 }

@@ -52,4 +52,6 @@ fn build_message_from_song_response(
         .field("Endings", "\u{200b}", false)
         .fields(mal_response.transform_endings())
         .thumbnail(mal_response.transform_thumbnail())
+        // TODO: Also Add Anilist Link??
+        .field("\u{200b}", mal_response.transform_mal_link(), false)
 }
