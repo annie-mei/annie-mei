@@ -265,6 +265,11 @@ impl Anime {
         }
 
         let studios = &self.studios.as_ref().unwrap();
+
+        if studios.edges.is_empty() || studios.nodes.is_empty(){
+            return EMPTY_STR.to_string();
+        }
+
         let mut main_studio_indices: Vec<usize> = Vec::new();
 
         for (index, edge) in studios.edges.iter().enumerate() {
