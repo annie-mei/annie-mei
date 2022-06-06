@@ -1,8 +1,10 @@
 use crate::{
-    commands::anime::fetcher::fetcher as anime_fetcher, models::mal_response::MalResponse,
+    models::mal_response::MalResponse,
     utils::my_anime_list_request,
+    utils::response_fetcher::fetcher as anime_fetcher
 };
 use tracing::info;
+
 
 pub fn fetcher(args: serenity::framework::standard::Args) -> Option<MalResponse> {
     let anime_response = anime_fetcher(args);

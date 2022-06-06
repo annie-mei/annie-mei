@@ -1,5 +1,4 @@
-use super::fetcher::fetcher;
-use crate::{models::anilist_anime::Anime, utils::message::{NOT_FOUND_ANIME}};
+use crate::{models::anilist_anime::Anime, utils::{message::NOT_FOUND_ANIME, response_fetcher::fetcher}};
 use serenity::{
     builder::CreateEmbed,
     client::Context,
@@ -36,6 +35,7 @@ async fn anime(ctx: &Context, msg: &Message) -> CommandResult {
     Ok(())
 }
 
+// TODO: Move this to Utils
 // TODO: Maybe use https://docs.rs/serenity/latest/serenity/model/channel/struct.Message.html
 //                 https://docs.rs/serenity/latest/serenity/model/channel/struct.Embed.html
 // and send proper embeds
