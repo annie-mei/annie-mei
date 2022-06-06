@@ -2,7 +2,7 @@ use serde_json::json;
 use tracing::info;
 use wana_kana::{ConvertJapanese, IsJapaneseStr};
 
-use crate::utils::anilist::send_request;
+use crate::utils::anilist_request::send_request;
 
 pub mod queries;
 
