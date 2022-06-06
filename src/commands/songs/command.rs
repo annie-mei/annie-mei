@@ -1,4 +1,4 @@
-use crate::models::mal_response::MalResponse;
+use crate::{models::mal_response::MalResponse, utils::message::NOT_FOUND_ANIME};
 
 use super::fetcher::fetcher as SongFetcher;
 use serenity::{
@@ -18,7 +18,7 @@ async fn songs(ctx: &Context, msg: &Message) -> CommandResult {
     let msg = match response {
         None => {
             msg.channel_id
-                .send_message(&ctx.http, |m| m.content("No anime with that name found :("))
+                .send_message(&ctx.http, |m| m.content(NOT_FOUND_ANIME))
                 .await
         }
         Some(song_response) => {

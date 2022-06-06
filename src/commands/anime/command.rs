@@ -1,5 +1,5 @@
 use super::fetcher::fetcher;
-use crate::models::anilist_anime::Anime;
+use crate::{models::anilist_anime::Anime, utils::message::{NOT_FOUND_ANIME}};
 use serenity::{
     builder::CreateEmbed,
     client::Context,
@@ -17,7 +17,7 @@ async fn anime(ctx: &Context, msg: &Message) -> CommandResult {
     let msg = match response {
         None => {
             msg.channel_id
-                .send_message(&ctx.http, |m| m.content("No anime with that name found :("))
+                .send_message(&ctx.http, |m| m.content(NOT_FOUND_ANIME))
                 .await
         }
         Some(anime) => {
