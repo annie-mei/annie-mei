@@ -4,8 +4,6 @@ use wana_kana::{ConvertJapanese, IsJapaneseStr};
 
 use crate::utils::anilist_request::send_request;
 
-pub mod queries;
-
 pub fn fetch_by_id(query: String, id: u32) -> String {
     let json = json!({"query": query, "variables": {"id":id}});
     let result: String = send_request(json);

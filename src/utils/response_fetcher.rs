@@ -1,9 +1,10 @@
-use super::fetchers::{fetch_by_id, fetch_by_name, queries::*};
+use crate::commands::anime::queries::{FETCH_ANIME_BY_ID, FETCH_ANIME};
 use crate::models::anilist_anime::Anime;
 use crate::models::{
     anime_id_response::FetchResponse as AnimeIdResponse,
     media_list_response::FetchResponse as MediaListResponse,
 };
+use crate::utils::fetchers::fetch_by_arguments::{fetch_by_name, fetch_by_id};
 use tracing::info;
 
 enum Argument {
@@ -11,8 +12,12 @@ enum Argument {
     Search(String),
 }
 
+
+// TODO: Make return type enum(Anime, Manga, Songs)?? ==> Is this idiomatic?
+// TODO: TRAITS CAN BE OVERWRITTEN
 impl Argument {
-    fn fetch_and_unwrap(&self) -> Option<Anime> {
+    // TODO: Make this return a Result?? and add Proper result error handling -> SNAFU
+    fn fetch_and_unwrap(&self, _query_type: &str) -> Option<Anime> {
         match self {
             Self::Id(value) => {
                 let fetched_data = fetch_by_id(FETCH_ANIME_BY_ID.to_string(), *value);
@@ -43,12 +48,15 @@ fn return_argument(arg: &str) -> Argument {
 
 pub fn fetcher(mut args: serenity::framework::standard::Args) -> Option<Anime> {
     // Skips over the first arg because this is the command name
-    args.single::<String>().unwrap();
+    info!("Found Args: {:#?}", args);
+    // TODO: This should be passed as an Enum
+    let query_type= &args.single::<String>().unwrap()[1..];
+    info!("Detected query of type: {:#?}", query_type);
+
     let args = args.remains().unwrap();
-    info!("Found Args: {}", args);
 
     let argument = return_argument(args);
-    argument.fetch_and_unwrap()
+    argument.fetch_and_unwrap(query_type)
 }
 
 // TODO: Custom deserializer?
