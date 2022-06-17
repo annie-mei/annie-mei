@@ -1,4 +1,7 @@
-use crate::{models::anilist_anime::Anime, utils::{message::NOT_FOUND_ANIME, response_fetcher::fetcher}};
+use crate::{
+    models::{anilist_anime::Anime, media_type::MediaType as Type},
+    utils::{message::NOT_FOUND_ANIME, response_fetcher::fetcher},
+};
 use serenity::{
     builder::CreateEmbed,
     client::Context,
@@ -11,7 +14,7 @@ use tracing::error;
 #[command]
 async fn anime(ctx: &Context, msg: &Message) -> CommandResult {
     let args = Args::new(&msg.content, &[Delimiter::Single(' ')]);
-    let response = task::spawn_blocking(|| fetcher(args)).await?;
+    let response = task::spawn_blocking(|| fetcher(Type::Anime, args)).await?;
 
     let msg = match response {
         None => {
