@@ -7,13 +7,13 @@ use crate::models::{
 use crate::utils::fetchers::fetch_by_arguments::{fetch_by_id, fetch_by_name};
 use tracing::info;
 
-pub struct AnimeResponse {
+pub struct AnimeConfig {
     argument: Argument,
     id_query: String,
     search_query: String,
 }
 
-pub struct MangaResponse {
+pub struct MangaConfig {
     argument: Argument,
     id_query: String,
     search_query: String,
@@ -29,9 +29,9 @@ pub trait Response {
     fn fetch(&self) -> Option<Anime>;
 }
 
-impl Response for AnimeResponse {
-    fn new(argument: Argument) -> AnimeResponse {
-        AnimeResponse {
+impl Response for AnimeConfig {
+    fn new(argument: Argument) -> AnimeConfig {
+        AnimeConfig {
             argument,
             id_query: FETCH_ANIME_BY_ID.to_string(),
             search_query: FETCH_ANIME.to_string(),
@@ -45,8 +45,7 @@ impl Response for AnimeResponse {
                 let fetched_data = fetch_by_id(self.id_query.clone(), *value);
                 let fetch_response: AnimeIdResponse = serde_json::from_str(&fetched_data).unwrap();
                 info!("Deserialized response: {:#?}", fetch_response);
-                let result: Anime = fetch_response.data.unwrap().media.unwrap();
-                Some(result)
+                fetch_response.data.unwrap().media
             }
             Argument::Search(value) => {
                 let fetched_data = fetch_by_name(self.search_query.clone(), value.to_string());

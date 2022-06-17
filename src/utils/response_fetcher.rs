@@ -1,6 +1,6 @@
 use crate::models::{
     anilist_anime::Anime,
-    fetcher::{AnimeResponse, Argument, Response},
+    fetcher::{AnimeConfig, Argument, Response},
     media_type::MediaType as Type,
 };
 use tracing::info;
@@ -20,6 +20,6 @@ pub fn fetcher(_media_type: Type, mut args: serenity::framework::standard::Args)
     info!("Found Args: {:#?}", args);
 
     let argument = return_argument(args);
-    let anime_response: AnimeResponse = Response::new(argument);
+    let anime_response: AnimeConfig = Response::new(argument);
     anime_response.fetch()
 }
