@@ -1,5 +1,4 @@
 use crate::models::{
-    anilist_anime::Anime,
     fetcher::{AnimeConfig, Argument, MangaConfig, Response},
     media_type::MediaResponse,
     media_type::MediaType as Type,

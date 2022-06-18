@@ -60,10 +60,7 @@ impl Response for AnimeConfig {
             }
         };
 
-        match response {
-            None => None,
-            Some(anime) => Some(ResponseType::Anime(anime)),
-        }
+        response.map(ResponseType::Anime)
     }
 }
 
@@ -97,10 +94,7 @@ impl Response for MangaConfig {
             }
         };
 
-        match response {
-            None => None,
-            Some(anime) => Some(ResponseType::Manga(anime)),
-        }
+        response.map(ResponseType::Manga)
     }
 }
 
