@@ -2,6 +2,7 @@ use crate::commands::anime::queries::{FETCH_ANIME, FETCH_ANIME_BY_ID};
 use crate::models::anilist_anime::Anime;
 use crate::models::{
     anime_id_response::FetchResponse as AnimeIdResponse,
+    manga_id_response::FetchResponse as MangaIdResponse,
     media_list_response::FetchResponse as MediaListResponse,
 };
 use crate::utils::fetchers::fetch_by_arguments::{fetch_by_id, fetch_by_name};
@@ -38,12 +39,43 @@ impl Response for AnimeConfig {
         }
     }
 
-    // TODO: Move this to default implementation to make it more reusable
+    // TODO: Move parts to default implementation to make it more reusable?
     fn fetch(&self) -> Option<Anime> {
         match &self.argument {
             Argument::Id(value) => {
                 let fetched_data = fetch_by_id(self.id_query.clone(), *value);
                 let fetch_response: AnimeIdResponse = serde_json::from_str(&fetched_data).unwrap();
+                info!("Deserialized response: {:#?}", fetch_response);
+                fetch_response.data.unwrap().media
+            }
+            Argument::Search(value) => {
+                let fetched_data = fetch_by_name(self.search_query.clone(), value.to_string());
+                let fetch_response: MediaListResponse =
+                    serde_json::from_str(&fetched_data).unwrap();
+                info!("Deserialized response: {:#?}", fetch_response);
+                let result: Option<Anime> = fetch_response.fuzzy_match(value);
+                info!("Fuzzy Response: {:#?}", result);
+                result
+            }
+        }
+    }
+}
+
+impl Response for MangaConfig {
+    fn new(argument: Argument) -> MangaConfig {
+        MangaConfig {
+            argument,
+            id_query: FETCH_ANIME_BY_ID.to_string(),
+            search_query: FETCH_ANIME.to_string(),
+        }
+    }
+
+    // TODO: Move parts to default implementation to make it more reusable?
+    fn fetch(&self) -> Option<Anime> {
+        match &self.argument {
+            Argument::Id(value) => {
+                let fetched_data = fetch_by_id(self.id_query.clone(), *value);
+                let fetch_response: MangaIdResponse = serde_json::from_str(&fetched_data).unwrap();
                 info!("Deserialized response: {:#?}", fetch_response);
                 fetch_response.data.unwrap().media
             }
