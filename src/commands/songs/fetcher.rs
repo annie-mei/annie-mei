@@ -11,7 +11,7 @@ pub fn fetcher(args: serenity::framework::standard::Args) -> Option<MalResponse>
         None => None,
         Some(anime) => {
             let mal_fetcher_response: String =
-                my_anime_list_request::send_request(anime.get_mal_id());
+                my_anime_list_request::send_request(anime.anime().get_mal_id());
             let mal_response: MalResponse = serde_json::from_str(&mal_fetcher_response).unwrap();
 
             info!("Mal Response: {:#?}", mal_response);

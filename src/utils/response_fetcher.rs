@@ -1,6 +1,7 @@
 use crate::models::{
     anilist_anime::Anime,
     fetcher::{AnimeConfig, Argument, MangaConfig, Response},
+    media_type::MediaResponse,
     media_type::MediaType as Type,
 };
 use tracing::info;
@@ -12,7 +13,10 @@ fn return_argument(arg: &str) -> Argument {
     }
 }
 
-pub fn fetcher(media_type: Type, mut args: serenity::framework::standard::Args) -> Option<Anime> {
+pub fn fetcher(
+    media_type: Type,
+    mut args: serenity::framework::standard::Args,
+) -> Option<MediaResponse> {
     // Skips over the first arg because this is the command name
     args.single::<String>().unwrap();
 

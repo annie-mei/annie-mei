@@ -4,6 +4,7 @@ use crate::models::{
     anime_id_response::FetchResponse as AnimeIdResponse,
     manga_id_response::FetchResponse as MangaIdResponse,
     media_list_response::FetchResponse as MediaListResponse,
+    media_type::MediaResponse as ResponseType,
 };
 use crate::utils::fetchers::fetch_by_arguments::{fetch_by_id, fetch_by_name};
 use tracing::info;
@@ -27,7 +28,7 @@ pub enum Argument {
 
 pub trait Response {
     fn new(argument: Argument) -> Self;
-    fn fetch(&self) -> Option<Anime>;
+    fn fetch(&self) -> Option<ResponseType>;
 }
 
 impl Response for AnimeConfig {
@@ -40,8 +41,8 @@ impl Response for AnimeConfig {
     }
 
     // TODO: Move parts to default implementation to make it more reusable?
-    fn fetch(&self) -> Option<Anime> {
-        match &self.argument {
+    fn fetch(&self) -> Option<ResponseType> {
+        let response = match &self.argument {
             Argument::Id(value) => {
                 let fetched_data = fetch_by_id(self.id_query.clone(), *value);
                 let fetch_response: AnimeIdResponse = serde_json::from_str(&fetched_data).unwrap();
@@ -57,10 +58,16 @@ impl Response for AnimeConfig {
                 info!("Fuzzy Response: {:#?}", result);
                 result
             }
+        };
+
+        match response {
+            None => None,
+            Some(anime) => Some(ResponseType::Anime(anime)),
         }
     }
 }
 
+// TODO: Figure out whats common and can be moved to make it reusable
 impl Response for MangaConfig {
     fn new(argument: Argument) -> MangaConfig {
         MangaConfig {
@@ -71,8 +78,8 @@ impl Response for MangaConfig {
     }
 
     // TODO: Move parts to default implementation to make it more reusable?
-    fn fetch(&self) -> Option<Anime> {
-        match &self.argument {
+    fn fetch(&self) -> Option<ResponseType> {
+        let response = match &self.argument {
             Argument::Id(value) => {
                 let fetched_data = fetch_by_id(self.id_query.clone(), *value);
                 let fetch_response: MangaIdResponse = serde_json::from_str(&fetched_data).unwrap();
@@ -88,6 +95,11 @@ impl Response for MangaConfig {
                 info!("Fuzzy Response: {:#?}", result);
                 result
             }
+        };
+
+        match response {
+            None => None,
+            Some(anime) => Some(ResponseType::Manga(anime)),
         }
     }
 }
