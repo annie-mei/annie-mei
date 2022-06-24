@@ -1,4 +1,4 @@
-pub const FETCH_ANIME_BY_ID: &str = "
+pub const FETCH_MANGA_BY_ID: &str = "
 query ($id: Int) {
   Media (id: $id, type: ANIME) {
     type
@@ -52,7 +52,7 @@ query ($id: Int) {
 }
 ";
 
-pub const FETCH_ANIME: &str = "
+pub const FETCH_MANGA: &str = "
 query ($page: Int, $perPage: Int, $search: String) {
   Page(page: $page, perPage: $perPage) {
     pageInfo {

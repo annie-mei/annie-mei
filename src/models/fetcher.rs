@@ -1,4 +1,7 @@
-use crate::commands::anime::queries::{FETCH_ANIME, FETCH_ANIME_BY_ID};
+use crate::commands::{
+    anime::queries::{FETCH_ANIME, FETCH_ANIME_BY_ID},
+    manga::queries::{FETCH_MANGA, FETCH_MANGA_BY_ID},
+};
 use crate::models::anilist_anime::Anime;
 use crate::models::{
     anime_id_response::FetchResponse as AnimeIdResponse,
@@ -69,8 +72,8 @@ impl Response for MangaConfig {
     fn new(argument: Argument) -> MangaConfig {
         MangaConfig {
             argument,
-            id_query: FETCH_ANIME_BY_ID.to_string(),
-            search_query: FETCH_ANIME.to_string(),
+            id_query: FETCH_MANGA_BY_ID.to_string(),
+            search_query: FETCH_MANGA.to_string(),
         }
     }
 

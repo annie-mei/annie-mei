@@ -16,7 +16,7 @@ impl MediaResponse {
         if let MediaResponse::Anime(anime) = self {
             anime
         } else {
-            panic!("Not a cat")
+            panic!("Not an Anime")
         }
     }
 
@@ -24,7 +24,7 @@ impl MediaResponse {
         if let MediaResponse::Manga(manga) = self {
             manga
         } else {
-            panic!("Not a cat")
+            panic!("Not a Manga")
         }
     }
 }
