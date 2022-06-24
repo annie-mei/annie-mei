@@ -1,4 +1,4 @@
-use super::anilist_anime::Anime;
+use super::{anilist_anime::Anime, anilist_manga::Manga};
 
 pub enum MediaType {
     Anime,
@@ -8,7 +8,7 @@ pub enum MediaType {
 pub enum MediaResponse {
     Anime(Anime),
     // TODO: Change this to Manga
-    Manga(Anime),
+    Manga(Manga),
 }
 
 impl MediaResponse {
@@ -20,7 +20,7 @@ impl MediaResponse {
         }
     }
 
-    pub fn manga(self) -> Anime {
+    pub fn manga(self) -> Manga {
         if let MediaResponse::Manga(manga) = self {
             manga
         } else {

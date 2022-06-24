@@ -1,6 +1,6 @@
 pub const FETCH_MANGA_BY_ID: &str = "
 query ($id: Int) {
-  Media (id: $id, type: ANIME) {
+  Media (id: $id, type: MANGA) {
     type
     id
     idMal
@@ -10,12 +10,20 @@ query ($id: Int) {
       native
     }
     synonyms
-    season
-    seasonYear
+		startDate {
+		  year
+		  month
+		  day
+		}
+    endDate {
+      year
+      month
+      day
+    }
     format
     status
-    episodes
-    duration
+    chapters
+    volumes
     genres
     source
     coverImage {
@@ -25,24 +33,23 @@ query ($id: Int) {
       color
     }
     averageScore
-    studios {
+    staff {
       edges {
         id
-        isMain
+        role
       }
       nodes {
         id
-        name
+        name {
+          full
+        }
+        siteUrl
       }
     }
     siteUrl
     externalLinks {
       url
       type
-    }
-    trailer {
-      id
-      site
     }
     description
     tags {
@@ -72,12 +79,20 @@ query ($page: Int, $perPage: Int, $search: String) {
         native
       }
       synonyms
-      season
-      seasonYear
+      startDate {
+        year
+        month
+        day
+      }
+      endDate {
+        year
+        month
+        day
+      }
       format
       status
-      episodes
-      duration
+      chapters
+      volumes
       genres
       source
       coverImage {
@@ -87,24 +102,23 @@ query ($page: Int, $perPage: Int, $search: String) {
         color
       }
       averageScore
-      studios {
+      staff {
         edges {
           id
-          isMain
+          role
         }
         nodes {
           id
-          name
+          name {
+            full
+          }
+          siteUrl
         }
       }
       siteUrl
       externalLinks {
         url
         type
-      }
-      trailer {
-        id
-        site
       }
       description
       tags {

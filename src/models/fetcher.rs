@@ -85,15 +85,16 @@ impl Response for MangaConfig {
                 let fetch_response: MangaIdResponse = serde_json::from_str(&fetched_data).unwrap();
                 info!("Deserialized response: {:#?}", fetch_response);
                 fetch_response.data.unwrap().media
-            }
+            } // TODO: Fix this
             Argument::Search(value) => {
-                let fetched_data = fetch_by_name(self.search_query.clone(), value.to_string());
-                let fetch_response: MediaListResponse =
-                    serde_json::from_str(&fetched_data).unwrap();
-                info!("Deserialized response: {:#?}", fetch_response);
-                let result: Option<Anime> = fetch_response.fuzzy_match(value);
-                info!("Fuzzy Response: {:#?}", result);
-                result
+                //   let fetched_data = fetch_by_name(self.search_query.clone(), value.to_string());
+                //   let fetch_response: MediaListResponse =
+                //       serde_json::from_str(&fetched_data).unwrap();
+                //   info!("Deserialized response: {:#?}", fetch_response);
+                //   let result: Option<Manga> = fetch_response.fuzzy_match(value);
+                //   info!("Fuzzy Response: {:#?}", result);
+                //   result
+                None
             }
         };
 

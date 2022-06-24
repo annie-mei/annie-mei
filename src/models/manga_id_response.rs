@@ -1,4 +1,5 @@
-use super::anilist_anime::Anime;
+use super::anilist_manga::Manga;
+
 use serde::Deserialize;
 
 #[derive(Deserialize, Debug)]
@@ -9,5 +10,5 @@ pub struct FetchResponse {
 #[derive(Deserialize, Debug)]
 pub struct FetchData {
     #[serde(rename = "Media")]
-    pub media: Option<Anime>,
+    pub media: Option<Manga>,
 }
