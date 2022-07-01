@@ -64,7 +64,7 @@ fn build_message_from_manga(manga: Manga, embed: &mut CreateEmbed) -> &mut Creat
             ("Top Tag", &manga.transform_tags(), true), // Field 8
         ])
         .field("Genres", &manga.transform_genres(), false) // Field 9
-        // .field("Studios", &manga.transform_studios(), false) // Field 10
+        .field("Staff", &manga.transform_staff(), false) // Field 10
         // TODO: Change this to a reader -> mangaDex?
         .fields(vec![
             ("Streaming", &manga.transform_links(), true), // Field 11

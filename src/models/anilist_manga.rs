@@ -276,44 +276,42 @@ impl Manga {
         }
     }
 
-    // TODO: Make Use Staff data
-    // pub fn transform_studios(&self) -> String {
-    //     if self.studios.is_none() {
-    //         return EMPTY_STR.to_string();
-    //     }
+    pub fn transform_staff(&self) -> String {
+        if self.staff.is_none() {
+            return EMPTY_STR.to_string();
+        }
 
-    //     let studios = &self.studios.as_ref().unwrap();
+        let staff = &self.staff.as_ref().unwrap();
 
-    //     if studios.edges.is_empty() || studios.nodes.is_empty() {
-    //         return EMPTY_STR.to_string();
-    //     }
+        if staff.edges.is_empty() || staff.nodes.is_empty() {
+            return EMPTY_STR.to_string();
+        }
 
-    //     let mut main_studio_indices: Vec<usize> = Vec::new();
+        let mut mangaka_index = 0_usize;
+        let mut artist_index = 0_usize;
 
-    //     for (index, edge) in studios.edges.iter().enumerate() {
-    //         if edge.is_main {
-    //             main_studio_indices.push(index);
-    //         }
-    //     }
+        for (index, edge) in staff.edges.iter().enumerate() {
+            if edge.role.to_lowercase().contains("story") {
+                mangaka_index = index;
+            }
+            if edge.role.to_lowercase().contains("art") {
+                artist_index = index;
+            }
+        }
 
-    //     if main_studio_indices.is_empty() {
-    //         main_studio_indices.push(0_usize);
-    //     }
+        let mangaka_name = staff.nodes[mangaka_index].name.full.to_string();
+        let artist_name = staff.nodes[artist_index].name.full.to_string();
 
-    //     let mut main_studios: Vec<String> = Vec::new();
-
-    //     for main_studio_index in main_studio_indices {
-    //         main_studios.push(studios.nodes[main_studio_index].name.to_string())
-    //     }
-
-    //     let main_studios = main_studios
-    //         .clone()
-    //         .into_iter()
-    //         .map(|studio| code(titlecase(&studio)))
-    //         .collect::<Vec<String>>();
-
-    //     main_studios.join(" x ")
-    // }
+        if mangaka_name == artist_name {
+            code(titlecase(&mangaka_name))
+        } else {
+            format!(
+                "{} x {}",
+                code(titlecase(&mangaka_name)),
+                code(titlecase(&artist_name))
+            )
+        }
+    }
 
     pub fn transform_anilist(&self) -> String {
         self.site_url.to_string()
