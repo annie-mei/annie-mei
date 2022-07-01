@@ -1,15 +1,19 @@
-use crate::commands::{
-    anime::queries::{FETCH_ANIME, FETCH_ANIME_BY_ID},
-    manga::queries::{FETCH_MANGA, FETCH_MANGA_BY_ID},
-};
 use crate::models::anilist_anime::Anime;
 use crate::models::{
     anime_id_response::FetchResponse as AnimeIdResponse,
     manga_id_response::FetchResponse as MangaIdResponse,
-    media_list_response::FetchResponse as MediaListResponse,
+    media_list_anime_response::FetchResponse as MediaListAnime,
+    media_list_manga_response::FetchResponse as MediaListManga,
     media_type::MediaResponse as ResponseType,
 };
 use crate::utils::fetchers::fetch_by_arguments::{fetch_by_id, fetch_by_name};
+use crate::{
+    commands::{
+        anime::queries::{FETCH_ANIME, FETCH_ANIME_BY_ID},
+        manga::queries::{FETCH_MANGA, FETCH_MANGA_BY_ID},
+    },
+    models::anilist_manga::Manga,
+};
 use tracing::info;
 
 pub struct AnimeConfig {
@@ -54,8 +58,7 @@ impl Response for AnimeConfig {
             }
             Argument::Search(value) => {
                 let fetched_data = fetch_by_name(self.search_query.clone(), value.to_string());
-                let fetch_response: MediaListResponse =
-                    serde_json::from_str(&fetched_data).unwrap();
+                let fetch_response: MediaListAnime = serde_json::from_str(&fetched_data).unwrap();
                 info!("Deserialized response: {:#?}", fetch_response);
                 let result: Option<Anime> = fetch_response.fuzzy_match(value);
                 info!("Fuzzy Response: {:#?}", result);
@@ -87,14 +90,13 @@ impl Response for MangaConfig {
                 fetch_response.data.unwrap().media
             } // TODO: Fix this
             Argument::Search(value) => {
-                //   let fetched_data = fetch_by_name(self.search_query.clone(), value.to_string());
-                //   let fetch_response: MediaListResponse =
-                //       serde_json::from_str(&fetched_data).unwrap();
-                //   info!("Deserialized response: {:#?}", fetch_response);
-                //   let result: Option<Manga> = fetch_response.fuzzy_match(value);
-                //   info!("Fuzzy Response: {:#?}", result);
-                //   result
-                None
+                let fetched_data = fetch_by_name(self.search_query.clone(), value.to_string());
+                let fetch_response: MediaListManga = serde_json::from_str(&fetched_data).unwrap();
+                info!("Deserialized response: {:#?}", fetch_response);
+                let result: Option<Manga> = fetch_response.fuzzy_match(value);
+                info!("Fuzzy Response: {:#?}", result);
+                result
+                // None
             }
         };
 

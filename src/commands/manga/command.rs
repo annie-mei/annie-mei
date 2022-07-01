@@ -1,5 +1,5 @@
 use crate::{
-    models::{anilist_anime::Anime, anilist_manga::Manga, media_type::MediaType as Type},
+    models::{anilist_manga::Manga, media_type::MediaType as Type},
     utils::{message::NOT_FOUND_MANGA, response_fetcher::fetcher},
 };
 use serenity::{

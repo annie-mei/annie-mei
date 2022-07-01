@@ -70,6 +70,7 @@ async fn dispatch_error(ctx: &Context, msg: &Message, error: DispatchError, _com
     }
 }
 
+// TODO: Add recommend system
 #[group]
 #[commands(help, ping, anime, manga, songs)]
 struct General;
