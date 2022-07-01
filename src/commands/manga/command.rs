@@ -48,9 +48,9 @@ fn build_message_from_manga(manga: Manga, embed: &mut CreateEmbed) -> &mut Creat
         .title(manga.transform_romaji_title())
         .description(manga.transform_description_and_mal_link())
         .fields(vec![
-            ("Type", "Manga", true),                       // Field 0
-            ("Status", &manga.transform_status(), true),   // Field 1
-            ("Start Date", &manga.transform_date(), true), // Field 2
+            ("Type", "Manga", true),                          // Field 0
+            ("Status", &manga.transform_status(), true),      // Field 1
+            ("Serialization", &manga.transform_date(), true), // Field 2
         ])
         .fields(vec![
             ("Format", &manga.transform_format(), true), // Field 3
@@ -65,7 +65,7 @@ fn build_message_from_manga(manga: Manga, embed: &mut CreateEmbed) -> &mut Creat
         ])
         .field("Genres", &manga.transform_genres(), false) // Field 9
         // .field("Studios", &manga.transform_studios(), false) // Field 10
-        // TODO: Change this to a reader
+        // TODO: Change this to a reader -> mangaDex?
         .fields(vec![
             ("Streaming", &manga.transform_links(), true), // Field 11
         ])

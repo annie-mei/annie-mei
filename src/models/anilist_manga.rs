@@ -5,6 +5,7 @@ use crate::utils::{
 use chrono::NaiveDate;
 use html2md::parse_html;
 use serde::Deserialize;
+use std::fmt::Write;
 use titlecase::titlecase;
 
 #[derive(Deserialize, Debug, Clone)]
@@ -368,7 +369,7 @@ impl Manga {
             if return_string == *EMPTY_STR {
                 return_string = linker("AniMixPlay".to_string(), url);
             } else {
-                return_string.push_str(&format!(" {}", &linker("AniMixPlay".to_string(), url)));
+                write!(return_string, " {}", linker("AniMixPlay".to_string(), url)).unwrap();
             }
         }
         return_string

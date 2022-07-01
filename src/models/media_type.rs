@@ -7,7 +7,6 @@ pub enum MediaType {
 
 pub enum MediaResponse {
     Anime(Anime),
-    // TODO: Change this to Manga
     Manga(Manga),
 }
 
