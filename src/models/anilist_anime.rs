@@ -4,6 +4,7 @@ use crate::utils::{
 };
 use html2md::parse_html;
 use serde::Deserialize;
+use std::fmt::Write;
 use titlecase::titlecase;
 
 #[derive(Deserialize, Debug, Clone)]
@@ -266,7 +267,7 @@ impl Anime {
 
         let studios = &self.studios.as_ref().unwrap();
 
-        if studios.edges.is_empty() || studios.nodes.is_empty(){
+        if studios.edges.is_empty() || studios.nodes.is_empty() {
             return EMPTY_STR.to_string();
         }
 
@@ -351,7 +352,7 @@ impl Anime {
             if return_string == *EMPTY_STR {
                 return_string = linker("AniMixPlay".to_string(), url);
             } else {
-                return_string.push_str(&format!(" {}", &linker("AniMixPlay".to_string(), url)));
+                write!(return_string, " {}", linker("AniMixPlay".to_string(), url)).unwrap();
             }
         }
         return_string
