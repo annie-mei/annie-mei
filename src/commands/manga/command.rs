@@ -65,10 +65,7 @@ fn build_message_from_manga(manga: Manga, embed: &mut CreateEmbed) -> &mut Creat
         ])
         .field("Genres", &manga.transform_genres(), false) // Field 9
         .field("Staff", &manga.transform_staff(), false) // Field 10
-        // TODO: Change this to a reader -> mangaDex?
-        .fields(vec![
-            ("Streaming", &manga.transform_links(), true), // Field 11
-        ])
+        // TODO:Add reader link -> mangaDex? -> HOW TF Do I get this
         .footer(|f| f.text(manga.transform_english_title()))
         .url(&manga.transform_anilist())
         .thumbnail(manga.transform_thumbnail())
