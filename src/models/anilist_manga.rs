@@ -165,9 +165,28 @@ impl Manga {
             start_date.day.unwrap_or(0),
         );
 
-        start_date_string.format("%b %e %Y").to_string()
+        let formatted_start_date = start_date_string.format("%b %e %Y").to_string();
 
-        // TODO: Use End Date
+        let is_end_date_available = if let Some(end_date) = &self.end_date {
+            end_date.year.is_some() && end_date.month.is_some() && end_date.day.is_some()
+        } else {
+            false
+        };
+
+        if is_end_date_available {
+            let end_date = &self.end_date.clone().unwrap();
+            let end_date_string = NaiveDate::from_ymd(
+                end_date.year.unwrap_or(0).try_into().unwrap(),
+                end_date.month.unwrap_or(0),
+                end_date.day.unwrap_or(0),
+            );
+
+            let formatted_end_date = end_date_string.format("%b %e %Y").to_string();
+
+            format!("{} - {}", formatted_start_date, formatted_end_date)
+        } else {
+            formatted_start_date
+        }
     }
 
     pub fn transform_format(&self) -> String {
@@ -193,8 +212,7 @@ impl Manga {
 
     pub fn transform_volumes(&self) -> String {
         match &self.volumes {
-            // TODO: Change this
-            Some(volumes) => format!("{} mins", volumes),
+            Some(volumes) => format!("{}", volumes),
             None => EMPTY_STR.to_string(),
         }
     }
