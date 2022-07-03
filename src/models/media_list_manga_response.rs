@@ -1,4 +1,4 @@
-use super::anilist_manga::Manga;
+use super::{anilist_manga::Manga, transformers::Transformers};
 use crate::utils::fuzzy::{fuzzy_matcher, fuzzy_matcher_synonyms};
 use log::info;
 use serde::Deserialize;
@@ -79,11 +79,11 @@ impl FetchResponse {
         let media_list = &self.filter_manga();
         let english_titles: Vec<String> = media_list
             .iter()
-            .map(|media| media.get_english_title())
+            .map(|media| media.get_english_title().unwrap_or_default())
             .collect();
         let romaji_titles: Vec<String> = media_list
             .iter()
-            .map(|media| media.get_romaji_title())
+            .map(|media| media.get_romaji_title().unwrap_or_default())
             .collect();
 
         let top_english_title_match =
@@ -121,7 +121,7 @@ impl FetchResponse {
         } else {
             let synonyms: Vec<Vec<String>> = media_list
                 .iter()
-                .map(|media| media.get_synonyms())
+                .map(|media| media.get_synonyms().unwrap_or_else(|| [].to_vec()))
                 .collect();
             let top_synonym_match = fuzzy_matcher_synonyms(&*name, synonyms).unwrap_or_default();
             match top_synonym_match.index {
