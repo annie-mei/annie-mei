@@ -1,4 +1,4 @@
-use titlecase::titlecase;
+use titlecase::titlecase as imported_titlecase;
 
 pub fn bold(input: String) -> String {
     format!("**{}**", input)
@@ -25,4 +25,8 @@ pub fn remove_underscores_and_titlecase(text: &str) -> String {
         "TV" | "OVA" | "ONA" => text.to_string(),
         _ => titlecase(&text.split('_').collect::<Vec<&str>>().join(" ")),
     }
+}
+
+pub fn titlecase(text: &str) -> String {
+    imported_titlecase(text)
 }
