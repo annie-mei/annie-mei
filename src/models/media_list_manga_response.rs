@@ -3,6 +3,7 @@ use crate::utils::fuzzy::{fuzzy_matcher, fuzzy_matcher_synonyms};
 use log::info;
 use serde::Deserialize;
 
+// TODO: Use generics to reuse these things in both anime and manga
 #[derive(Deserialize, Debug)]
 pub struct FetchResponse {
     pub data: Option<Page>,
