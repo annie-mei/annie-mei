@@ -1,8 +1,11 @@
+use super::{
+    anilist_common::{CoverImage, ExternalLinks, Tag, Title},
+    transformers::Transformers,
+};
 use crate::utils::{
-    formatter::{code, italics, linker, remove_underscores_and_titlecase},
+    formatter::{code, linker},
     EMPTY_STR,
 };
-use html2md::parse_html;
 use serde::Deserialize;
 use std::fmt::Write;
 use titlecase::titlecase;
@@ -38,24 +41,6 @@ pub struct Anime {
 
 #[derive(Deserialize, Debug, Clone)]
 
-pub struct Title {
-    pub romaji: Option<String>,
-    pub english: Option<String>,
-    pub native: Option<String>,
-}
-
-#[derive(Deserialize, Debug, Clone)]
-#[serde(rename_all = "camelCase")]
-
-pub struct CoverImage {
-    pub extra_large: Option<String>,
-    pub large: Option<String>,
-    pub medium: Option<String>,
-    pub color: Option<String>,
-}
-
-#[derive(Deserialize, Debug, Clone)]
-
 pub struct Studios {
     pub edges: Vec<Edges>,
     pub nodes: Vec<Nodes>,
@@ -76,85 +61,12 @@ pub struct Nodes {
 
 #[derive(Deserialize, Debug, Clone)]
 
-pub struct ExternalLinks {
-    pub url: String,
-    #[serde(alias = "type")]
-    pub url_type: String,
-}
-
-#[derive(Deserialize, Debug, Clone)]
-
 pub struct Trailer {
     pub id: String,
     pub site: String,
 }
 
-#[derive(Deserialize, Debug, Clone)]
-pub struct Tag {
-    pub name: String,
-}
-
 impl Anime {
-    pub fn get_type(&self) -> String {
-        self.media_type.as_ref().unwrap().to_string().to_lowercase()
-    }
-
-    pub fn get_mal_id(&self) -> u32 {
-        self.id_mal.unwrap()
-    }
-
-    pub fn transform_mal_id(&self) -> Option<String> {
-        self.id_mal
-            .map(|mal_id| format!("https://www.myanimelist.net/anime/{}", mal_id))
-    }
-
-    pub fn get_english_title(&self) -> String {
-        self.title
-            .english
-            .as_ref()
-            .unwrap_or(&"".to_string())
-            .to_string()
-            .to_lowercase()
-    }
-
-    pub fn get_romaji_title(&self) -> String {
-        self.title
-            .romaji
-            .as_ref()
-            .unwrap_or(&"".to_string())
-            .to_string()
-            .to_lowercase()
-    }
-
-    // Will fuzzy work with this?
-    // pub fn get_native_title(&self) -> String {
-    //     self.title.native.unwrap_or("".to_string())
-    // }
-
-    pub fn transform_romaji_title(&self) -> String {
-        match &self.title.romaji {
-            Some(title) => title.to_string(),
-            None => match &self.title.english {
-                Some(title) => title.to_string(),
-                None => self.title.native.as_ref().unwrap().to_string(),
-            },
-        }
-    }
-
-    pub fn transform_english_title(&self) -> String {
-        match &self.title.english {
-            Some(title) => title.to_string(),
-            None => match &self.title.romaji {
-                Some(title) => title.to_string(),
-                None => self.title.native.as_ref().unwrap().to_string(),
-            },
-        }
-    }
-
-    pub fn get_synonyms(&self) -> Vec<String> {
-        self.synonyms.as_ref().unwrap_or(&[].to_vec()).to_vec()
-    }
-
     pub fn transform_season(&self) -> String {
         let season = match &self.season {
             Some(season) => season.to_string(),
@@ -174,20 +86,6 @@ impl Anime {
         }
     }
 
-    pub fn transform_format(&self) -> String {
-        match &self.format {
-            Some(format) => remove_underscores_and_titlecase(format),
-            None => EMPTY_STR.to_string(),
-        }
-    }
-
-    pub fn transform_status(&self) -> String {
-        match &self.status {
-            Some(status) => remove_underscores_and_titlecase(status),
-            None => EMPTY_STR.to_string(),
-        }
-    }
-
     pub fn transform_episodes(&self) -> String {
         match &self.episodes {
             Some(episodes) => episodes.to_string(),
@@ -198,64 +96,6 @@ impl Anime {
     pub fn transform_duration(&self) -> String {
         match &self.duration {
             Some(duration) => format!("{} mins", duration),
-            None => EMPTY_STR.to_string(),
-        }
-    }
-
-    pub fn transform_genres(&self) -> String {
-        let genres = self
-            .genres
-            .clone()
-            .into_iter()
-            .map(|genre| code(titlecase(&genre)))
-            .collect::<Vec<String>>();
-        let genres = genres.join(" - ");
-
-        match genres.is_empty() {
-            true => EMPTY_STR.to_string(),
-            false => genres,
-        }
-    }
-
-    pub fn transform_source(&self) -> String {
-        match &self.source {
-            Some(source) => remove_underscores_and_titlecase(source),
-            None => EMPTY_STR.to_string(),
-        }
-    }
-
-    // CoverImage Transformers
-    pub fn transform_color(&self) -> i32 {
-        i32::from_str_radix(
-            self.cover_image
-                .color
-                .as_ref()
-                .unwrap_or(&"#0000ff".to_string())
-                .trim_start_matches('#'),
-            16,
-        )
-        .unwrap_or(0x0000ff)
-    }
-
-    pub fn transform_thumbnail(&self) -> String {
-        let extra_large = self.cover_image.extra_large.as_ref();
-        let large = self.cover_image.large.as_ref();
-        let medium = self.cover_image.medium.as_ref();
-
-        if let Some(value) = extra_large {
-            return value.to_string();
-        }
-
-        if let Some(value) = large {
-            return value.to_string();
-        }
-
-        medium.unwrap().to_string()
-    }
-
-    pub fn transform_score(&self) -> String {
-        match &self.average_score {
-            Some(score) => format!("{}/100", score),
             None => EMPTY_STR.to_string(),
         }
     }
@@ -296,10 +136,6 @@ impl Anime {
             .collect::<Vec<String>>();
 
         main_studios.join(" x ")
-    }
-
-    pub fn transform_anilist(&self) -> String {
-        self.site_url.to_string()
     }
 
     fn build_animixplay_link(&self) -> Option<String> {
@@ -368,33 +204,71 @@ impl Anime {
             }
         }
     }
+}
 
-    pub fn transform_description_and_mal_link(&self) -> String {
-        let description = parse_html(
-            self.description
-                .as_ref()
-                .unwrap_or(&"<i>No Description Yet<i>".to_string()),
-        );
-
-        let url = self.transform_mal_id();
-
-        match url {
-            Some(link) => format!(
-                "{}\n\n**{}**",
-                description,
-                linker("MyAnimeList".to_string(), link),
-            ),
-            None => description,
-        }
+impl Transformers for Anime {
+    fn get_type(&self) -> String {
+        self.media_type.as_ref().unwrap().to_string().to_lowercase()
     }
 
-    pub fn transform_tags(&self) -> String {
-        let tags_list = &self.tags;
+    fn get_mal_id(&self) -> Option<u32> {
+        self.id_mal
+    }
 
-        if tags_list.is_empty() {
-            EMPTY_STR.to_string()
-        } else {
-            italics(tags_list.first().unwrap().name.to_string())
-        }
+    fn get_english_title(&self) -> Option<String> {
+        self.title.english.to_owned()
+    }
+
+    fn get_romaji_title(&self) -> Option<String> {
+        self.title.romaji.to_owned()
+    }
+
+    fn get_native_title(&self) -> Option<String> {
+        self.title.native.to_owned()
+    }
+
+    fn get_synonyms(&self) -> Option<Vec<String>> {
+        self.synonyms.to_owned()
+    }
+
+    fn get_format(&self) -> Option<String> {
+        self.format.to_owned()
+    }
+
+    fn get_status(&self) -> Option<String> {
+        self.status.to_owned()
+    }
+
+    fn get_genres(&self) -> Vec<String> {
+        self.genres.to_owned()
+    }
+
+    fn get_source(&self) -> Option<String> {
+        self.source.to_owned()
+    }
+
+    fn get_cover_image(&self) -> CoverImage {
+        self.cover_image.to_owned()
+    }
+
+    fn get_average_score(&self) -> Option<u32> {
+        self.average_score.to_owned()
+    }
+
+    fn get_site_url(&self) -> String {
+        self.site_url.to_owned()
+    }
+
+    fn get_description(&self) -> Option<String> {
+        self.description.to_owned()
+    }
+
+    fn get_tags(&self) -> Vec<Tag> {
+        self.tags.to_owned()
+    }
+
+    fn transform_mal_id(&self) -> Option<String> {
+        self.id_mal
+            .map(|mal_id| format!("https://www.myanimelist.net/anime/{}", mal_id))
     }
 }

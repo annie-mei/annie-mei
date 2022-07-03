@@ -1,5 +1,5 @@
 use crate::{
-    models::{anilist_anime::Anime, media_type::MediaType as Type},
+    models::{anilist_anime::Anime, media_type::MediaType as Type, transformers::Transformers},
     utils::{message::NOT_FOUND_ANIME, response_fetcher::fetcher},
 };
 use serenity::{
