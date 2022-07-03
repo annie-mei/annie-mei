@@ -3,12 +3,11 @@ use super::{
     transformers::Transformers,
 };
 use crate::utils::{
-    formatter::{code, linker},
+    formatter::{code, linker, titlecase},
     EMPTY_STR,
 };
 use serde::Deserialize;
 use std::fmt::Write;
-use titlecase::titlecase;
 
 #[derive(Deserialize, Debug, Clone)]
 #[serde(rename_all = "camelCase")]
