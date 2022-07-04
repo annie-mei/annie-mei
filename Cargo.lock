@@ -849,9 +849,9 @@ checksum = "e4a24736216ec316047a1fc4252e27dabb04218aa4a3f37c6e7ddbf1f9782b54"
 
 [[package]]
 name = "ngrammatic"
-version = "0.3.5"
+version = "0.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c06d3ef4b3f5865a560b7799a0d7978eb2e80a9ee6b8d9444b30d6e718e76991"
+checksum = "3c6f2f987e82da7fb8a290e959bba528638bc0e2629e38647591e845ecb5f6fe"
 
 [[package]]
 name = "num-integer"
