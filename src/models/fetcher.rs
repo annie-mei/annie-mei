@@ -1,7 +1,5 @@
-use crate::models::anilist_anime::Anime;
 use crate::models::{
-    anime_id_response::FetchResponse as AnimeIdResponse,
-    manga_id_response::FetchResponse as MangaIdResponse,
+    id_response::FetchResponse as IdResponse,
     media_list_anime_response::FetchResponse as MediaListAnime,
     media_list_manga_response::FetchResponse as MediaListManga,
     media_type::MediaResponse as ResponseType,
@@ -12,7 +10,7 @@ use crate::{
         anime::queries::{FETCH_ANIME, FETCH_ANIME_BY_ID},
         manga::queries::{FETCH_MANGA, FETCH_MANGA_BY_ID},
     },
-    models::anilist_manga::Manga,
+    models::{anilist_anime::Anime, anilist_manga::Manga},
 };
 use tracing::info;
 
@@ -52,7 +50,8 @@ impl Response for AnimeConfig {
         let response = match &self.argument {
             Argument::Id(value) => {
                 let fetched_data = fetch_by_id(self.id_query.clone(), *value);
-                let fetch_response: AnimeIdResponse = serde_json::from_str(&fetched_data).unwrap();
+                let fetch_response: IdResponse<Anime> =
+                    serde_json::from_str(&fetched_data).unwrap();
                 info!("Deserialized response: {:#?}", fetch_response);
                 fetch_response.data.unwrap().media
             }
@@ -85,10 +84,11 @@ impl Response for MangaConfig {
         let response = match &self.argument {
             Argument::Id(value) => {
                 let fetched_data = fetch_by_id(self.id_query.clone(), *value);
-                let fetch_response: MangaIdResponse = serde_json::from_str(&fetched_data).unwrap();
+                let fetch_response: IdResponse<Manga> =
+                    serde_json::from_str(&fetched_data).unwrap();
                 info!("Deserialized response: {:#?}", fetch_response);
                 fetch_response.data.unwrap().media
-            } // TODO: Fix this
+            }
             Argument::Search(value) => {
                 let fetched_data = fetch_by_name(self.search_query.clone(), value.to_string());
                 let fetch_response: MediaListManga = serde_json::from_str(&fetched_data).unwrap();
@@ -103,8 +103,6 @@ impl Response for MangaConfig {
         response.map(ResponseType::Manga)
     }
 }
-
-// TODO: Make return type enum(Anime, Manga) ==> MediaType?? ==> Is this idiomatic?
 
 // TODO: Custom deserializer?
 // impl serde::Serialize for Argument {
