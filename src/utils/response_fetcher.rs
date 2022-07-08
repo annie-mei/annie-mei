@@ -27,11 +27,11 @@ pub fn fetcher(
     match media_type {
         Type::Anime => {
             let anime_response: AnimeConfig = Response::new(argument);
-            anime_response.fetch()
+            anime_response.fetch(media_type)
         }
         Type::Manga => {
             let manga_response: MangaConfig = Response::new(argument);
-            manga_response.fetch()
+            manga_response.fetch(media_type)
         }
     }
 }

@@ -1,8 +1,6 @@
 use crate::models::{
-    id_response::FetchResponse as IdResponse,
-    media_list_anime_response::FetchResponse as MediaListAnime,
-    media_list_manga_response::FetchResponse as MediaListManga,
-    media_type::MediaResponse as ResponseType,
+    id_response::FetchResponse as IdResponse, media_list_response::FetchResponse as MediaListManga,
+    media_type::MediaResponse as ResponseType, media_type::MediaType as Type,
 };
 use crate::utils::fetchers::fetch_by_arguments::{fetch_by_id, fetch_by_name};
 use crate::{
@@ -33,7 +31,7 @@ pub enum Argument {
 
 pub trait Response {
     fn new(argument: Argument) -> Self;
-    fn fetch(&self) -> Option<ResponseType>;
+    fn fetch(&self, media_type: Type) -> Option<ResponseType>;
 }
 
 impl Response for AnimeConfig {
@@ -46,7 +44,7 @@ impl Response for AnimeConfig {
     }
 
     // TODO: Move parts to default implementation to make it more reusable?
-    fn fetch(&self) -> Option<ResponseType> {
+    fn fetch(&self, media_type: Type) -> Option<ResponseType> {
         let response = match &self.argument {
             Argument::Id(value) => {
                 let fetched_data = fetch_by_id(self.id_query.clone(), *value);
@@ -57,9 +55,10 @@ impl Response for AnimeConfig {
             }
             Argument::Search(value) => {
                 let fetched_data = fetch_by_name(self.search_query.clone(), value.to_string());
-                let fetch_response: MediaListAnime = serde_json::from_str(&fetched_data).unwrap();
+                let fetch_response: MediaListManga<Anime> =
+                    serde_json::from_str(&fetched_data).unwrap();
                 info!("Deserialized response: {:#?}", fetch_response);
-                let result: Option<Anime> = fetch_response.fuzzy_match(value);
+                let result: Option<Anime> = fetch_response.fuzzy_match(value, media_type);
                 info!("Fuzzy Response: {:#?}", result);
                 result
             }
@@ -80,7 +79,7 @@ impl Response for MangaConfig {
     }
 
     // TODO: Move parts to default implementation to make it more reusable?
-    fn fetch(&self) -> Option<ResponseType> {
+    fn fetch(&self, media_type: Type) -> Option<ResponseType> {
         let response = match &self.argument {
             Argument::Id(value) => {
                 let fetched_data = fetch_by_id(self.id_query.clone(), *value);
@@ -91,9 +90,10 @@ impl Response for MangaConfig {
             }
             Argument::Search(value) => {
                 let fetched_data = fetch_by_name(self.search_query.clone(), value.to_string());
-                let fetch_response: MediaListManga = serde_json::from_str(&fetched_data).unwrap();
+                let fetch_response: MediaListManga<Manga> =
+                    serde_json::from_str(&fetched_data).unwrap();
                 info!("Deserialized response: {:#?}", fetch_response);
-                let result: Option<Manga> = fetch_response.fuzzy_match(value);
+                let result: Option<Manga> = fetch_response.fuzzy_match(value, media_type);
                 info!("Fuzzy Response: {:#?}", result);
                 result
                 // None

@@ -1,25 +1,24 @@
-use super::{anilist_manga::Manga, transformers::Transformers};
+use super::{media_type::MediaType, transformers::Transformers};
 use crate::utils::fuzzy::{fuzzy_matcher, fuzzy_matcher_synonyms};
 use log::info;
 use serde::Deserialize;
 
-// TODO: Use generics to reuse these things in both anime and manga
 #[derive(Deserialize, Debug)]
-pub struct FetchResponse {
-    pub data: Option<Page>,
+pub struct FetchResponse<T> {
+    pub data: Option<Page<T>>,
 }
 
 #[derive(Deserialize, Debug)]
-pub struct Page {
+pub struct Page<T> {
     #[serde(rename = "Page")]
-    pub page: Option<PageData>,
+    pub page: Option<PageData<T>>,
 }
 #[derive(Deserialize, Debug)]
 #[serde(rename_all = "camelCase")]
-pub struct PageData {
+pub struct PageData<T> {
     pub page_info: Option<PageInfo>,
     #[serde(rename = "media")]
-    pub media_list: Option<Vec<Manga>>,
+    pub media_list: Option<Vec<T>>,
 }
 
 #[derive(Deserialize, Debug)]
@@ -32,7 +31,7 @@ pub struct PageInfo {
     pub per_page: Option<u32>,
 }
 
-impl FetchResponse {
+impl<T: Transformers + std::clone::Clone> FetchResponse<T> {
     pub fn no_results(&self) -> bool {
         let media_list = self
             .data
@@ -49,7 +48,7 @@ impl FetchResponse {
         media_list.is_empty()
     }
 
-    pub fn filter_manga(&self) -> Vec<Manga> {
+    pub fn filter(&self, media_type: MediaType) -> Vec<T> {
         let media_list = self
             .data
             .as_ref()
@@ -64,12 +63,15 @@ impl FetchResponse {
 
         media_list
             .iter()
-            .filter(|media| media.get_type() == "manga")
+            .filter(|media| match media_type {
+                MediaType::Anime => media.get_type() == "anime",
+                MediaType::Manga => media.get_type() == "manga",
+            })
             .cloned()
             .collect()
     }
 
-    pub fn fuzzy_match(&self, user_input: &str) -> Option<Manga> {
+    pub fn fuzzy_match(&self, user_input: &str, media_type: MediaType) -> Option<T> {
         let no_result = &self.no_results();
 
         if *no_result {
@@ -77,7 +79,7 @@ impl FetchResponse {
         }
 
         let name = user_input.to_lowercase();
-        let media_list = &self.filter_manga();
+        let media_list = &self.filter(media_type);
         let english_titles: Vec<String> = media_list
             .iter()
             .map(|media| media.get_english_title().unwrap_or_default())
