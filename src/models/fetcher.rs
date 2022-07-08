@@ -96,7 +96,6 @@ impl Response for MangaConfig {
                 let result: Option<Manga> = fetch_response.fuzzy_match(value, media_type);
                 info!("Fuzzy Response: {:#?}", result);
                 result
-                // None
             }
         };
 
