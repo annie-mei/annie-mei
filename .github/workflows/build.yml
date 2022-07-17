@@ -14,7 +14,6 @@ jobs:
 
     steps:
     - uses: actions-rs/cargo@v1
-    - name: Build for Rasperry PI
       with:
         use-cross: true
         command: build
