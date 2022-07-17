@@ -15,4 +15,4 @@ jobs:
     steps:
     - uses: actions/checkout@v3
     - name: Build
-      run: cargo build --verbose --release --target=stable-armv7-unknown-linux-gnueabihf
+      run: cargo build --verbose --release --target=armv7-unknown-linux-gnueabihf
