@@ -7,25 +7,32 @@ jobs:
     name: Linux ARMv7
     runs-on: ubuntu-latest
     steps:
-    - name: Build-checkout
-      uses: actions/checkout@v3
-    - name: Build-toolchain
-      uses: actions-rs/toolchain@v1
-      with:
-        toolchain: stable
-        target: armv7-unknown-linux-gnueabihf
-        override: true
-    - name: Build-cargo-cross
-      uses: actions-rs/cargo@v1
-      with:
-        use-cross: true
-        command: build
-        args: --target armv7-unknown-linux-gnueabihf --release
-    - name: Check dir 
-      run: ls target/armv7-unknown-linux-gnueabihf
-    - name: Release
-      uses: actions/upload-artifact@v3
-      with:
-        name: anni-mai-armv7
-        path: target/armv7-unknown-linux-gnueabihf/release/annie-mai
-
+      - name: Build-checkout
+        uses: actions/checkout@v3
+      - name: Build-toolchain
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          target: armv7-unknown-linux-gnueabihf
+          override: true
+      - name: Build-cargo-cross
+        uses: actions-rs/cargo@v1
+        with:
+          use-cross: true
+          command: build
+          args: --target armv7-unknown-linux-gnueabihf --release
+      - name: Check dir
+        run: ls target/armv7-unknown-linux-gnueabihf
+      - name: Upload artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: anni-mai-armv7
+          path: target/armv7-unknown-linux-gnueabihf/release/annie-mai
+      - name: Release
+        uses: softprops/action-gh-release@v0.1.14
+        if: startsWith(github.ref, 'refs/tags/')
+        with:
+          files: |
+            target/armv7-unknown-linux-gnueabihf/release/annie-mai
+            LICENSE
+          prelease: true
