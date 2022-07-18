@@ -21,8 +21,10 @@ jobs:
         use-cross: true
         command: build
         args: --target armv7-unknown-linux-gnueabihf --release
+    - name: Check dir 
+      run: ls target/release
     - name: Release
       uses: actions/upload-artifact@v3
       with:
         name: anni-mai-armv7
-        path: target/release/annie-mai
+        path: /target/release/annie-mai
