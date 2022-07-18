@@ -27,5 +27,5 @@ jobs:
       uses: actions/upload-artifact@v3
       with:
         name: anni-mai-armv7
-        path: target/armv7-unknown-linux-gnueabihf/annie-mai
+        path: target/armv7-unknown-linux-gnueabihf/release/annie-mai
 
