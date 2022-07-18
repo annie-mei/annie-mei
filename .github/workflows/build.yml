@@ -10,13 +10,13 @@ jobs:
     - name: Build-checkout
       uses: actions/checkout@v3
     - name: Build-toolchain
-    - uses: actions-rs/toolchain@v1
+      uses: actions-rs/toolchain@v1
       with:
         toolchain: stable
         target: armv7-unknown-linux-gnueabihf
         override: true
     - name: Build-cargo-cross
-    - uses: actions-rs/cargo@v1
+      uses: actions-rs/cargo@v1
       with:
         use-cross: true
         command: build
