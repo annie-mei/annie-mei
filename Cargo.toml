@@ -3,6 +3,9 @@ name = "annie-mai"
 version = "0.1.0"
 edition = "2021"
 
+[package.metadata.cross.target.armv7-unknown-linux-gnueabihf]
+image = "rustembedded/cross:armv7-unknown-linux-gnueabihf-0.1.16"
+
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
