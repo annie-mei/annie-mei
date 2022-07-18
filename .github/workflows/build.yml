@@ -22,7 +22,7 @@ jobs:
         command: build
         args: --target armv7-unknown-linux-gnueabihf --release
     - name: Check dir 
-      run: ls target/release
+      run: ls target
     - name: Release
       uses: actions/upload-artifact@v3
       with:
