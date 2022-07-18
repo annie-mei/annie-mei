@@ -27,4 +27,4 @@ jobs:
       uses: actions/upload-artifact@v3
       with:
         name: anni-mai-armv7
-        path: /target/release/annie-mai
+        path: target/release
