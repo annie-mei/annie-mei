@@ -34,7 +34,7 @@ jobs:
           name: anni-mai-armv7
           path: target/armv7-unknown-linux-gnueabihf/release/annie-mai
       - name: Release
-        uses: softprops/action-gh-release@v0.1.14
+        uses: softprops/action-gh-release@v1
         with:
           files: |
             target/armv7-unknown-linux-gnueabihf/release/annie-mai
