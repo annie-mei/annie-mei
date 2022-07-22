@@ -1,7 +1,7 @@
 use crate::models::{
     fetcher::{AnimeConfig, Argument, MangaConfig, Response},
-    media_type::MediaResponse,
     media_type::MediaType as Type,
+    transformers::Transformers,
 };
 use tracing::info;
 
@@ -12,10 +12,12 @@ fn return_argument(arg: &str) -> Argument {
     }
 }
 
-pub fn fetcher(
+pub fn fetcher<
+    T: serde::de::DeserializeOwned + Transformers + std::fmt::Debug + std::clone::Clone,
+>(
     media_type: Type,
     mut args: serenity::framework::standard::Args,
-) -> Option<MediaResponse> {
+) -> Option<T> {
     // Skips over the first arg because this is the command name
     args.single::<String>().unwrap();
 
@@ -27,11 +29,11 @@ pub fn fetcher(
     match media_type {
         Type::Anime => {
             let anime_response: AnimeConfig = Response::new(argument);
-            anime_response.fetch(media_type)
+            anime_response.fetch::<T>(media_type)
         }
         Type::Manga => {
             let manga_response: MangaConfig = Response::new(argument);
-            manga_response.fetch(media_type)
+            manga_response.fetch::<T>(media_type)
         }
     }
 }

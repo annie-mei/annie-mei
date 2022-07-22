@@ -68,8 +68,6 @@ pub struct StaffName {
     pub full: String,
 }
 
-// TODO: Move some of these into a trait: See fetcher.rs
-
 impl Manga {
     pub fn transform_date(&self) -> String {
         let start_date = self.start_date.clone().unwrap();

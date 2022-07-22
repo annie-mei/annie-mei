@@ -25,7 +25,7 @@ async fn anime(ctx: &Context, msg: &Message) -> CommandResult {
         Some(anime) => {
             msg.channel_id
                 .send_message(&ctx.http, |m| {
-                    m.embed(|e| build_message_from_anime(anime.anime(), e))
+                    m.embed(|e| build_message_from_anime(anime, e))
                 })
                 .await
         }

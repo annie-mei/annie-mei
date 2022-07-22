@@ -1,15 +1,13 @@
+use crate::commands::{
+    anime::queries::{FETCH_ANIME, FETCH_ANIME_BY_ID},
+    manga::queries::{FETCH_MANGA, FETCH_MANGA_BY_ID},
+};
 use crate::models::{
-    id_response::FetchResponse as IdResponse, media_list_response::FetchResponse as MediaListManga,
-    media_type::MediaResponse as ResponseType, media_type::MediaType as Type,
+    id_response::FetchResponse as IdResponse,
+    media_list_response::FetchResponse as MediaListResponse, media_type::MediaType as Type,
+    transformers::Transformers,
 };
 use crate::utils::fetchers::fetch_by_arguments::{fetch_by_id, fetch_by_name};
-use crate::{
-    commands::{
-        anime::queries::{FETCH_ANIME, FETCH_ANIME_BY_ID},
-        manga::queries::{FETCH_MANGA, FETCH_MANGA_BY_ID},
-    },
-    models::{anilist_anime::Anime, anilist_manga::Manga},
-};
 use tracing::info;
 
 pub struct AnimeConfig {
@@ -31,7 +29,36 @@ pub enum Argument {
 
 pub trait Response {
     fn new(argument: Argument) -> Self;
-    fn fetch(&self, media_type: Type) -> Option<ResponseType>;
+    fn get_argument(&self) -> &Argument;
+    fn get_id_query(&self) -> String;
+    fn get_search_query(&self) -> String;
+
+    fn fetch<
+        T: serde::de::DeserializeOwned + Transformers + std::fmt::Debug + std::clone::Clone,
+    >(
+        &self,
+        media_type: Type,
+    ) -> Option<T> {
+        let response = match self.get_argument() {
+            Argument::Id(value) => {
+                let fetched_data = fetch_by_id(self.get_id_query(), *value);
+                let fetch_response: IdResponse<T> = serde_json::from_str(&fetched_data).unwrap();
+                info!("Deserialized response: {:#?}", fetch_response);
+                fetch_response.data.unwrap().media
+            }
+            Argument::Search(value) => {
+                let fetched_data = fetch_by_name(self.get_search_query(), value.to_string());
+                let fetch_response: MediaListResponse<T> =
+                    serde_json::from_str(&fetched_data).unwrap();
+                info!("Deserialized response: {:#?}", fetch_response);
+                let result = fetch_response.fuzzy_match(value, media_type);
+                info!("Fuzzy Response: {:#?}", result);
+                result
+            }
+        };
+
+        response
+    }
 }
 
 impl Response for AnimeConfig {
@@ -43,28 +70,16 @@ impl Response for AnimeConfig {
         }
     }
 
-    // TODO: Move parts to default implementation to make it more reusable?
-    fn fetch(&self, media_type: Type) -> Option<ResponseType> {
-        let response = match &self.argument {
-            Argument::Id(value) => {
-                let fetched_data = fetch_by_id(self.id_query.clone(), *value);
-                let fetch_response: IdResponse<Anime> =
-                    serde_json::from_str(&fetched_data).unwrap();
-                info!("Deserialized response: {:#?}", fetch_response);
-                fetch_response.data.unwrap().media
-            }
-            Argument::Search(value) => {
-                let fetched_data = fetch_by_name(self.search_query.clone(), value.to_string());
-                let fetch_response: MediaListManga<Anime> =
-                    serde_json::from_str(&fetched_data).unwrap();
-                info!("Deserialized response: {:#?}", fetch_response);
-                let result: Option<Anime> = fetch_response.fuzzy_match(value, media_type);
-                info!("Fuzzy Response: {:#?}", result);
-                result
-            }
-        };
+    fn get_argument(&self) -> &Argument {
+        &self.argument
+    }
 
-        response.map(ResponseType::Anime)
+    fn get_id_query(&self) -> String {
+        self.id_query.to_owned()
+    }
+
+    fn get_search_query(&self) -> String {
+        self.search_query.to_owned()
     }
 }
 
@@ -78,28 +93,16 @@ impl Response for MangaConfig {
         }
     }
 
-    // TODO: Move parts to default implementation to make it more reusable?
-    fn fetch(&self, media_type: Type) -> Option<ResponseType> {
-        let response = match &self.argument {
-            Argument::Id(value) => {
-                let fetched_data = fetch_by_id(self.id_query.clone(), *value);
-                let fetch_response: IdResponse<Manga> =
-                    serde_json::from_str(&fetched_data).unwrap();
-                info!("Deserialized response: {:#?}", fetch_response);
-                fetch_response.data.unwrap().media
-            }
-            Argument::Search(value) => {
-                let fetched_data = fetch_by_name(self.search_query.clone(), value.to_string());
-                let fetch_response: MediaListManga<Manga> =
-                    serde_json::from_str(&fetched_data).unwrap();
-                info!("Deserialized response: {:#?}", fetch_response);
-                let result: Option<Manga> = fetch_response.fuzzy_match(value, media_type);
-                info!("Fuzzy Response: {:#?}", result);
-                result
-            }
-        };
+    fn get_argument(&self) -> &Argument {
+        &self.argument
+    }
 
-        response.map(ResponseType::Manga)
+    fn get_id_query(&self) -> String {
+        self.id_query.to_owned()
+    }
+
+    fn get_search_query(&self) -> String {
+        self.search_query.to_owned()
     }
 }
 

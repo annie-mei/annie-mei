@@ -25,7 +25,7 @@ async fn manga(ctx: &Context, msg: &Message) -> CommandResult {
         Some(manga) => {
             msg.channel_id
                 .send_message(&ctx.http, |m| {
-                    m.embed(|e| build_message_from_manga(manga.manga(), e))
+                    m.embed(|e| build_message_from_manga(manga, e))
                 })
                 .await
         }
