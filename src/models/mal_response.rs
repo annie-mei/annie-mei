@@ -1,4 +1,4 @@
-use crate::utils::formatter::linker;
+use crate::utils::formatter::{bold, linker};
 use serde::Deserialize;
 
 #[derive(Deserialize, Debug, Clone)]
@@ -30,32 +30,55 @@ impl MalResponse {
         self.title.to_string()
     }
 
-    fn transform_songs(&self, songs: Option<Vec<SongInfo>>) -> Vec<(String, String, bool)> {
+    fn transform_songs(&self, songs: Option<Vec<SongInfo>>) -> String {
         match songs {
-            None => vec![(
-                "No information available".to_string(),
-                "\u{200b}".to_string(),
-                true,
-            )],
-            Some(songs_list) => {
-                let mut songs = vec![];
-                for song in songs_list {
-                    let song_text = song.text.split("by").collect::<Vec<&str>>();
-                    let song_name = song_text[0];
-                    let artist_names = song_text[1];
-                    songs.push((song_name.to_owned(), artist_names.to_owned(), true));
-                }
-                songs
-            }
+            None => "No information available".to_string(),
+            Some(songs_list) => Self::format_songs_for_display(songs_list),
         }
     }
 
-    pub fn transform_openings(&self) -> Vec<(String, String, bool)> {
+    pub fn transform_openings(&self) -> String {
         self.transform_songs(self.opening_themes.clone())
     }
 
-    pub fn transform_endings(&self) -> Vec<(String, String, bool)> {
+    pub fn transform_endings(&self) -> String {
         self.transform_songs(self.ending_themes.clone())
+    }
+
+    fn format_songs_for_display(songs: Vec<SongInfo>) -> String {
+        let mut return_string: Vec<String> = vec![];
+        for (index, song) in songs.iter().enumerate() {
+            let song_name = Self::get_song_name(&song.text);
+            let artist_names = Self::get_artist_names(&song.text);
+            let episode_numbers = Self::get_episode_numbers(&song.text);
+            let song_string = format!(
+                "{}. {} by {} | {}",
+                index + 1,
+                bold(song_name),
+                artist_names,
+                episode_numbers
+            );
+            return_string.push(song_string);
+        }
+        return_string.join("\n")
+    }
+
+    fn get_song_name(song: &str) -> String {
+        let start_index = song.find('"').unwrap();
+        let end_index = song.rfind('"').unwrap();
+        song[(start_index + 1)..end_index].to_string()
+    }
+
+    fn get_artist_names(song: &str) -> String {
+        let start_index = song.find("by").unwrap();
+        let end_index = song.rfind('(').unwrap();
+        song[(start_index + 3)..end_index].to_string()
+    }
+
+    fn get_episode_numbers(song: &str) -> String {
+        let start_index = song.rfind('(').unwrap();
+        let end_index = song.rfind(')').unwrap();
+        song[(start_index + 1)..end_index].to_string()
     }
 
     pub fn transform_thumbnail(&self) -> String {
