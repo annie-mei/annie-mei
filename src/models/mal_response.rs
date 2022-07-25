@@ -1,5 +1,6 @@
 use crate::utils::formatter::{bold, linker};
 use serde::Deserialize;
+use std::collections::HashSet;
 
 #[derive(Deserialize, Debug, Clone)]
 pub struct MalResponse {
@@ -47,32 +48,79 @@ impl MalResponse {
 
     fn format_songs_for_display(songs: Vec<SongInfo>) -> String {
         let mut return_string: Vec<String> = vec![];
+        let mut parsed_songs: HashSet<u32> = HashSet::new();
         for (index, song) in songs.iter().enumerate() {
+            let song_number = Self::get_song_number(&song.text);
+            if parsed_songs.contains(&song_number) {
+                continue;
+            } else {
+                parsed_songs.insert(song_number);
+            }
             let song_name = Self::get_song_name(&song.text);
             let artist_names = Self::get_artist_names(&song.text);
             let episode_numbers = Self::get_episode_numbers(&song.text);
-            let song_string = format!(
-                "{}. {} by {} | {}",
-                index + 1,
-                bold(song_name),
-                artist_names,
-                episode_numbers
-            );
-            return_string.push(song_string);
+
+            if artist_names.is_some() {
+                let song_string = format!(
+                    "{}. {} by {} | {}",
+                    index + 1,
+                    bold(song_name),
+                    artist_names.unwrap(),
+                    episode_numbers
+                );
+                return_string.push(song_string);
+            } else {
+                let song_string =
+                    format!("{}. {} | {}", index + 1, bold(song_name), episode_numbers);
+                return_string.push(song_string);
+            }
         }
         return_string.join("\n")
     }
 
+    fn get_song_number(song: &str) -> u32 {
+        let start_index = song.find('#').unwrap();
+        let end_index = song.find(':').unwrap();
+        song[start_index + 1..end_index].parse::<u32>().unwrap()
+    }
+
     fn get_song_name(song: &str) -> String {
-        let start_index = song.find('"').unwrap();
-        let end_index = song.rfind('"').unwrap();
+        let start_index = song
+            .find('"')
+            .unwrap_or_else(|| song.find('\'').unwrap_or(usize::MAX));
+        let end_index = song
+            .rfind('"')
+            .unwrap_or_else(|| song.rfind('\'').unwrap_or(usize::MAX));
+
+        if start_index == usize::MAX || end_index == usize::MAX {
+            return "No information available".to_string();
+        }
         song[(start_index + 1)..end_index].to_string()
     }
 
-    fn get_artist_names(song: &str) -> String {
-        let start_index = song.find("by").unwrap();
+    fn get_artist_names(song: &str) -> Option<String> {
+        let start_index = song.find("by");
         let end_index = song.rfind('(').unwrap();
-        song[(start_index + 3)..end_index].to_string()
+        // If there is no "by" in the song, then there are no artists
+        start_index?;
+        let start_index = start_index.unwrap();
+
+        // The case when the response overflows into multiple api response
+        let artist_names = if end_index < start_index {
+            song[(start_index + 3)..].to_string()
+        } else {
+            song[(start_index + 3)..end_index].to_string()
+        };
+        // +3 to skip the "by" and the space after it
+        let number_of_artists = artist_names.split('&').count();
+
+        if number_of_artists > 3 {
+            let mut artist_names = artist_names.split('&').take(3).collect::<Vec<&str>>();
+            artist_names.push("and more");
+            Some(artist_names.join(", "))
+        } else {
+            Some(artist_names)
+        }
     }
 
     fn get_episode_numbers(song: &str) -> String {
