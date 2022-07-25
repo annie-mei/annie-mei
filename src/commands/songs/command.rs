@@ -47,11 +47,8 @@ fn build_message_from_song_response(
 ) -> &mut CreateEmbed {
     embed
         .title(mal_response.transform_title())
-        .field("Openings", "\u{200b}", false)
-        .fields(mal_response.transform_openings())
-        .field("\u{200b}", "\u{200b}", false)
-        .field("Endings", "\u{200b}", false)
-        .fields(mal_response.transform_endings())
+        .field("Openings", mal_response.transform_openings(), false)
+        .field("Endings", mal_response.transform_endings(), false)
         .thumbnail(mal_response.transform_thumbnail())
         // TODO: Also Add Anilist Link??
         .field("\u{200b}", mal_response.transform_mal_link(), false)
