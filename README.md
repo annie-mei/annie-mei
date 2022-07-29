@@ -22,5 +22,6 @@
   
 ###### `search`
 - The `search` variant for `arg` has kana support!
+  Try !manga きめつのやいば
 
 <!-- TODO: Optimize Binary -> https://lifthrasiir.github.io/rustlog/why-is-a-rust-executable-large.html -->
