@@ -34,10 +34,17 @@ impl MalResponse {
     fn transform_songs(&self, songs: Option<Vec<SongInfo>>) -> String {
         match songs {
             None => "No information available".to_string(),
-            Some(songs_list) => Self::format_songs_for_display(songs_list),
+            Some(mut songs_list) => {
+                // Only use first 10 entries, because discord hates large embeds
+                songs_list.truncate(10);
+                songs_list.shrink_to_fit();
+                Self::format_songs_for_display(songs_list)
+            }
         }
     }
 
+    // Only takes the first 5 entries
+    // Discord doesn't support huge embeds
     pub fn transform_openings(&self) -> String {
         self.transform_songs(self.opening_themes.clone())
     }
