@@ -43,8 +43,6 @@ impl MalResponse {
         }
     }
 
-    // Only takes the first 5 entries
-    // Discord doesn't support huge embeds
     pub fn transform_openings(&self) -> String {
         self.transform_songs(self.opening_themes.clone())
     }
