@@ -1,6 +1,6 @@
 use crate::utils::formatter::{bold, linker};
 use serde::Deserialize;
-use std::collections::HashSet;
+use std::{collections::HashSet, fmt::Write};
 
 #[derive(Deserialize, Debug, Clone)]
 pub struct MalResponse {
@@ -54,7 +54,7 @@ impl MalResponse {
     fn format_songs_for_display(songs: Vec<SongInfo>) -> String {
         let mut return_string: Vec<String> = vec![];
         let mut parsed_songs: HashSet<u32> = HashSet::new();
-        for (index, song) in songs.iter().enumerate() {
+        for song in songs {
             let song_number = Self::get_song_number(&song.text);
             if parsed_songs.contains(&song_number) {
                 continue;
@@ -65,20 +65,25 @@ impl MalResponse {
             let artist_names = Self::get_artist_names(&song.text);
             let episode_numbers = Self::get_episode_numbers(&song.text);
 
+            let mut song_string = "".to_string();
+
+            // Add song number
+            write!(song_string, "{}. ", song_number).unwrap();
+
+            // Add song name
+            write!(song_string, "{}", bold(song_name)).unwrap();
+
+            // Add artist names if they exist
             if artist_names.is_some() {
-                let song_string = format!(
-                    "{}. {} by {} | {}",
-                    index + 1,
-                    bold(song_name),
-                    artist_names.unwrap(),
-                    episode_numbers
-                );
-                return_string.push(song_string);
-            } else {
-                let song_string =
-                    format!("{}. {} | {}", index + 1, bold(song_name), episode_numbers);
-                return_string.push(song_string);
+                write!(song_string, " by {}", artist_names.unwrap()).unwrap();
             }
+
+            // Add episode numbers if they exist
+            if episode_numbers.is_some() {
+                // Use write
+                write!(song_string, " | {}", episode_numbers.unwrap()).unwrap();
+            }
+            return_string.push(song_string);
         }
         return_string.join("\n")
     }
@@ -105,7 +110,7 @@ impl MalResponse {
 
     fn get_artist_names(song: &str) -> Option<String> {
         let start_index = song.find("by");
-        let end_index = song.rfind('(').unwrap();
+        let end_index = song.rfind('(').unwrap_or(song.len());
         // If there is no "by" in the song, then there are no artists
         start_index?;
         let start_index = start_index.unwrap();
@@ -128,10 +133,14 @@ impl MalResponse {
         }
     }
 
-    fn get_episode_numbers(song: &str) -> String {
+    fn get_episode_numbers(song: &str) -> Option<String> {
+        let has_episodes_numbers = song.contains("(ep");
+        if !has_episodes_numbers {
+            return None;
+        }
         let start_index = song.rfind('(').unwrap();
         let end_index = song.rfind(')').unwrap();
-        song[(start_index + 1)..end_index].to_string()
+        Some(song[(start_index + 1)..end_index].to_string())
     }
 
     pub fn transform_thumbnail(&self) -> String {

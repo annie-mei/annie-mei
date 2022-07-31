@@ -41,6 +41,7 @@ async fn songs(ctx: &Context, msg: &Message) -> CommandResult {
 // TODO: Maybe use https://docs.rs/serenity/latest/serenity/model/channel/struct.Message.html
 //                 https://docs.rs/serenity/latest/serenity/model/channel/struct.Embed.html
 // and send proper embeds
+
 fn build_message_from_song_response(
     mal_response: MalResponse,
     embed: &mut CreateEmbed,
