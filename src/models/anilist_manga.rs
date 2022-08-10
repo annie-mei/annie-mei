@@ -70,31 +70,18 @@ pub struct StaffName {
 
 impl Manga {
     pub fn transform_date(&self) -> String {
-        let start_date = self.start_date.clone().unwrap();
-        let start_date_string = NaiveDate::from_ymd(
-            start_date.year.unwrap_or(0).try_into().unwrap(),
-            start_date.month.unwrap_or(0),
-            start_date.day.unwrap_or(0),
-        );
-
-        let formatted_start_date = start_date_string.format("%b %e %Y").to_string();
+        let start_date = self.start_date.as_ref().unwrap();
+        let formatted_start_date = get_formatted_date_string(start_date);
 
         let is_end_date_available = if let Some(end_date) = &self.end_date {
-            end_date.year.is_some() && end_date.month.is_some() && end_date.day.is_some()
+            end_date.year.is_some() && end_date.month.is_some()
         } else {
             false
         };
 
         if is_end_date_available {
-            let end_date = &self.end_date.clone().unwrap();
-            let end_date_string = NaiveDate::from_ymd(
-                end_date.year.unwrap_or(0).try_into().unwrap(),
-                end_date.month.unwrap_or(0),
-                end_date.day.unwrap_or(0),
-            );
-
-            let formatted_end_date = end_date_string.format("%b %e %Y").to_string();
-
+            let end_date = self.end_date.as_ref().unwrap();
+            let formatted_end_date = get_formatted_date_string(end_date);
             format!("{} - {}", formatted_start_date, formatted_end_date)
         } else {
             formatted_start_date
@@ -158,6 +145,28 @@ impl Manga {
     //         .as_ref()
     //         .map(|id| format!("https://animixplay.to/anime/{}", id))
     // }
+}
+
+fn get_formatted_date_string(date: &AnilistDate) -> String {
+    match date.day {
+        Some(day) => {
+            let date_string = NaiveDate::from_ymd(
+                date.year.unwrap().try_into().unwrap(),
+                date.month.unwrap(),
+                day,
+            );
+            date_string.format("%b %e %Y").to_string()
+        }
+        None => {
+            let date_string = NaiveDate::from_ymd(
+                date.year.unwrap().try_into().unwrap(),
+                date.month.unwrap(),
+                // Need to use 1 as the day to give NaiveDate a valid date
+                1,
+            );
+            date_string.format("%b %Y").to_string()
+        }
+    }
 }
 
 impl Transformers for Manga {

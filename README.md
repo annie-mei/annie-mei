@@ -27,3 +27,4 @@
 
 <!-- TODO: Optimize Binary -> https://lifthrasiir.github.io/rustlog/why-is-a-rust-executable-large.html -->
 <!-- TODO: Maybe Try to get Spotify links for songs? -->
+<!-- TODO: Add Character and Studio query -->
