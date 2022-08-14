@@ -1,13 +1,16 @@
-use crate::commands::{
-    anime::queries::{FETCH_ANIME, FETCH_ANIME_BY_ID},
-    manga::queries::{FETCH_MANGA, FETCH_MANGA_BY_ID},
-};
 use crate::models::{
     id_response::FetchResponse as IdResponse,
     media_list_response::FetchResponse as MediaListResponse, media_type::MediaType as Type,
     transformers::Transformers,
 };
 use crate::utils::fetchers::fetch_by_arguments::{fetch_by_id, fetch_by_name};
+use crate::{
+    commands::{
+        anime::queries::{FETCH_ANIME, FETCH_ANIME_BY_ID},
+        manga::queries::{FETCH_MANGA, FETCH_MANGA_BY_ID},
+    },
+    utils::redis::{cache_response, check_cache},
+};
 use tracing::info;
 
 pub struct AnimeConfig {
@@ -47,12 +50,32 @@ pub trait Response {
                 fetch_response.data.unwrap().media
             }
             Argument::Search(value) => {
-                let fetched_data = fetch_by_name(self.get_search_query(), value.to_string());
+                let cache_key = format!("{}:{}", media_type.as_ref(), value);
+                let fetched_data = match check_cache(&cache_key) {
+                    Ok(value) => {
+                        info!("Cache hit for {:#?} returned {:#?}", cache_key, value);
+                        value
+                    }
+                    Err(e) => {
+                        info!("Cache miss for {:#?} with error {:#?}", cache_key, e);
+                        let response = fetch_by_name(self.get_search_query(), value.to_string());
+                        match cache_response(&cache_key, &response) {
+                            Ok(()) => {
+                                info!("Successfully cached {:#?}", cache_key);
+                            }
+                            Err(e) => {
+                                info!("Failed to cache {:#?} with error {:#?}", cache_key, e);
+                            }
+                        }
+                        response
+                    }
+                };
                 let fetch_response: MediaListResponse<T> =
                     serde_json::from_str(&fetched_data).unwrap();
                 info!("Deserialized response: {:#?}", fetch_response);
                 let result = fetch_response.fuzzy_match(value, media_type);
                 info!("Fuzzy Response: {:#?}", result);
+                // TODO: Cache only the final result
                 result
             }
         };
@@ -83,7 +106,6 @@ impl Response for AnimeConfig {
     }
 }
 
-// TODO: Figure out whats common and can be moved to make it reusable
 impl Response for MangaConfig {
     fn new(argument: Argument) -> MangaConfig {
         MangaConfig {
