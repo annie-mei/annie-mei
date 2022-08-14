@@ -11,7 +11,7 @@ use crate::{
     },
     utils::redis::{cache_response, check_cache},
 };
-use tracing::info;
+use tracing::{debug, info};
 
 pub struct AnimeConfig {
     argument: Argument,
@@ -46,7 +46,7 @@ pub trait Response {
             Argument::Id(value) => {
                 let fetched_data = fetch_by_id(self.get_id_query(), *value);
                 let fetch_response: IdResponse<T> = serde_json::from_str(&fetched_data).unwrap();
-                info!("Deserialized response: {:#?}", fetch_response);
+                debug!("Deserialized response: {:#?}", fetch_response);
                 fetch_response.data.unwrap().media
             }
             Argument::Search(value) => {
@@ -72,9 +72,9 @@ pub trait Response {
                 };
                 let fetch_response: MediaListResponse<T> =
                     serde_json::from_str(&fetched_data).unwrap();
-                info!("Deserialized response: {:#?}", fetch_response);
+                debug!("Deserialized response: {:#?}", fetch_response);
                 let result = fetch_response.fuzzy_match(value, media_type);
-                info!("Fuzzy Response: {:#?}", result);
+                debug!("Fuzzy Response: {:#?}", result);
                 // TODO: Cache only the final result
                 result
             }

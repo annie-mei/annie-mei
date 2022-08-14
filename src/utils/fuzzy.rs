@@ -1,5 +1,5 @@
 use ngrammatic::{CorpusBuilder, Pad, SearchResult};
-use tracing::info;
+use tracing::{debug, info};
 
 #[derive(Debug, Clone)]
 pub struct FuzzyResponse {
@@ -23,7 +23,7 @@ pub fn fuzzy_matcher(
     string_list: Vec<String>,
     threshold: f32,
 ) -> Option<FuzzyResponse> {
-    info!(
+    debug!(
         "Matching {:#?} against {:#?} with a threshold of {:#?}",
         pattern, string_list, threshold
     );
@@ -47,7 +47,7 @@ pub fn fuzzy_matcher(
             .iter()
             .position(|string| *string.to_lowercase() == top_match.unwrap().text.to_lowercase())
             .unwrap();
-        info!("Top Match Index: {:#?}", top_match_index);
+        debug!("Top Match Index: {:#?}", top_match_index);
         info!("Top Match Similarity: {:#?}", top_match.unwrap().similarity);
         Some(FuzzyResponse {
             index: top_match_index,
@@ -64,7 +64,7 @@ pub fn fuzzy_matcher_synonyms(
     pattern: &str,
     synonyms_list: Vec<Vec<String>>,
 ) -> Option<FuzzyResponse> {
-    info!(
+    debug!(
         "Matching {:#?} against Synonyms: {:#?}",
         pattern, synonyms_list
     );

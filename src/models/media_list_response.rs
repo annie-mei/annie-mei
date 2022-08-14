@@ -1,7 +1,7 @@
 use super::{media_type::MediaType, transformers::Transformers};
 use crate::utils::fuzzy::{fuzzy_matcher, fuzzy_matcher_synonyms};
-use log::info;
 use serde::Deserialize;
+use tracing::{debug, info};
 
 #[derive(Deserialize, Debug)]
 pub struct FetchResponse<T> {
@@ -101,11 +101,11 @@ impl<T: Transformers + std::clone::Clone> FetchResponse<T> {
         let need_to_match_synonyms = !((is_english_match_available && is_english_match_good)
             || (is_romaji_match_available && is_romaji_match_good));
 
-        info!("English Match - {:#?}", is_english_match_available);
-        info!("Romaji Match - {:#?}", is_romaji_match_available);
-        info!("English Match Good - {:#?}", is_english_match_good);
-        info!("Romaji Match Good - {:#?}", is_romaji_match_good);
-        info!("Matching Synonyms - {:#?}", need_to_match_synonyms);
+        debug!("English Match - {:#?}", is_english_match_available);
+        debug!("Romaji Match - {:#?}", is_romaji_match_available);
+        debug!("English Match Good - {:#?}", is_english_match_good);
+        debug!("Romaji Match Good - {:#?}", is_romaji_match_good);
+        debug!("Matching Synonyms - {:#?}", need_to_match_synonyms);
 
         let english_score = top_english_title_match.result.similarity;
         let romaji_score = top_romaji_title_match.result.similarity;
