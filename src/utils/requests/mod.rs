@@ -1,2 +1,2 @@
-pub mod anilist_request;
-pub mod my_anime_list_request;
+pub mod anilist;
+pub mod my_anime_list;

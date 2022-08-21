@@ -1,4 +1,4 @@
-use crate::utils::requests::anilist_request::send_request;
+use crate::utils::requests::anilist::send_request;
 
 use serde_json::json;
 use tracing::info;
