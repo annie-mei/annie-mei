@@ -1,7 +1,9 @@
-use html2md::parse_html;
+use crate::{
+    models::anilist_common::{CoverImage, Tag},
+    utils::{formatter::*, statics::EMPTY_STR},
+};
 
-use super::anilist_common::{CoverImage, Tag};
-use crate::utils::{formatter::*, EMPTY_STR};
+use html2md::parse_html;
 
 pub trait Transformers {
     fn get_type(&self) -> String;

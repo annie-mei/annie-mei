@@ -1,6 +1,8 @@
-use crate::{models::mal_response::MalResponse, utils::message::NOT_FOUND_ANIME};
+use crate::{
+    commands::songs::fetcher::fetcher as SongFetcher, models::mal_response::MalResponse,
+    utils::statics::NOT_FOUND_ANIME,
+};
 
-use super::fetcher::fetcher as SongFetcher;
 use serenity::{
     builder::CreateEmbed,
     client::Context,

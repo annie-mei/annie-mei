@@ -3,9 +3,9 @@ use crate::{
         anilist_anime::Anime, mal_response::MalResponse, media_type::MediaType as Type,
         transformers::Transformers,
     },
-    utils::my_anime_list_request,
-    utils::response_fetcher::fetcher as anime_fetcher,
+    utils::{requests::my_anime_list_request, response_fetcher::fetcher as anime_fetcher},
 };
+
 use tracing::info;
 
 pub fn fetcher(args: serenity::framework::standard::Args) -> Option<MalResponse> {

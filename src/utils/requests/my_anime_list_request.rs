@@ -1,5 +1,6 @@
-use reqwest::blocking::Client;
 use std::env;
+
+use reqwest::blocking::Client;
 use tracing::info;
 
 const MY_ANIME_LIST_BASE: &str = "https://api.myanimelist.net/v2";

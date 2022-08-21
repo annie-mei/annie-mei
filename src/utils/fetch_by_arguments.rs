@@ -1,8 +1,8 @@
+use crate::utils::requests::anilist_request::send_request;
+
 use serde_json::json;
 use tracing::info;
 use wana_kana::{ConvertJapanese, IsJapaneseStr};
-
-use crate::utils::anilist_request::send_request;
 
 pub fn fetch_by_id(query: String, id: u32) -> String {
     let json = json!({"query": query, "variables": {"id":id}});

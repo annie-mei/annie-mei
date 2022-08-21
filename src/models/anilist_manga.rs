@@ -1,8 +1,11 @@
-use super::{
-    anilist_common::{CoverImage, ExternalLinks, Tag, Title},
-    transformers::Transformers,
+use crate::{
+    models::{
+        anilist_common::{CoverImage, ExternalLinks, Tag, Title},
+        transformers::Transformers,
+    },
+    utils::{formatter::code, statics::EMPTY_STR},
 };
-use crate::utils::{formatter::code, EMPTY_STR};
+
 use chrono::NaiveDate;
 use serde::Deserialize;
 use titlecase::titlecase;

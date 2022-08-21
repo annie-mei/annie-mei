@@ -1,16 +1,19 @@
-use crate::models::{
-    id_response::FetchResponse as IdResponse,
-    media_list_response::FetchResponse as MediaListResponse, media_type::MediaType as Type,
-    transformers::Transformers,
-};
-use crate::utils::fetchers::fetch_by_arguments::{fetch_by_id, fetch_by_name};
 use crate::{
     commands::{
         anime::queries::{FETCH_ANIME, FETCH_ANIME_BY_ID},
         manga::queries::{FETCH_MANGA, FETCH_MANGA_BY_ID},
     },
-    utils::redis::{cache_response, check_cache},
+    models::{
+        id_response::FetchResponse as IdResponse,
+        media_list_response::FetchResponse as MediaListResponse, media_type::MediaType as Type,
+        transformers::Transformers,
+    },
+    utils::{
+        fetch_by_arguments::{fetch_by_id, fetch_by_name},
+        redis::{cache_response, check_cache},
+    },
 };
+
 use tracing::{debug, info};
 
 pub struct AnimeConfig {

@@ -1,5 +1,8 @@
-use super::{media_type::MediaType, transformers::Transformers};
-use crate::utils::fuzzy::{fuzzy_matcher, fuzzy_matcher_synonyms};
+use crate::{
+    models::{media_type::MediaType, transformers::Transformers},
+    utils::fuzzy::{fuzzy_matcher, fuzzy_matcher_synonyms},
+};
+
 use serde::Deserialize;
 use tracing::{debug, info};
 

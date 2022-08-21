@@ -1,6 +1,8 @@
 use crate::utils::formatter::{bold, linker};
-use serde::Deserialize;
+
 use std::{collections::HashSet, fmt::Write};
+
+use serde::Deserialize;
 
 #[derive(Deserialize, Debug, Clone)]
 pub struct MalResponse {

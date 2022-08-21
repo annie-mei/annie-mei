@@ -3,7 +3,6 @@ use serenity::{
     framework::standard::{macros::command, CommandResult},
     model::channel::Message,
 };
-
 use tracing::error;
 
 #[command]

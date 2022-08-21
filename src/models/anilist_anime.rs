@@ -1,13 +1,17 @@
-use super::{
-    anilist_common::{CoverImage, ExternalLinks, Tag, Title},
-    transformers::Transformers,
+use crate::{
+    models::{
+        anilist_common::{CoverImage, ExternalLinks, Tag, Title},
+        transformers::Transformers,
+    },
+    utils::{
+        formatter::{code, linker, titlecase},
+        statics::EMPTY_STR,
+    },
 };
-use crate::utils::{
-    formatter::{code, linker, titlecase},
-    EMPTY_STR,
-};
-use serde::Deserialize;
+
 use std::fmt::Write;
+
+use serde::Deserialize;
 
 #[derive(Deserialize, Debug, Clone)]
 #[serde(rename_all = "camelCase")]

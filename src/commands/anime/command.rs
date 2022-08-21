@@ -1,7 +1,8 @@
 use crate::{
     models::{anilist_anime::Anime, media_type::MediaType as Type, transformers::Transformers},
-    utils::{message::NOT_FOUND_ANIME, response_fetcher::fetcher},
+    utils::{response_fetcher::fetcher, statics::NOT_FOUND_ANIME},
 };
+
 use serenity::{
     builder::CreateEmbed,
     client::Context,
