@@ -16,7 +16,7 @@ futures = "0.3.24"
 html2md = "0.2.13"
 log = "0.4"
 ngrammatic = "0.4.0"
-reqwest = { version = "0.11.11", features = ["blocking", "rustls-tls"] }
+reqwest = { version = "0.11.12", features = ["blocking", "rustls-tls"] }
 redis = "0.21.6"
 serde = "1.0"
 serde_json = "1.0"
