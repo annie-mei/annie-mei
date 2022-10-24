@@ -4,7 +4,7 @@ mod utils;
 
 use std::env;
 
-use commands::{anime::command::*, help::*, manga::command::*, ping::*, songs::command::*};
+use commands::{anime::command::*, manga::command::*, songs::command::*};
 use dotenv::dotenv;
 use tracing::{debug, info, instrument};
 
@@ -15,7 +15,12 @@ use serenity::{
         macros::{group, hook},
         CommandResult, DispatchError, StandardFramework,
     },
-    model::{channel::Message, event::ResumedEvent, gateway::Ready},
+    model::{
+        application::{command::Command, interaction::Interaction},
+        channel::Message,
+        event::ResumedEvent,
+        gateway::Ready,
+    },
     prelude::*,
     utils::parse_emoji,
 };
@@ -72,15 +77,49 @@ async fn dispatch_error(ctx: &Context, msg: &Message, error: DispatchError, _com
 
 // TODO: Add recommend system
 #[group]
-#[commands(help, ping, anime, manga, songs)]
+#[commands(anime, manga, songs)]
 struct General;
 
 struct Handler;
 
 #[async_trait]
 impl EventHandler for Handler {
-    async fn ready(&self, _: Context, ready: Ready) {
-        println!("{} is connected!", ready.user.name);
+    async fn interaction_create(&self, ctx: Context, interaction: Interaction) {
+        if let Interaction::ApplicationCommand(command) = interaction {
+            info!("Received command interaction: {:#?}", command);
+
+            match command.data.name.as_str() {
+                "ping" => commands::ping::run(&ctx, &command).await,
+                "help" => commands::help::run(&ctx, &command).await,
+                _ => {
+                    let msg = command
+                        .channel_id
+                        .send_message(&ctx.http, |msg| {
+                            msg.embed(|e| e.title("Error").description("Not implemented"))
+                        })
+                        .await;
+                    if let Err(why) = msg {
+                        println!("Error sending message: {:?}", why);
+                        info!("Cannot respond to slash command: {}", why);
+                    }
+                }
+            };
+        }
+    }
+
+    async fn ready(&self, ctx: Context, ready: Ready) {
+        let guild_commands = Command::set_global_application_commands(&ctx.http, |commands| {
+            commands
+                .create_application_command(|command| commands::ping::register(command))
+                .create_application_command(|command| commands::help::register(command))
+        })
+        .await;
+
+        info!(
+            "I created the following global slash command: {:#?}",
+            guild_commands
+        );
+        info!("{} is connected!", ready.user.name);
     }
 
     #[instrument(skip(self, _ctx))]

@@ -1,23 +1,27 @@
 use serenity::{
-    client::Context,
-    framework::standard::{macros::command, CommandResult},
-    model::channel::Message,
-    utils::MessageBuilder,
+    builder::CreateApplicationCommand,
+    model::application::interaction::{
+        application_command::ApplicationCommandInteraction, InteractionResponseType,
+    },
+    prelude::*,
 };
-use tracing::error;
 
-#[command]
-pub async fn ping(ctx: &Context, msg: &Message) -> CommandResult {
-    let response = MessageBuilder::new()
-        .push("User ")
-        .mention(&msg.author.id)
-        .push(" used the 'ping' command in the ")
-        .push(" channel")
-        .build();
+pub async fn run(ctx: &Context, interaction: &ApplicationCommandInteraction) {
+    let user = &interaction.user;
 
-    if let Err(why) = msg.channel_id.say(&ctx.http, response).await {
-        error!("Error sending message: {:?}", why);
-    }
+    let _ping = interaction
+        .create_interaction_response(&ctx.http, |response| {
+            { response.kind(InteractionResponseType::ChannelMessageWithSource) }
+                .interaction_response_data(|m| {
+                    m.content(format!(
+                        "Hello {}! I'm Annie Mai, a bot that helps you find anime and manga!",
+                        user.name
+                    ))
+                })
+        })
+        .await;
+}
 
-    Ok(())
+pub fn register(command: &mut CreateApplicationCommand) -> &mut CreateApplicationCommand {
+    command.name("ping").description("A ping command")
 }
