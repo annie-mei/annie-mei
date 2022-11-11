@@ -9,6 +9,7 @@ use serenity::{
 pub async fn run(ctx: &Context, interaction: &ApplicationCommandInteraction) {
     let user = &interaction.user;
 
+    // TODO: Convert response to PONG
     let _ping = interaction
         .create_interaction_response(&ctx.http, |response| {
             { response.kind(InteractionResponseType::ChannelMessageWithSource) }
