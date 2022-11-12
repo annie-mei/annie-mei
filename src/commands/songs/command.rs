@@ -18,6 +18,25 @@ use serenity::{
 use tokio::task;
 use tracing::info;
 
+pub fn register(command: &mut CreateApplicationCommand) -> &mut CreateApplicationCommand {
+    command
+        .name("songs")
+        .description("Fetches the songs of an anime")
+        .create_option(|option| {
+            option
+                .name("id")
+                .description("Anilist ID")
+                .kind(CommandOptionType::Integer)
+                .min_int_value(1)
+        })
+        .create_option(|option| {
+            option
+                .name("name")
+                .description("Search term")
+                .kind(CommandOptionType::String)
+        })
+}
+
 pub async fn run(ctx: &Context, interaction: &ApplicationCommandInteraction) {
     let user = &interaction.user;
     // Ignores the second value
@@ -78,23 +97,4 @@ fn build_message_from_song_response(
         .thumbnail(mal_response.transform_thumbnail())
         // TODO: Also Add Anilist Link??
         .field("\u{200b}", mal_response.transform_mal_link(), false)
-}
-
-pub fn register(command: &mut CreateApplicationCommand) -> &mut CreateApplicationCommand {
-    command
-        .name("songs")
-        .description("Fetches the songs of an anime")
-        .create_option(|option| {
-            option
-                .name("id")
-                .description("Anilist ID")
-                .kind(CommandOptionType::Integer)
-                .min_int_value(1)
-        })
-        .create_option(|option| {
-            option
-                .name("name")
-                .description("Search term")
-                .kind(CommandOptionType::String)
-        })
 }

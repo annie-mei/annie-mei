@@ -6,6 +6,10 @@ use serenity::{
     prelude::*,
 };
 
+pub fn register(command: &mut CreateApplicationCommand) -> &mut CreateApplicationCommand {
+    command.name("ping").description("A ping command")
+}
+
 pub async fn run(ctx: &Context, interaction: &ApplicationCommandInteraction) {
     let user = &interaction.user;
 
@@ -21,8 +25,4 @@ pub async fn run(ctx: &Context, interaction: &ApplicationCommandInteraction) {
                 })
         })
         .await;
-}
-
-pub fn register(command: &mut CreateApplicationCommand) -> &mut CreateApplicationCommand {
-    command.name("ping").description("A ping command")
 }
