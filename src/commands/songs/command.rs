@@ -4,39 +4,62 @@ use crate::{
 };
 
 use serenity::{
-    builder::CreateEmbed,
+    builder::{CreateApplicationCommand, CreateEmbed},
     client::Context,
-    framework::standard::{macros::command, Args, CommandResult, Delimiter},
-    model::channel::Message,
+    framework::standard::{Args, Delimiter},
+    model::{
+        application::interaction::{
+            application_command::ApplicationCommandInteraction, InteractionResponseType,
+        },
+        prelude::command::CommandOptionType,
+    },
 };
+
 use tokio::task;
-use tracing::error;
+use tracing::info;
 
-#[command]
-async fn songs(ctx: &Context, msg: &Message) -> CommandResult {
-    let args = Args::new(&msg.content, &[Delimiter::Single(' ')]);
-    let response = task::spawn_blocking(|| SongFetcher(args)).await?;
+pub async fn run(ctx: &Context, interaction: &ApplicationCommandInteraction) {
+    let user = &interaction.user;
+    // Ignores the second value
+    let arg = interaction.data.options[0]
+        .value
+        .clone()
+        .unwrap()
+        .to_string();
 
-    let msg = match response {
+    info!(
+        "Got command 'songs' by user '{}' with args: {:#?}",
+        user.name,
+        Args::new(arg.as_str(), &[Delimiter::Single(' ')])
+    );
+
+    // TODO: Remove this hack
+    let args = Args::new(
+        format!("songs {}", arg.as_str()).as_str(),
+        &[Delimiter::Single(' ')],
+    );
+    let response = task::spawn_blocking(|| SongFetcher(args)).await.unwrap();
+
+    let _songs_response = match response {
         None => {
-            msg.channel_id
-                .send_message(&ctx.http, |m| m.content(NOT_FOUND_ANIME))
+            interaction
+                .create_interaction_response(&ctx.http, |response| {
+                    { response.kind(InteractionResponseType::ChannelMessageWithSource) }
+                        .interaction_response_data(|m| m.content(NOT_FOUND_ANIME))
+                })
                 .await
         }
         Some(song_response) => {
-            msg.channel_id
-                .send_message(&ctx.http, |m| {
-                    m.embed(|e| build_message_from_song_response(song_response, e))
+            interaction
+                .create_interaction_response(&ctx.http, |response| {
+                    { response.kind(InteractionResponseType::ChannelMessageWithSource) }
+                        .interaction_response_data(|m| {
+                            m.embed(|e| build_message_from_song_response(song_response, e))
+                        })
                 })
                 .await
         }
     };
-
-    if let Err(why) = msg {
-        error!("Error sending message: {:?}", why);
-    }
-
-    Ok(())
 }
 
 // TODO: Move this to Utils
@@ -55,4 +78,23 @@ fn build_message_from_song_response(
         .thumbnail(mal_response.transform_thumbnail())
         // TODO: Also Add Anilist Link??
         .field("\u{200b}", mal_response.transform_mal_link(), false)
+}
+
+pub fn register(command: &mut CreateApplicationCommand) -> &mut CreateApplicationCommand {
+    command
+        .name("songs")
+        .description("Fetches the songs of an anime")
+        .create_option(|option| {
+            option
+                .name("id")
+                .description("Anilist ID")
+                .kind(CommandOptionType::Integer)
+                .min_int_value(1)
+        })
+        .create_option(|option| {
+            option
+                .name("name")
+                .description("Search term")
+                .kind(CommandOptionType::String)
+        })
 }

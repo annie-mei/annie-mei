@@ -4,7 +4,7 @@ mod utils;
 
 use std::env;
 
-use commands::{anime::command::*, manga::command::*, songs::command::*};
+use commands::{anime::command::*, manga::command::*};
 use dotenv::dotenv;
 use tracing::{debug, info, instrument};
 
@@ -77,7 +77,7 @@ async fn dispatch_error(ctx: &Context, msg: &Message, error: DispatchError, _com
 
 // TODO: Add recommend system
 #[group]
-#[commands(anime, manga, songs)]
+#[commands(anime, manga)]
 struct General;
 
 struct Handler;
@@ -91,6 +91,7 @@ impl EventHandler for Handler {
             match command.data.name.as_str() {
                 "ping" => commands::ping::run(&ctx, &command).await,
                 "help" => commands::help::run(&ctx, &command).await,
+                "songs" => commands::songs::command::run(&ctx, &command).await,
                 _ => {
                     let msg = command
                         .channel_id
@@ -112,6 +113,7 @@ impl EventHandler for Handler {
             commands
                 .create_application_command(|command| commands::ping::register(command))
                 .create_application_command(|command| commands::help::register(command))
+                .create_application_command(|command| commands::songs::command::register(command))
         })
         .await;
 
