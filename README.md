@@ -1,6 +1,12 @@
 # Annie Mai
 
+> I am slowly working on converting commands to Slash commands to follow the new way of doing things
+
 ##### Commands
+
+###### \/help
+
+- Shows a list of commands that Annie-mai supports!
 
 ###### !anime <arg>
 
@@ -14,9 +20,9 @@
   1. `id`: Anilist ID for lookup
   2. `search`: A string for fuzzy matching lookup
 
-###### !songs <arg>
+###### /songs
 
-- `arg` variants
+- variants
   1. `id`: Anilist ID for lookup
   2. `search`: A string for fuzzy matching lookup
 
