@@ -1,6 +1,6 @@
 # Annie Mai
 
-> I am slowly working on converting commands to Slash commands to follow the new way of doing things
+> Annie-mai now listens to /commands!
 
 ##### Commands
 
