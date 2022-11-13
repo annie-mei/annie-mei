@@ -10,10 +10,7 @@ use tracing::{debug, info, instrument};
 use serenity::{
     async_trait,
     client::{Client, Context, EventHandler},
-    framework::standard::{
-        macros::{group, hook},
-        CommandResult, DispatchError, StandardFramework,
-    },
+    framework::standard::{macros::hook, CommandResult, DispatchError, StandardFramework},
     model::{
         application::{command::Command, interaction::Interaction},
         channel::Message,
@@ -73,11 +70,6 @@ async fn dispatch_error(ctx: &Context, msg: &Message, error: DispatchError, _com
         }
     }
 }
-
-// TODO: Add recommend system
-#[group]
-#[commands(anime)]
-struct General;
 
 struct Handler;
 
@@ -144,8 +136,7 @@ async fn main() {
         .before(before)
         .after(after)
         .unrecognised_command(unknown_command)
-        .on_dispatch_error(dispatch_error)
-        .group(&GENERAL_GROUP);
+        .on_dispatch_error(dispatch_error);
     let token = env::var("DISCORD_TOKEN").expect("Expected a token in the environment");
     let intents = GatewayIntents::GUILD_MESSAGES
         | GatewayIntents::DIRECT_MESSAGES
