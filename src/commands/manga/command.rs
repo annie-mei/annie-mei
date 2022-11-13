@@ -4,39 +4,83 @@ use crate::{
 };
 
 use serenity::{
-    builder::CreateEmbed,
+    builder::{CreateApplicationCommand, CreateEmbed},
     client::Context,
-    framework::standard::{macros::command, Args, CommandResult, Delimiter},
-    model::channel::Message,
+    framework::standard::{Args, Delimiter},
+    model::{
+        application::interaction::{
+            application_command::ApplicationCommandInteraction, InteractionResponseType,
+        },
+        prelude::command::CommandOptionType,
+    },
 };
+
 use tokio::task;
-use tracing::error;
+use tracing::info;
 
-#[command]
-async fn manga(ctx: &Context, msg: &Message) -> CommandResult {
-    let args = Args::new(&msg.content, &[Delimiter::Single(' ')]);
-    let response = task::spawn_blocking(|| fetcher(Type::Manga, args)).await?;
+pub fn register(command: &mut CreateApplicationCommand) -> &mut CreateApplicationCommand {
+    command
+        .name("manga")
+        .description("Fetches the details for a manga")
+        .create_option(|option| {
+            option
+                .name("id")
+                .description("Anilist ID")
+                .kind(CommandOptionType::Integer)
+                .min_int_value(1)
+        })
+        .create_option(|option| {
+            option
+                .name("name")
+                .description("Search term")
+                .kind(CommandOptionType::String)
+        })
+}
 
-    let msg = match response {
+pub async fn run(ctx: &Context, interaction: &ApplicationCommandInteraction) {
+    let user = &interaction.user;
+    // Ignores the second value
+    let arg = interaction.data.options[0]
+        .value
+        .clone()
+        .unwrap()
+        .to_string();
+
+    info!(
+        "Got command 'manga' by user '{}' with args: {:#?}",
+        user.name,
+        Args::new(arg.as_str(), &[Delimiter::Single(' ')])
+    );
+
+    // TODO: Remove this hack
+    let args = Args::new(
+        format!("manga {}", arg.as_str()).as_str(),
+        &[Delimiter::Single(' ')],
+    );
+    let response = task::spawn_blocking(|| fetcher(Type::Manga, args))
+        .await
+        .unwrap();
+
+    let _manga_response = match response {
         None => {
-            msg.channel_id
-                .send_message(&ctx.http, |m| m.content(NOT_FOUND_MANGA))
+            interaction
+                .create_interaction_response(&ctx.http, |response| {
+                    { response.kind(InteractionResponseType::ChannelMessageWithSource) }
+                        .interaction_response_data(|m| m.content(NOT_FOUND_MANGA))
+                })
                 .await
         }
-        Some(manga) => {
-            msg.channel_id
-                .send_message(&ctx.http, |m| {
-                    m.embed(|e| build_message_from_manga(manga, e))
+        Some(manga_response) => {
+            interaction
+                .create_interaction_response(&ctx.http, |response| {
+                    { response.kind(InteractionResponseType::ChannelMessageWithSource) }
+                        .interaction_response_data(|m| {
+                            m.embed(|e| build_message_from_manga(manga_response, e))
+                        })
                 })
                 .await
         }
     };
-
-    if let Err(why) = msg {
-        error!("Error sending message: {:?}", why);
-    }
-
-    Ok(())
 }
 
 // TODO: Move this to Utils
