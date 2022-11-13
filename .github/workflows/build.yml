@@ -1,9 +1,9 @@
-on: 
+on:
   push:
     paths-ignore:
-      - '**/README.md'
-    tags:        
-      - '**' 
+      - "**/README.md"
+    tags:
+      - "**"
 
 name: ARMv7 build
 
@@ -27,7 +27,7 @@ jobs:
       - name: Upload artifact
         uses: actions/upload-artifact@v3
         with:
-          name: anni-mai-armv7
+          name: annie-mai-armv7
           path: target/armv7-unknown-linux-gnueabihf/release/annie-mai
       - name: Release
         uses: softprops/action-gh-release@v1
