@@ -33,7 +33,7 @@ pub async fn run(ctx: &Context, interaction: &ApplicationCommandInteraction) {
                             )
                             .field("/songs", "Lookup an anime's songs", false)
                             .field("/help", "Show this message", false)
-                            .field("/ping", "check if I'm reachable", false)
+                            .field("/ping", "Check if I'm reachable", false)
                             .footer(|f| f.text("Annie Mai"))
                             .timestamp(chrono::Utc::now())
                             .thumbnail("attachment://mai.jpg")
