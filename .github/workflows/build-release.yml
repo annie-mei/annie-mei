@@ -3,13 +3,13 @@ on:
     paths-ignore:
       - "**/README.md"
     tags:
-      - "**"
+      - "v[0-9]+.[0-9]+.[0-9]+"
 
-name: ARMv7 build
+name: ARMv7 build-release
 
 jobs:
   linux_arm7:
-    name: Linux ARMv7
+    name: Raspberry Pi 3
     runs-on: ubuntu-latest
     steps:
       - name: Build-checkout
@@ -22,8 +22,6 @@ jobs:
           use-cross: true
           command: build
           args: --target armv7-unknown-linux-gnueabihf --release
-      - name: Check dir
-        run: ls target/armv7-unknown-linux-gnueabihf
       - name: Upload artifact
         uses: actions/upload-artifact@v3
         with:
