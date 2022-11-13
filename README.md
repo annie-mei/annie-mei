@@ -8,13 +8,13 @@
 
 - Shows a list of commands that Annie-mai supports!
 
-###### !anime <arg>
+###### /anime
 
 - `arg` variants
   1. `id`: Anilist ID for lookup
   2. `search`: A string for fuzzy matching lookup
 
-###### !manga <arg>
+###### /manga
 
 - `arg` variants
   1. `id`: Anilist ID for lookup

@@ -21,16 +21,8 @@ pub async fn run(ctx: &Context, interaction: &ApplicationCommandInteraction) {
                         e.colour(0x00ff00)
                             .title(format!("Hello there {}!", user.name))
                             .description("Use these commands to interact with Annie Mai!")
-                            .field(
-                                "!anime <anilist id/search term>",
-                                "Search for an anime",
-                                false,
-                            )
-                            .field(
-                                "!manga <anilist id/search term>",
-                                "Search for a manga",
-                                false,
-                            )
+                            .field("/anime", "Search for an anime", false)
+                            .field("/manga", "Search for a manga", false)
                             .field("/songs", "Lookup an anime's songs", false)
                             .field("/help", "Show this message", false)
                             .field("/ping", "Check if I'm reachable", false)
