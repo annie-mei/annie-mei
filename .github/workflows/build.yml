@@ -14,12 +14,8 @@ jobs:
     steps:
       - name: Build-checkout
         uses: actions/checkout@v3
-      - name: Build-toolchain
-        uses: actions-rs/toolchain@v1
-        with:
-          toolchain: stable
-          target: armv7-unknown-linux-gnueabihf
-          override: true
+      - name: Install Rust
+        run: rustup update stable && rustup default stable
       - name: Build-cargo-cross
         uses: actions-rs/cargo@v1
         with:
