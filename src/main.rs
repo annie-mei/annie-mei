@@ -4,7 +4,6 @@ mod utils;
 
 use std::env;
 
-use commands::{anime::command::*};
 use dotenv::dotenv;
 use tracing::{debug, info, instrument};
 
@@ -93,6 +92,7 @@ impl EventHandler for Handler {
                 "help" => commands::help::run(&ctx, &command).await,
                 "songs" => commands::songs::command::run(&ctx, &command).await,
                 "manga" => commands::manga::command::run(&ctx, &command).await,
+                "anime" => commands::anime::command::run(&ctx, &command).await,
                 _ => {
                     let msg = command
                         .channel_id
@@ -116,6 +116,7 @@ impl EventHandler for Handler {
                 .create_application_command(|command| commands::help::register(command))
                 .create_application_command(|command| commands::songs::command::register(command))
                 .create_application_command(|command| commands::manga::command::register(command))
+                .create_application_command(|command| commands::anime::command::register(command))
         })
         .await;
 
