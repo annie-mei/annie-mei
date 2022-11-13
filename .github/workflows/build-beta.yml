@@ -1,0 +1,35 @@
+on:
+  push:
+    paths-ignore:
+      - "**/README.md"
+    tags:
+      - "v[0-9]+.[0-9]+.[0-9]+-beta"
+
+name: ARMv7 build-beta
+
+jobs:
+  linux_arm7:
+    name: Raspberry Pi 3 beta
+    runs-on: ubuntu-latest
+    steps:
+      - name: Build-checkout
+        uses: actions/checkout@v3
+      - name: Install Rust
+        run: rustup update stable && rustup default stable
+      - name: Build-cargo-cross
+        uses: actions-rs/cargo@v1
+        with:
+          use-cross: true
+          command: build
+          args: --target armv7-unknown-linux-gnueabihf --release
+      - name: Upload artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: annie-mai-beta-armv7
+          path: target/armv7-unknown-linux-gnueabihf/release/annie-mai-beta
+      - name: Release
+        uses: softprops/action-gh-release@v1
+        with:
+          files: |
+            target/armv7-unknown-linux-gnueabihf/release/annie-mai-beta
+            LICENSE
