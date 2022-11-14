@@ -92,9 +92,8 @@ impl<T: Transformers + std::clone::Clone> FetchResponse<T> {
             .map(|media| media.get_romaji_title().unwrap_or_default())
             .collect();
 
-        let top_english_title_match =
-            fuzzy_matcher(&*name, english_titles, 0.5).unwrap_or_default();
-        let top_romaji_title_match = fuzzy_matcher(&*name, romaji_titles, 0.5).unwrap_or_default();
+        let top_english_title_match = fuzzy_matcher(&name, english_titles, 0.5).unwrap_or_default();
+        let top_romaji_title_match = fuzzy_matcher(&name, romaji_titles, 0.5).unwrap_or_default();
 
         let is_english_match_available = top_english_title_match.index != usize::MAX;
         let is_english_match_good = top_english_title_match.result.similarity >= 0.85;
@@ -129,7 +128,7 @@ impl<T: Transformers + std::clone::Clone> FetchResponse<T> {
                 .iter()
                 .map(|media| media.get_synonyms().unwrap_or_else(|| [].to_vec()))
                 .collect();
-            let top_synonym_match = fuzzy_matcher_synonyms(&*name, synonyms).unwrap_or_default();
+            let top_synonym_match = fuzzy_matcher_synonyms(&name, synonyms).unwrap_or_default();
             match top_synonym_match.index {
                 usize::MAX => match top_match.index {
                     usize::MAX => match media_list.is_empty() {
