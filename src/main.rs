@@ -16,6 +16,7 @@ use serenity::{
         channel::Message,
         event::ResumedEvent,
         gateway::Ready,
+        prelude::Activity,
     },
     prelude::*,
     utils::parse_emoji,
@@ -111,6 +112,8 @@ impl EventHandler for Handler {
                 .create_application_command(|command| commands::anime::command::register(command))
         })
         .await;
+
+        ctx.set_activity(Activity::listening("/help")).await;
 
         info!(
             "I created the following global slash command: {:#?}",
