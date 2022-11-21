@@ -10,7 +10,7 @@ use crate::{
     },
     utils::{
         fetch_by_arguments::{fetch_by_id, fetch_by_name},
-        redis::{cache_response, check_cache},
+        redis::{check_cache, try_to_cache_response},
     },
 };
 
@@ -62,14 +62,7 @@ pub trait Response {
                     Err(e) => {
                         info!("Cache miss for {:#?} with error {:#?}", cache_key, e);
                         let response = fetch_by_name(self.get_search_query(), value.to_string());
-                        match cache_response(&cache_key, &response) {
-                            Ok(()) => {
-                                info!("Successfully cached {:#?}", cache_key);
-                            }
-                            Err(e) => {
-                                info!("Failed to cache {:#?} with error {:#?}", cache_key, e);
-                            }
-                        }
+                        try_to_cache_response(&cache_key, &response);
                         response
                     }
                 };
