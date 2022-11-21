@@ -105,9 +105,10 @@ impl MalResponse {
     ) -> Option<String> {
         info!("Romaji Song Name: {:#?}", romaji_name);
         info!("Kana Song Name: {:#?}", kana_name);
+
         Some(get_song_url(
             romaji_name,
-            "君の知らない物語".to_owned(),
+            kana_name,
             artist_name.to_string(),
         ))
         .unwrap_or(None)
