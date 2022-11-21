@@ -23,9 +23,20 @@ pub fn check_cache(key: &str) -> RedisResult<String> {
     Ok(cached_value)
 }
 
-pub fn cache_response(key: &str, response: &str) -> RedisResult<()> {
+fn cache_response(key: &str, response: &str) -> RedisResult<()> {
     let mut redis_client_connection = get_redis_client().unwrap();
     // Expires cached value in 5 hours
     redis_client_connection.set_ex(key, response, 18_000)?;
     Ok(())
+}
+
+pub fn try_to_cache_response(key: &str, response: &str) {
+    match cache_response(key, response) {
+        Ok(()) => {
+            info!("Successfully cached {:#?}", key);
+        }
+        Err(e) => {
+            info!("Failed to cache {:#?} with error {:#?}", key, e);
+        }
+    }
 }
