@@ -63,21 +63,25 @@ impl MalResponse {
             // Get Spotify URL
             // TODO: Cache Requests
             let spotify_url = match &artist_names {
-                Some(artist_names) => {
-                    Self::fetch_spotify_url(song_name.clone(), song_name.clone(), artist_names)
-                }
+                Some(artist_names) => Self::fetch_spotify_url(
+                    Self::get_romaji_song_name(&song_name),
+                    Self::get_kana_song_name(&song_name),
+                    artist_names,
+                ),
                 None => None,
             };
 
             info!("Spotify Url: {:#?}", spotify_url);
 
             // Add song name
-            write!(
-                song_string,
-                "{}",
-                linker(bold(song_name), spotify_url.unwrap())
-            )
-            .unwrap();
+            match spotify_url {
+                Some(spotify_url) => {
+                    write!(song_string, "{}", linker(bold(song_name), spotify_url)).unwrap();
+                }
+                None => {
+                    write!(song_string, "{}", song_name).unwrap();
+                }
+            }
 
             // Add artist names if they exist
             if artist_names.is_some() {
@@ -96,13 +100,15 @@ impl MalResponse {
 
     fn fetch_spotify_url(
         romaji_name: String,
-        kana_name: String,
+        kana_name: Option<String>,
         artist_name: &String,
     ) -> Option<String> {
+        info!("Romaji Song Name: {:#?}", romaji_name);
+        info!("Kana Song Name: {:#?}", kana_name);
         Some(get_song_url(
-            "Chainsaw Blood".to_owned(),
+            romaji_name,
             "君の知らない物語".to_owned(),
-            "Vaundy".to_owned(),
+            artist_name.to_string(),
         ))
         .unwrap_or(None)
     }
@@ -154,6 +160,25 @@ impl MalResponse {
             return "No information available".to_string();
         }
         song[(start_index + 1)..end_index].to_string()
+    }
+
+    fn get_romaji_song_name(song_name: &str) -> String {
+        let end_index = song_name.find('(').unwrap_or(usize::MAX);
+
+        if end_index == usize::MAX {
+            return song_name.to_string();
+        }
+        song_name[..end_index].to_string()
+    }
+
+    fn get_kana_song_name(song_name: &str) -> Option<String> {
+        let start_index = song_name.find('(').unwrap_or(usize::MAX);
+        let end_index = song_name.find(')').unwrap_or(usize::MAX);
+
+        if start_index == usize::MAX || end_index == usize::MAX {
+            return None;
+        }
+        Some(song_name[(start_index + 1)..end_index].to_string())
     }
 
     fn get_song_number(song: &str) -> Option<u32> {

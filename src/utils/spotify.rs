@@ -42,7 +42,13 @@ pub fn get_song_url(romaji_name: String, kana_name: String, artist_name: String)
                 SearchResult::Tracks(page) => {
                     // Gets URL for top result
                     // TODO: Improve this using fuzzy matching
-                    return Some(page.items[0].external_urls["spotify"].to_owned());
+                    // TODO: Add kana fallback
+                    if !page.items.is_empty() {
+                        let track = &page.items[0];
+                        info!("Found track: {track:#?}");
+                        return Some(track.external_urls["spotify"].to_owned());
+                    }
+                    return None;
                 }
                 _ => info!("Something else"),
             }
