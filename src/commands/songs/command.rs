@@ -59,16 +59,6 @@ pub async fn run(ctx: &Context, interaction: &ApplicationCommandInteraction) {
     );
     let response = task::spawn_blocking(|| SongFetcher(args)).await.unwrap();
 
-    let spotify_url = crate::utils::spotify::get_song_url(
-        "Chainsaw Blood".to_owned(),
-        "君の知らない物語".to_owned(),
-        "Vaundy".to_owned(),
-    )
-    .await
-    .unwrap_or_else(|| "None".to_owned());
-
-    info!("Spotify results: {:#?}", spotify_url);
-
     let _songs_response = match response {
         None => {
             interaction
