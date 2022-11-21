@@ -21,23 +21,17 @@ fn get_spotify_client() -> ClientCredsSpotify {
     spotify
 }
 
-pub async fn get_song_url(
-    romaji_name: String,
-    kana_name: String,
-    artist_name: String,
-) -> Option<String> {
+pub fn get_song_url(romaji_name: String, kana_name: String, artist_name: String) -> Option<String> {
     let mut spotify = get_spotify_client();
-    spotify.request_token().await.unwrap();
-    let search = spotify
-        .search(
-            format!("track:{} artist:{}", romaji_name, artist_name).as_str(),
-            &SearchType::Track,
-            Some(&Market::Country(Country::UnitedStates)),
-            None,
-            Some(5),
-            None,
-        )
-        .await;
+    spotify.request_token().unwrap();
+    let search = spotify.search(
+        format!("track:{} artist:{}", romaji_name, artist_name).as_str(),
+        &SearchType::Track,
+        Some(&Market::Country(Country::UnitedStates)),
+        None,
+        Some(5),
+        None,
+    );
 
     // TODO: Fallback on Kana Name
 
