@@ -1,3 +1,5 @@
+use crate::utils::redis::{check_cache, try_to_cache_response};
+
 use rspotify::{
     model::{Country, Market, SearchResult, SearchType},
     prelude::*,
@@ -26,11 +28,29 @@ pub fn get_song_url(
     kana_name: Option<String>,
     artist_name: String,
 ) -> Option<String> {
+    // TODO: Clean up nested Matches
+    // If cached response if found, return it
+    let cache_key = format!("{}:{:#?}:{}", romaji_name, kana_name, artist_name);
+    match check_cache(&cache_key) {
+        Ok(value) => {
+            info!("Cache hit for {:#?} returned {:#?}", cache_key, value);
+            return match value.as_str() {
+                "None" => None,
+                _ => Some(value),
+            };
+        }
+        Err(e) => {
+            info!("Cache miss for {:#?} with error {:#?}", cache_key, e);
+        }
+    };
+
+    // TODO: Make this more functional
     let romaji_search = send_search_request(&romaji_name, &artist_name);
     match romaji_search {
         Ok(search_result) => {
             info!("Searched track: {search_result:#?}");
             if let Some(url) = get_url_from_search_result(search_result) {
+                try_to_cache_response(&cache_key, &url);
                 return Some(url);
             } else if let Some(kana_name) = kana_name {
                 let kana_search = send_search_request(&kana_name, &artist_name);
@@ -38,21 +58,28 @@ pub fn get_song_url(
                     Ok(search_result) => {
                         info!("Searched track using Track: {kana_name:#?} Artist: {artist_name:#?}: {search_result:#?}");
                         match get_url_from_search_result(search_result) {
-                            Some(url) => return Some(url),
-                            None => return None,
+                            Some(url) => {
+                                try_to_cache_response(&cache_key, &url);
+                                return Some(url);
+                            }
+                            None => {
+                                try_to_cache_response(&cache_key, "None");
+                                return None;
+                            }
                         }
                     }
                     Err(e) => {
                         info!("Error searching track: {e:#?}");
-                        return None;
                     }
                 }
             } else {
+                try_to_cache_response(&cache_key, "None");
                 return None;
             }
         }
         Err(err) => info!("Could not find track: {err:#?}"),
     }
+    try_to_cache_response(&cache_key, "None");
     None
 }
 
