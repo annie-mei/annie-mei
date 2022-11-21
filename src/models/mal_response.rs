@@ -1,8 +1,12 @@
-use crate::utils::formatter::{bold, linker};
+use crate::utils::{
+    formatter::{bold, linker},
+    spotify::get_song_url,
+};
 
 use std::{collections::HashSet, fmt::Write};
 
 use serde::Deserialize;
+use tracing::info;
 
 #[derive(Deserialize, Debug, Clone)]
 pub struct MalResponse {
@@ -56,8 +60,24 @@ impl MalResponse {
             )
             .unwrap();
 
+            // Get Spotify URL
+            // TODO: Cache Requests
+            let spotify_url = match &artist_names {
+                Some(artist_names) => {
+                    Self::fetch_spotify_url(song_name.clone(), song_name.clone(), artist_names)
+                }
+                None => None,
+            };
+
+            info!("Spotify Url: {:#?}", spotify_url);
+
             // Add song name
-            write!(song_string, "{}", bold(song_name)).unwrap();
+            write!(
+                song_string,
+                "{}",
+                linker(bold(song_name), spotify_url.unwrap())
+            )
+            .unwrap();
 
             // Add artist names if they exist
             if artist_names.is_some() {
@@ -72,6 +92,19 @@ impl MalResponse {
             return_string.push(song_string);
         }
         return_string.join("\n")
+    }
+
+    fn fetch_spotify_url(
+        romaji_name: String,
+        kana_name: String,
+        artist_name: &String,
+    ) -> Option<String> {
+        Some(get_song_url(
+            "Chainsaw Blood".to_owned(),
+            "君の知らない物語".to_owned(),
+            "Vaundy".to_owned(),
+        ))
+        .unwrap_or(None)
     }
 
     fn get_artist_names(song: &str) -> Option<String> {
