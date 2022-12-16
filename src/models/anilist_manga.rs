@@ -168,21 +168,21 @@ impl Manga {
 fn get_formatted_date_string(date: &AnilistDate) -> String {
     match date.day {
         Some(day) => {
-            let date_string = NaiveDate::from_ymd(
+            let date_string = NaiveDate::from_ymd_opt(
                 date.year.unwrap().try_into().unwrap(),
                 date.month.unwrap(),
                 day,
             );
-            date_string.format("%b %e %Y").to_string()
+            date_string.unwrap().format("%b %e %Y").to_string()
         }
         None => {
-            let date_string = NaiveDate::from_ymd(
+            let date_string = NaiveDate::from_ymd_opt(
                 date.year.unwrap().try_into().unwrap(),
                 date.month.unwrap(),
                 // Need to use 1 as the day to give NaiveDate a valid date
                 1,
             );
-            date_string.format("%b %Y").to_string()
+            date_string.unwrap().format("%b %Y").to_string()
         }
     }
 }
