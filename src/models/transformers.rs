@@ -100,7 +100,7 @@ pub trait Transformers {
             self.get_cover_image()
                 .color
                 .as_ref()
-                .unwrap_or(&"#0000ff".to_string())
+                .unwrap()
                 .trim_start_matches('#'),
             16,
         )
