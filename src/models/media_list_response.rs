@@ -111,9 +111,10 @@ impl<T: Transformers + std::clone::Clone> FetchResponse<T> {
 
         let english_score = top_english_title_match.result.similarity;
         let romaji_score = top_romaji_title_match.result.similarity;
-        let top_match = match english_score < romaji_score {
-            true => top_romaji_title_match,
-            false => top_english_title_match,
+        let top_match = if english_score < romaji_score {
+            top_romaji_title_match
+        } else {
+            top_english_title_match
         };
 
         if !need_to_match_synonyms {
@@ -131,9 +132,10 @@ impl<T: Transformers + std::clone::Clone> FetchResponse<T> {
             let top_synonym_match = fuzzy_matcher_synonyms(&name, synonyms).unwrap_or_default();
             if let usize::MAX = top_synonym_match.index {
                 match top_match.index {
-                usize::MAX => match media_list.is_empty() {
-                    true => None,
-                    false => Some(media_list[0].clone()),
+                usize::MAX => if media_list.is_empty() {
+                    None
+                } else {
+                    Some(media_list[0].clone())
                 },
                 _ => Some(media_list[top_match.index].clone()),
             }
