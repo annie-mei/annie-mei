@@ -132,6 +132,18 @@ impl EventHandler for Handler {
 async fn main() {
     tracing_subscriber::fmt::init();
 
+    let environment = env::var("ENV").expect("Expected an environment in the environment");
+    let sentry_dsn = env::var("SENTRY_DSN").expect("Expected a sentry dsn in the environment");
+
+    let _guard = sentry::init((
+        sentry_dsn,
+        sentry::ClientOptions {
+            release: sentry::release_name!(),
+            environment: Some(environment.into()),
+            ..Default::default()
+        },
+    ));
+
     let framework = StandardFramework::new()
         .configure(|c| c.prefix("!"))
         .before(before)
