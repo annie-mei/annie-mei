@@ -1,4 +1,7 @@
-use crate::utils::redis::{check_cache, try_to_cache_response};
+use crate::utils::{
+    redis::{check_cache, try_to_cache_response},
+    statics::{SPOTIFY_CLIENT_ID, SPOTIFY_CLIENT_SECRET},
+};
 
 use rspotify::{
     model::{Country, Market, SearchResult, SearchType},
@@ -11,8 +14,8 @@ use tracing::info;
 
 fn get_spotify_client() -> ClientCredsSpotify {
     let client_id =
-        env::var("SPOTIFY_CLIENT_ID").expect("Expected a spotify client id in the environment");
-    let client_secret = env::var("SPOTIFY_CLIENT_SECRET")
+        env::var(SPOTIFY_CLIENT_ID).expect("Expected a spotify client id in the environment");
+    let client_secret = env::var(SPOTIFY_CLIENT_SECRET)
         .expect("Expected a spotify client secret in the environment");
     let credentials = Credentials {
         id: client_id,

@@ -21,6 +21,8 @@ use serenity::{
     utils::parse_emoji,
 };
 
+use utils::statics::{DISCORD_TOKEN, ENV, SENTRY_DSN};
+
 #[hook]
 #[instrument]
 async fn before(_: &Context, msg: &Message, command_name: &str) -> bool {
@@ -132,8 +134,8 @@ impl EventHandler for Handler {
 async fn main() {
     tracing_subscriber::fmt::init();
 
-    let environment = env::var("ENV").expect("Expected an environment in the environment");
-    let sentry_dsn = env::var("SENTRY_DSN").expect("Expected a sentry dsn in the environment");
+    let environment = env::var(ENV).expect("Expected an environment in the environment");
+    let sentry_dsn = env::var(SENTRY_DSN).expect("Expected a sentry dsn in the environment");
 
     let _guard = sentry::init((
         sentry_dsn,
@@ -150,7 +152,7 @@ async fn main() {
         .after(after)
         .unrecognised_command(unknown_command)
         .on_dispatch_error(dispatch_error);
-    let token = env::var("DISCORD_TOKEN").expect("Expected a token in the environment");
+    let token = env::var(DISCORD_TOKEN).expect("Expected a token in the environment");
     let intents = GatewayIntents::GUILD_MESSAGES
         | GatewayIntents::DIRECT_MESSAGES
         | GatewayIntents::MESSAGE_CONTENT;
