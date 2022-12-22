@@ -4,7 +4,6 @@ mod utils;
 
 use std::env;
 
-use dotenv::dotenv;
 use tracing::{debug, info, instrument};
 
 use serenity::{
@@ -131,7 +130,6 @@ impl EventHandler for Handler {
 #[tokio::main]
 #[instrument]
 async fn main() {
-    dotenv().ok();
     tracing_subscriber::fmt::init();
 
     let framework = StandardFramework::new()
