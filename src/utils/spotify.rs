@@ -103,20 +103,17 @@ fn send_search_request(
 }
 
 fn get_url_from_search_result(search_result: SearchResult) -> Option<String> {
-    match search_result {
-        SearchResult::Tracks(page) => {
-            // Gets URL for top result
-            // TODO: Improve this using fuzzy matching instead of just taking the first result
-            if !page.items.is_empty() {
-                let track = &page.items[0];
-                info!("Found track: {track:#?}");
-                return Some(track.external_urls["spotify"].to_owned());
-            }
-            None
+    if let SearchResult::Tracks(page) = search_result {
+        // Gets URL for top result
+        // TODO: Improve this using fuzzy matching instead of just taking the first result
+        if !page.items.is_empty() {
+            let track = &page.items[0];
+            info!("Found track: {track:#?}");
+            return Some(track.external_urls["spotify"].to_owned());
         }
-        _ => {
-            info!("Something else");
-            None
-        }
+        None
+    } else {
+        info!("Something else");
+        None
     }
 }
