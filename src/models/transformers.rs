@@ -81,9 +81,10 @@ pub trait Transformers {
             .collect::<Vec<String>>();
         let genres = genres.join(" - ");
 
-        match genres.is_empty() {
-            true => EMPTY_STR.to_string(),
-            false => genres,
+        if genres.is_empty() {
+            EMPTY_STR.to_string()
+        } else {
+            genres
         }
     }
 

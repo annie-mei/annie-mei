@@ -14,9 +14,10 @@ pub fn fetch_by_id(query: String, id: u32) -> String {
 }
 
 pub fn fetch_by_name(query: String, name: String) -> String {
-    let searchable_name = match name.is_japanese() {
-        true => name.clone().to_romaji(),
-        false => name.clone(),
+    let searchable_name = if name.is_japanese() {
+        name.clone().to_romaji()
+    } else {
+        name.clone()
     };
     let json = json!({"query": query, "variables": {"search":searchable_name}});
     let result: String = send_request(json);
