@@ -129,22 +129,21 @@ impl<T: Transformers + std::clone::Clone> FetchResponse<T> {
                 .map(|media| media.get_synonyms().unwrap_or_else(|| [].to_vec()))
                 .collect();
             let top_synonym_match = fuzzy_matcher_synonyms(&name, synonyms).unwrap_or_default();
-            match top_synonym_match.index {
-                usize::MAX => match top_match.index {
-                    usize::MAX => match media_list.is_empty() {
-                        true => None,
-                        false => Some(media_list[0].clone()),
-                    },
-                    _ => Some(media_list[top_match.index].clone()),
+            if let usize::MAX = top_synonym_match.index {
+                match top_match.index {
+                usize::MAX => match media_list.is_empty() {
+                    true => None,
+                    false => Some(media_list[0].clone()),
                 },
-                _ => {
-                    info!(
-                        "Synonym match says: {:#?}  at Index: {:#?}",
-                        media_list[top_synonym_match.index].get_romaji_title(),
-                        top_synonym_match.index
-                    );
-                    Some(media_list[top_synonym_match.index].clone())
-                }
+                _ => Some(media_list[top_match.index].clone()),
+            }
+            } else {
+                info!(
+                    "Synonym match says: {:#?}  at Index: {:#?}",
+                    media_list[top_synonym_match.index].get_romaji_title(),
+                    top_synonym_match.index
+                );
+                Some(media_list[top_synonym_match.index].clone())
             }
         }
     }
