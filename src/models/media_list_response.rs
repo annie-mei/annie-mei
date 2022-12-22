@@ -130,15 +130,17 @@ impl<T: Transformers + std::clone::Clone> FetchResponse<T> {
                 .map(|media| media.get_synonyms().unwrap_or_else(|| [].to_vec()))
                 .collect();
             let top_synonym_match = fuzzy_matcher_synonyms(&name, synonyms).unwrap_or_default();
-            if let usize::MAX = top_synonym_match.index {
+            if top_synonym_match.index == usize::MAX {
                 match top_match.index {
-                usize::MAX => if media_list.is_empty() {
-                    None
-                } else {
-                    Some(media_list[0].clone())
-                },
-                _ => Some(media_list[top_match.index].clone()),
-            }
+                    usize::MAX => {
+                        if media_list.is_empty() {
+                            None
+                        } else {
+                            Some(media_list[0].clone())
+                        }
+                    }
+                    _ => Some(media_list[top_match.index].clone()),
+                }
             } else {
                 info!(
                     "Synonym match says: {:#?}  at Index: {:#?}",
