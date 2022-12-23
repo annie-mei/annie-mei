@@ -8,7 +8,6 @@ use crate::{
 
 use chrono::NaiveDate;
 use serde::Deserialize;
-use serde_json::{Result, Value};
 use titlecase::titlecase;
 
 #[derive(Deserialize, Debug, Clone)]
@@ -140,27 +139,6 @@ impl Manga {
                 code(titlecase(&mangaka_name)),
                 code(titlecase(&artist_name))
             )
-        }
-    }
-
-    // TODO: Get this working
-    pub async fn build_mangadex_link(&self) -> String {
-        let name = self.transform_romaji_title();
-        let json =
-            tokio::task::spawn_blocking(|| crate::utils::requests::mangadex::send_request(name))
-                .await
-                .unwrap();
-        let result: Result<Value> = serde_json::from_str(&json);
-        match result {
-            Ok(json) => {
-                if json["result"] == "error" {
-                    return EMPTY_STR.to_string();
-                }
-                let mangadex_id = json["data"][0]["id"].as_str().unwrap();
-                let mangadex_url = format!("https://mangadex.org/manga/{}", mangadex_id);
-                mangadex_url
-            }
-            Err(_) => EMPTY_STR.to_string(),
         }
     }
 }
