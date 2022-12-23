@@ -9,8 +9,6 @@ use crate::{
     },
 };
 
-use std::fmt::Write;
-
 use serde::Deserialize;
 
 #[derive(Deserialize, Debug, Clone)]
@@ -141,14 +139,8 @@ impl Anime {
         main_studios.join(" x ")
     }
 
-    fn build_animixplay_link(&self) -> Option<String> {
-        self.id_mal
-            .as_ref()
-            .map(|id| format!("https://animixplay.to/anime/{}", id))
-    }
-
     pub fn transform_links(&self) -> String {
-        let mut return_string: String = match &self.external_links {
+        let return_string: String = match &self.external_links {
             Some(links) => {
                 if links.is_empty() {
                     EMPTY_STR.to_string()
@@ -186,14 +178,7 @@ impl Anime {
             }
             None => EMPTY_STR.to_string(),
         };
-        let animix_link = self.build_animixplay_link();
-        if let Some(url) = animix_link {
-            if return_string == *EMPTY_STR {
-                return_string = linker("AniMixPlay".to_string(), url);
-            } else {
-                write!(return_string, " {}", linker("AniMixPlay".to_string(), url)).unwrap();
-            }
-        }
+
         return_string
     }
 
