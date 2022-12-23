@@ -10,7 +10,10 @@
 name: rust-clippy analyze
 
 on:
-  push
+  pull_request:
+    # Sequence of patterns matched against refs/heads
+    branches-ignore:    
+      - 'dependabot/*'
 
 jobs:
   rust-clippy-analyze:
