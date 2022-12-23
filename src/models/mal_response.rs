@@ -116,6 +116,8 @@ impl MalResponse {
 
     fn get_artist_names(song: &str) -> Option<String> {
         let start_index = song.find("by");
+
+        // skipcq: RS-W1031
         let end_index = song.rfind('(').unwrap_or(song.len());
         // If there is no "by" in the song, then there are no artists
         start_index?;
