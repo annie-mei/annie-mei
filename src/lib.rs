@@ -129,11 +129,9 @@ impl EventHandler for Handler {
     }
 }
 
-#[tokio::main]
+#[shuttle_service::main]
 #[instrument]
-async fn main() {
-    tracing_subscriber::fmt::init();
-
+pub async fn serenity() -> shuttle_service::ShuttleSerenity {
     let environment = env::var(ENV).expect("Expected an environment in the environment");
     let sentry_dsn = env::var(SENTRY_DSN).expect("Expected a sentry dsn in the environment");
 
@@ -157,13 +155,11 @@ async fn main() {
         | GatewayIntents::DIRECT_MESSAGES
         | GatewayIntents::MESSAGE_CONTENT;
 
-    let mut client = Client::builder(&token, intents)
+    let client = Client::builder(&token, intents)
         .event_handler(Handler)
         .framework(framework)
         .await
         .expect("Err creating client");
 
-    if let Err(why) = client.start().await {
-        println!("Client error: {:?}", why);
-    }
+    Ok(client)
 }
