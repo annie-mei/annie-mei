@@ -90,12 +90,12 @@ fn send_search_request(
     song_name: &String,
     artist_name: &String,
 ) -> Result<SearchResult, ClientError> {
-    let mut spotify = get_spotify_client();
+    let spotify = get_spotify_client();
     spotify.request_token().unwrap();
     spotify.search(
         format!("track:{} artist:{}", song_name, artist_name).as_str(),
-        &SearchType::Track,
-        Some(&Market::Country(Country::UnitedStates)),
+        SearchType::Track,
+        Some(Market::Country(Country::UnitedStates)),
         None,
         Some(5),
         None,
