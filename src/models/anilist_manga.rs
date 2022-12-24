@@ -151,7 +151,10 @@ fn get_formatted_date_string(date: &AnilistDate) -> String {
                 date.month.unwrap(),
                 day,
             );
-            date_string.unwrap().format("%b %e %Y").to_string()
+            match date_string {
+                Some(date_string) => date_string.format("%b %e %Y").to_string(),
+                None => EMPTY_STR.to_string(),
+            }
         }
         None => {
             let date_string = NaiveDate::from_ymd_opt(
@@ -160,7 +163,10 @@ fn get_formatted_date_string(date: &AnilistDate) -> String {
                 // Need to use 1 as the day to give NaiveDate a valid date
                 1,
             );
-            date_string.unwrap().format("%b %Y").to_string()
+            match date_string {
+                Some(date_string) => date_string.format("%b %Y").to_string(),
+                None => EMPTY_STR.to_string(),
+            }
         }
     }
 }
