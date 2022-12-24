@@ -151,21 +151,38 @@ fn get_formatted_date_string(date: &AnilistDate) -> String {
                 date.month.unwrap(),
                 day,
             );
-            match date_string {
-                Some(date_string) => date_string.format("%b %e %Y").to_string(),
-                None => EMPTY_STR.to_string(),
+            if let Some(date_string) = date_string {
+                date_string.format("%b %e %Y").to_string()
+            } else {
+                EMPTY_STR.to_string()
             }
         }
         None => {
-            let date_string = NaiveDate::from_ymd_opt(
-                date.year.unwrap().try_into().unwrap(),
-                date.month.unwrap(),
-                // Need to use 1 as the day to give NaiveDate a valid date
-                1,
-            );
-            match date_string {
-                Some(date_string) => date_string.format("%b %Y").to_string(),
-                None => EMPTY_STR.to_string(),
+            if let Some(month) = date.month {
+                let date_string = NaiveDate::from_ymd_opt(
+                    date.year.unwrap().try_into().unwrap(),
+                    month,
+                    // Need to use 1 as the day to give NaiveDate a valid date
+                    1,
+                );
+                if let Some(date_string) = date_string {
+                    date_string.format("%b %Y").to_string()
+                } else {
+                    EMPTY_STR.to_string()
+                }
+            } else {
+                let date_string = NaiveDate::from_ymd_opt(
+                    date.year.unwrap().try_into().unwrap(),
+                    // Need to use 1 as the month to give NaiveDate a valid date
+                    1,
+                    // Need to use 1 as the day to give NaiveDate a valid date
+                    1,
+                );
+                if let Some(date_string) = date_string {
+                    date_string.format("%Y").to_string()
+                } else {
+                    EMPTY_STR.to_string()
+                }
             }
         }
     }
