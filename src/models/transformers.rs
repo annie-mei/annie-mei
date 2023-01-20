@@ -97,15 +97,12 @@ pub trait Transformers {
 
     // CoverImage Transformers
     fn transform_color(&self) -> i32 {
-        i32::from_str_radix(
-            self.get_cover_image()
-                .color
-                .as_ref()
-                .unwrap()
-                .trim_start_matches('#'),
-            16,
-        )
-        .unwrap_or(0x0000ff)
+        match self.get_cover_image().color.as_ref() {
+            None => 0x0000ff,
+            Some(color) => {
+                i32::from_str_radix(color.trim_start_matches('#'), 16).unwrap_or(0x0000ff)
+            }
+        }
     }
     fn transform_thumbnail(&self) -> String {
         let extra_large = self.get_cover_image().extra_large;
