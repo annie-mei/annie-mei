@@ -1,6 +1,6 @@
 [package]
 name = "annie-mai"
-version = "1.2.2"
+version = "1.2.3"
 edition = "2021"
 
 [package.metadata.cross.target.armv7-unknown-linux-gnueabihf]
