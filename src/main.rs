@@ -146,6 +146,8 @@ async fn main() {
         },
     ));
 
+    let _connection = &mut utils::database::establish_connection();
+
     let framework = StandardFramework::new()
         .configure(|c| c.prefix("!"))
         .before(before)
