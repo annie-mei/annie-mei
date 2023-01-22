@@ -1,5 +1,6 @@
 mod commands;
 mod models;
+mod schema;
 mod utils;
 
 use std::env;
