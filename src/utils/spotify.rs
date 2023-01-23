@@ -36,7 +36,7 @@ pub fn get_song_url(
     let cache_key = format!("{}:{:#?}:{}", romaji_name, kana_name, artist_name);
     match check_cache(&cache_key) {
         Ok(value) => {
-            info!("Cache hit for {:#?} returned {:#?}", cache_key, value);
+            info!("Cache hit for {:#?}", cache_key);
             return match value.as_str() {
                 "None" => None,
                 _ => Some(value),
