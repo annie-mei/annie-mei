@@ -37,27 +37,16 @@ pub fn register(command: &mut CreateApplicationCommand) -> &mut CreateApplicatio
         })
 }
 
-pub async fn run(ctx: &Context, interaction: &ApplicationCommandInteraction) {
+pub async fn run(ctx: &Context, interaction: &mut ApplicationCommandInteraction) {
     let user = &interaction.user;
-    // Ignores the second value
-    let arg = interaction.data.options[0]
-        .value
-        .clone()
-        .unwrap()
-        .to_string();
+    let arg = interaction.data.options[0].resolved.to_owned().unwrap();
 
     info!(
         "Got command 'manga' by user '{}' with args: {:#?}",
-        user.name,
-        Args::new(arg.as_str(), &[Delimiter::Single(' ')])
+        user.name, arg
     );
 
-    // TODO: Remove this hack
-    let args = Args::new(
-        format!("manga {}", arg.as_str()).as_str(),
-        &[Delimiter::Single(' ')],
-    );
-    let response = task::spawn_blocking(|| fetcher(Type::Manga, args))
+    let response = task::spawn_blocking(move || fetcher(Type::Manga, arg.to_owned()))
         .await
         .unwrap();
 

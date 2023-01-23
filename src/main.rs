@@ -78,15 +78,15 @@ struct Handler;
 #[async_trait]
 impl EventHandler for Handler {
     async fn interaction_create(&self, ctx: Context, interaction: Interaction) {
-        if let Interaction::ApplicationCommand(command) = interaction {
+        if let Interaction::ApplicationCommand(mut command) = interaction {
             info!("Received command interaction: {:#?}", command);
 
             match command.data.name.as_str() {
                 "ping" => commands::ping::run(&ctx, &command).await,
                 "help" => commands::help::run(&ctx, &command).await,
-                "songs" => commands::songs::command::run(&ctx, &command).await,
-                "manga" => commands::manga::command::run(&ctx, &command).await,
-                "anime" => commands::anime::command::run(&ctx, &command).await,
+                "songs" => commands::songs::command::run(&ctx, &mut command).await,
+                "manga" => commands::manga::command::run(&ctx, &mut command).await,
+                "anime" => commands::anime::command::run(&ctx, &mut command).await,
                 _ => {
                     let msg = command
                         .channel_id
