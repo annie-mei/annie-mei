@@ -12,6 +12,7 @@ pub fn code(input: String) -> String {
     format!("`{}`", input)
 }
 
+#[allow(dead_code)]
 pub fn strike(input: String) -> String {
     format!("~~{}~~", input)
 }
