@@ -56,7 +56,7 @@ pub trait Response {
                 let cache_key = format!("{}:{}", media_type.as_ref(), value);
                 let fetched_data = match check_cache(&cache_key) {
                     Ok(value) => {
-                        info!("Cache hit for {:#?} returned {:#?}", cache_key, value);
+                        info!("Cache hit for {:#?}", cache_key);
                         value
                     }
                     Err(e) => {
