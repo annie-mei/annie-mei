@@ -37,27 +37,18 @@ pub fn register(command: &mut CreateApplicationCommand) -> &mut CreateApplicatio
         })
 }
 
-pub async fn run(ctx: &Context, interaction: &ApplicationCommandInteraction) {
+pub async fn run(ctx: &Context, interaction: &mut ApplicationCommandInteraction) {
     let user = &interaction.user;
-    // Ignores the second value
-    let arg = interaction.data.options[0]
-        .value
-        .clone()
-        .unwrap()
-        .to_string();
+    let arg = interaction.data.options[0].resolved.to_owned().unwrap();
 
     info!(
         "Got command 'songs' by user '{}' with args: {:#?}",
-        user.name,
-        Args::new(arg.as_str(), &[Delimiter::Single(' ')])
+        user.name, arg
     );
 
-    // TODO: Remove this hack
-    let args = Args::new(
-        format!("songs {}", arg.as_str()).as_str(),
-        &[Delimiter::Single(' ')],
-    );
-    let response = task::spawn_blocking(|| SongFetcher(args)).await.unwrap();
+    let response = task::spawn_blocking(move || SongFetcher(arg))
+        .await
+        .unwrap();
 
     let _songs_response = match response {
         None => {

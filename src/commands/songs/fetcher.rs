@@ -6,9 +6,10 @@ use crate::{
     utils::{requests::my_anime_list, response_fetcher::fetcher as anime_fetcher},
 };
 
+use serenity::model::prelude::interaction::application_command::CommandDataOptionValue;
 use tracing::info;
 
-pub fn fetcher(args: serenity::framework::standard::Args) -> Option<MalResponse> {
+pub fn fetcher(args: CommandDataOptionValue) -> Option<MalResponse> {
     let anime_response: Option<Anime> = anime_fetcher(Type::Anime, args);
     match anime_response {
         None => None,
