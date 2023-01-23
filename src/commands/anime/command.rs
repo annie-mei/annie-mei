@@ -45,7 +45,7 @@ pub async fn run(ctx: &Context, interaction: &mut ApplicationCommandInteraction)
         user.name, arg
     );
 
-    let response = task::spawn_blocking(move || fetcher(Type::Anime, arg.to_owned()))
+    let response = task::spawn_blocking(move || fetcher(Type::Anime, arg))
         .await
         .unwrap();
 
