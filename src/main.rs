@@ -88,6 +88,7 @@ impl EventHandler for Handler {
                 "songs" => commands::songs::command::run(&ctx, &mut command).await,
                 "manga" => commands::manga::command::run(&ctx, &mut command).await,
                 "anime" => commands::anime::command::run(&ctx, &mut command).await,
+                "register" => commands::register::command::run(&ctx, &mut command).await,
                 _ => {
                     let msg = command
                         .channel_id
@@ -112,6 +113,9 @@ impl EventHandler for Handler {
                 .create_application_command(|command| commands::songs::command::register(command))
                 .create_application_command(|command| commands::manga::command::register(command))
                 .create_application_command(|command| commands::anime::command::register(command))
+                .create_application_command(|command| {
+                    commands::register::command::register(command)
+                })
         })
         .await;
 
