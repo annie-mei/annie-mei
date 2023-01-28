@@ -131,7 +131,7 @@ impl EventHandler for Handler {
 
 #[shuttle_service::main]
 #[instrument]
-pub async fn serenity() -> shuttle_service::ShuttleSerenity {
+async fn serenity() -> shuttle_service::ShuttleSerenity {
     let environment = env::var(ENV).expect("Expected an environment in the environment");
     let sentry_dsn = env::var(SENTRY_DSN).expect("Expected a sentry dsn in the environment");
 
