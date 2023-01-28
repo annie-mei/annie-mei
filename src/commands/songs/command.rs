@@ -41,8 +41,8 @@ pub async fn run(ctx: &Context, interaction: &mut ApplicationCommandInteraction)
     let arg = interaction.data.options[0].resolved.to_owned().unwrap();
 
     info!(
-        "Got command 'songs' by user '{}' with args: {:#?}",
-        user.name, arg
+        "Got command 'songs' by user '{}' with args: {arg:#?}",
+        user.name
     );
 
     let response = task::spawn_blocking(move || SongFetcher(arg))

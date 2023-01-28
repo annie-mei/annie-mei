@@ -27,10 +27,7 @@ use utils::statics::{DISCORD_TOKEN, ENV, SENTRY_DSN};
 #[hook]
 #[instrument]
 async fn before(_: &Context, msg: &Message, command_name: &str) -> bool {
-    info!(
-        "Got command '{}' by user '{}'",
-        command_name, msg.author.name
-    );
+    info!("Got command '{command_name}' by user '{}'", msg.author.name);
     true
 }
 
@@ -38,8 +35,8 @@ async fn before(_: &Context, msg: &Message, command_name: &str) -> bool {
 #[instrument]
 async fn after(_: &Context, _msg: &Message, command_name: &str, command_result: CommandResult) {
     match command_result {
-        Ok(()) => info!("Processed command '{}'", command_name),
-        Err(why) => info!("Command '{}' returned error {:?}", command_name, why),
+        Ok(()) => info!("Processed command '{command_name}'"),
+        Err(why) => info!("Command '{command_name}' returned error {:?}", why),
     }
 }
 
@@ -47,7 +44,7 @@ async fn after(_: &Context, _msg: &Message, command_name: &str, command_result: 
 #[hook]
 #[instrument]
 async fn unknown_command(ctx: &Context, msg: &Message, unknown_command_name: &str) {
-    info!("Could not find command named '{}'", unknown_command_name);
+    info!("Could not find command named '{unknown_command_name}'");
     let reaction = parse_emoji("<:wtf:953730408158228570>").unwrap();
     let _ = msg.react(ctx, reaction).await;
 }
@@ -98,7 +95,7 @@ impl EventHandler for Handler {
                         .await;
                     if let Err(why) = msg {
                         println!("Error sending message: {:?}", why);
-                        info!("Cannot respond to slash command: {}", why);
+                        info!("Cannot respond to slash command: {why}");
                     }
                 }
             };

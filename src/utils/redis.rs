@@ -9,7 +9,7 @@ fn get_redis_client() -> RedisResult<Connection> {
     let password = env::var(REDIS_PASSWORD).expect("Expected a redis password in the environment");
     let host = env::var(REDIS_HOST).expect("Expected a redis host in the environment");
 
-    let redis_connection_string = format!("redis://{}:{}@{}", user_name, password, host);
+    let redis_connection_string = format!("redis://{user_name}:{password}@{host}");
 
     let client = redis::Client::open(redis_connection_string)?;
     let connection = client.get_connection()?;

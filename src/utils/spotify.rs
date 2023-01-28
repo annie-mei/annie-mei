@@ -33,7 +33,7 @@ pub fn get_song_url(
 ) -> Option<String> {
     // TODO: Clean up nested Matches
     // If cached response if found, return it
-    let cache_key = format!("{}:{:#?}:{}", romaji_name, kana_name, artist_name);
+    let cache_key = format!("{romaji_name}:{kana_name:#?}:{artist_name}");
     match check_cache(&cache_key) {
         Ok(value) => {
             info!("Cache hit for {:#?}", cache_key);
@@ -93,7 +93,7 @@ fn send_search_request(
     let spotify = get_spotify_client();
     spotify.request_token().unwrap();
     spotify.search(
-        format!("track:{} artist:{}", song_name, artist_name).as_str(),
+        format!("track:{song_name} artist:{artist_name}").as_str(),
         SearchType::Track,
         Some(Market::Country(Country::UnitedStates)),
         None,

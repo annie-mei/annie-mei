@@ -1,24 +1,24 @@
 use titlecase::titlecase as imported_titlecase;
 
 pub fn bold(input: String) -> String {
-    format!("**{}**", input)
+    format!("**{input}**")
 }
 
 pub fn italics(input: String) -> String {
-    format!("*{}*", input)
+    format!("*{input}*")
 }
 
 pub fn code(input: String) -> String {
-    format!("`{}`", input)
+    format!("`{input}`")
 }
 
 #[allow(dead_code)]
 pub fn strike(input: String) -> String {
-    format!("~~{}~~", input)
+    format!("~~{input}~~")
 }
 
 pub fn linker(text: String, link: String) -> String {
-    format!("[{}]({})", text, link)
+    format!("[{text}]({link})")
 }
 
 pub fn remove_underscores_and_titlecase(text: &str) -> String {

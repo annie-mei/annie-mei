@@ -41,8 +41,8 @@ pub async fn run(ctx: &Context, interaction: &mut ApplicationCommandInteraction)
     let arg = interaction.data.options[0].resolved.to_owned().unwrap();
 
     info!(
-        "Got command 'manga' by user '{}' with args: {:#?}",
-        user.name, arg
+        "Got command 'manga' by user '{}' with args: {arg:#?}",
+        user.name
     );
 
     let response = task::spawn_blocking(move || fetcher(Type::Manga, arg))

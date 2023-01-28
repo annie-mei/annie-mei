@@ -10,13 +10,11 @@ const FIELDS_TO_FETCH: [&str; 3] = ["id", "opening_themes", "ending_themes"];
 
 fn build_mal_url(mal_id: u32) -> String {
     let mal_url = format!(
-        "{}/anime/{}?fields={}",
-        MY_ANIME_LIST_BASE,
-        mal_id,
+        "{MY_ANIME_LIST_BASE}/anime/{mal_id}?fields={}",
         FIELDS_TO_FETCH.join(",")
     );
 
-    info!("Sent MAL Request to URL: {:#?}", mal_url);
+    info!("Sent MAL Request to URL: {mal_url:#?}");
     mal_url
 }
 
