@@ -96,7 +96,7 @@ impl Anime {
 
     pub fn transform_duration(&self) -> String {
         match &self.duration {
-            Some(duration) => format!("{} mins", duration),
+            Some(duration) => format!("{duration} mins"),
             None => EMPTY_STR.to_string(),
         }
     }
@@ -257,6 +257,6 @@ impl Transformers for Anime {
 
     fn transform_mal_id(&self) -> Option<String> {
         self.id_mal
-            .map(|mal_id| format!("https://www.myanimelist.net/anime/{}", mal_id))
+            .map(|mal_id| format!("https://www.myanimelist.net/anime/{mal_id}"))
     }
 }

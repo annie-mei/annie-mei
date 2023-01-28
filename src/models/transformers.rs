@@ -122,7 +122,7 @@ pub trait Transformers {
 
     fn transform_score(&self) -> String {
         match self.get_average_score() {
-            Some(score) => format!("{}/100", score),
+            Some(score) => format!("{score}/100"),
             None => EMPTY_STR.to_string(),
         }
     }
@@ -142,8 +142,7 @@ pub trait Transformers {
 
         match url {
             Some(link) => format!(
-                "{}\n\n**{}**",
-                description,
+                "{description}\n\n**{}**",
                 linker("MyAnimeList".to_string(), link),
             ),
             None => description,

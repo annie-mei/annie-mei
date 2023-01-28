@@ -85,7 +85,7 @@ impl Manga {
         if is_end_date_available {
             let end_date = self.end_date.as_ref().unwrap();
             let formatted_end_date = get_formatted_date_string(end_date);
-            format!("{} - {}", formatted_start_date, formatted_end_date)
+            format!("{formatted_start_date} - {formatted_end_date}")
         } else {
             formatted_start_date
         }

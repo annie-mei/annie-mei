@@ -33,8 +33,8 @@ pub async fn run(ctx: &Context, interaction: &mut ApplicationCommandInteraction)
     let arg = interaction.data.options[0].resolved.to_owned().unwrap();
 
     info!(
-        "Got command 'register' by user '{}' with args: {:#?}",
-        user.name, arg
+        "Got command 'register' by user '{}' with args: {arg:#?}",
+        user.name
     );
 
     let anilist_username = match arg {

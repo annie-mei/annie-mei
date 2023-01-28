@@ -53,7 +53,7 @@ pub trait Response {
                 fetch_response.data.unwrap().media
             }
             Argument::Search(value) => {
-                let cache_key = format!("{}:{}", media_type.as_ref(), value);
+                let cache_key = format!("{}:{value}", media_type.as_ref());
                 let fetched_data = match check_cache(&cache_key) {
                     Ok(value) => {
                         info!("Cache hit for {:#?}", cache_key);
