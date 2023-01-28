@@ -24,6 +24,7 @@ pub async fn run(ctx: &Context, interaction: &ApplicationCommandInteraction) {
                             .field("/anime", "Search for an anime", false)
                             .field("/manga", "Search for a manga", false)
                             .field("/songs", "Lookup an anime's songs", false)
+                            .field("/register", "Tell me your Anilist username", false)
                             .field("/help", "Show this message", false)
                             .field("/ping", "Check if I'm reachable", false)
                             .footer(|f| f.text("Annie Mai"))
