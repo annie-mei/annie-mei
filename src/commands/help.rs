@@ -19,7 +19,7 @@ pub async fn run(ctx: &Context, interaction: &ApplicationCommandInteraction) {
                 .interaction_response_data(|m| {
                     m.embed(|e| {
                         e.colour(0x00ff00)
-                            .title(format!("Hello there {}!", user.name))
+                            .title(format!("Hello there <@{}>!", user.id))
                             .description("Use these commands to interact with Annie Mai!")
                             .field("/anime", "Search for an anime", false)
                             .field("/manga", "Search for a manga", false)
