@@ -71,10 +71,6 @@ pub async fn run(ctx: &Context, interaction: &mut ApplicationCommandInteraction)
     };
 }
 
-// TODO: Move this to Utils
-// TODO: Maybe use https://docs.rs/serenity/latest/serenity/model/channel/struct.Message.html
-//                 https://docs.rs/serenity/latest/serenity/model/channel/struct.Embed.html
-// and send proper embeds
 fn build_message_from_manga(manga: Manga, embed: &mut CreateEmbed) -> &mut CreateEmbed {
     embed
         .colour(manga.transform_color())

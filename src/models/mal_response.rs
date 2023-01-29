@@ -61,7 +61,6 @@ impl MalResponse {
             .unwrap();
 
             // Get Spotify URL
-            // TODO: Cache Requests
             let spotify_url = match &artist_names {
                 Some(artist_names) => Self::fetch_spotify_url(
                     Self::get_romaji_song_name(&song_name),

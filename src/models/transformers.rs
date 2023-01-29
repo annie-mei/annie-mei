@@ -10,7 +10,6 @@ pub trait Transformers {
     fn get_mal_id(&self) -> Option<u32>;
     fn get_english_title(&self) -> Option<String>;
     fn get_romaji_title(&self) -> Option<String>;
-    // TODO: Will fuzzy work with this?
     fn get_native_title(&self) -> Option<String>;
     fn get_synonyms(&self) -> Option<Vec<String>>;
     fn get_format(&self) -> Option<String>;
@@ -25,7 +24,6 @@ pub trait Transformers {
 
     fn transform_mal_id(&self) -> Option<String>;
 
-    // TODO: Maybe let people give preference for Primary and Secondary language
     fn transform_english_title(&self) -> String {
         let english_title = self.get_english_title();
         let return_title = match english_title {

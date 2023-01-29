@@ -32,7 +32,6 @@ pub struct Manga {
     average_score: Option<u32>,
     staff: Option<Staff>,
     site_url: String,
-    // TODO: Decide what to do with this
     #[allow(dead_code)]
     external_links: Option<Vec<ExternalLinks>>,
     description: Option<String>,

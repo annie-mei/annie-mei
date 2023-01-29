@@ -43,7 +43,6 @@ async fn after(_: &Context, _msg: &Message, command_name: &str, command_result: 
     }
 }
 
-// TODO: Add default reaction
 #[hook]
 #[instrument]
 async fn unknown_command(ctx: &Context, msg: &Message, unknown_command_name: &str) {
@@ -51,7 +50,6 @@ async fn unknown_command(ctx: &Context, msg: &Message, unknown_command_name: &st
     let reaction = parse_emoji("<:wtf:953730408158228570>").unwrap();
     let _ = msg.react(ctx, reaction).await;
 }
-// TODO: Figure out how to use this
 #[hook]
 async fn delay_action(ctx: &Context, msg: &Message) {
     // You may want to handle a Discord rate limit if this fails.

@@ -71,11 +71,6 @@ pub async fn run(ctx: &Context, interaction: &mut ApplicationCommandInteraction)
     };
 }
 
-// TODO: Move this to Utils
-// TODO: Maybe use https://docs.rs/serenity/latest/serenity/model/channel/struct.Message.html
-//                 https://docs.rs/serenity/latest/serenity/model/channel/struct.Embed.html
-// and send proper embeds
-
 fn build_message_from_song_response(
     mal_response: MalResponse,
     embed: &mut CreateEmbed,
@@ -85,6 +80,5 @@ fn build_message_from_song_response(
         .field("Openings", mal_response.transform_openings(), false)
         .field("Endings", mal_response.transform_endings(), false)
         .thumbnail(mal_response.transform_thumbnail())
-        // TODO: Also Add Anilist Link??
         .field("\u{200b}", mal_response.transform_mal_link(), false)
 }
