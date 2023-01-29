@@ -78,7 +78,7 @@ impl MalResponse {
                     write!(song_string, "{}", linker(bold(song_name), spotify_url)).unwrap();
                 }
                 None => {
-                    write!(song_string, "{}", song_name).unwrap();
+                    write!(song_string, "{song_name}").unwrap();
                 }
             }
 

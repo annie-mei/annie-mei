@@ -95,7 +95,7 @@ impl EventHandler for Handler {
                         })
                         .await;
                     if let Err(why) = msg {
-                        println!("Error sending message: {:?}", why);
+                        println!("Error sending message: {why:?}");
                         info!("Cannot respond to slash command: {why}");
                     }
                 }
@@ -170,6 +170,6 @@ async fn main() {
         .expect("Err creating client");
 
     if let Err(why) = client.start().await {
-        println!("Client error: {:?}", why);
+        println!("Client error: {why:?}");
     }
 }
