@@ -2,8 +2,7 @@ mod commands;
 mod models;
 mod utils;
 
-use std::env;
-
+use shuttle_secrets::SecretStore;
 use tracing::{debug, info, instrument};
 
 use serenity::{
@@ -130,10 +129,16 @@ impl EventHandler for Handler {
 }
 
 #[shuttle_service::main]
-#[instrument]
-async fn serenity() -> shuttle_service::ShuttleSerenity {
-    let environment = env::var(ENV).expect("Expected an environment in the environment");
-    let sentry_dsn = env::var(SENTRY_DSN).expect("Expected a sentry dsn in the environment");
+// #[instrument]
+async fn serenity(
+    #[shuttle_secrets::Secrets] secret_store: SecretStore,
+) -> shuttle_service::ShuttleSerenity {
+    let environment = secret_store
+        .get(ENV)
+        .expect("Expected an environment in the environment");
+    let sentry_dsn = secret_store
+        .get(SENTRY_DSN)
+        .expect("Expected a sentry dsn in the environment");
 
     let _guard = sentry::init((
         sentry_dsn,
@@ -150,7 +155,9 @@ async fn serenity() -> shuttle_service::ShuttleSerenity {
         .after(after)
         .unrecognised_command(unknown_command)
         .on_dispatch_error(dispatch_error);
-    let token = env::var(DISCORD_TOKEN).expect("Expected a token in the environment");
+    let token = secret_store
+        .get(DISCORD_TOKEN)
+        .expect("Expected a token in the environment");
     let intents = GatewayIntents::GUILD_MESSAGES
         | GatewayIntents::DIRECT_MESSAGES
         | GatewayIntents::MESSAGE_CONTENT;

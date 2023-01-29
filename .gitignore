@@ -17,3 +17,6 @@ target/
 
 #vscode files
 .vscode/
+
+# secrets
+Secrets.toml
