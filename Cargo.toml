@@ -4,6 +4,9 @@ version = "1.2.5"
 edition = "2021"
 
 [package.metadata.cross.target.armv7-unknown-linux-gnueabihf]
+pre-build = [
+  "dpkg --add-architecture armhf && apt-get update && apt-get install --assume-yes libpq-dev:armhf",
+]
 image = "ghcr.io/cross-rs/armv7-unknown-linux-gnueabihf:latest"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
