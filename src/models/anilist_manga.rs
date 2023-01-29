@@ -250,6 +250,6 @@ impl Transformers for Manga {
 
     fn transform_mal_id(&self) -> Option<String> {
         self.id_mal
-            .map(|mal_id| format!("https://www.myanimelist.net/manga/{}", mal_id))
+            .map(|mal_id| format!("https://www.myanimelist.net/manga/{mal_id}"))
     }
 }
