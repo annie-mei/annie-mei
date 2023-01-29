@@ -31,7 +31,6 @@ pub fn get_song_url(
     kana_name: Option<String>,
     artist_name: String,
 ) -> Option<String> {
-    // TODO: Clean up nested Matches
     // If cached response if found, return it
     let cache_key = format!("{romaji_name}:{kana_name:#?}:{artist_name}");
     match check_cache(&cache_key) {
@@ -47,7 +46,6 @@ pub fn get_song_url(
         }
     };
 
-    // TODO: Make this more functional
     let romaji_search = send_search_request(&romaji_name, &artist_name);
     match romaji_search {
         Ok(search_result) => {
@@ -105,7 +103,6 @@ fn send_search_request(
 fn get_url_from_search_result(search_result: SearchResult) -> Option<String> {
     if let SearchResult::Tracks(page) = search_result {
         // Gets URL for top result
-        // TODO: Improve this using fuzzy matching instead of just taking the first result
         if !page.items.is_empty() {
             let track = &page.items[0];
             info!("Found track: {track:#?}");

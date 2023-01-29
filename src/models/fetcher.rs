@@ -71,7 +71,6 @@ pub trait Response {
                 debug!("Deserialized response: {:#?}", fetch_response);
                 let result = fetch_response.fuzzy_match(value, media_type);
                 debug!("Fuzzy Response: {:#?}", result);
-                // TODO: Cache only the final result
                 result
             }
         };
@@ -123,25 +122,3 @@ impl Response for MangaConfig {
         self.search_query.to_owned()
     }
 }
-
-// TODO: Custom deserializer?
-// impl serde::Serialize for Argument {
-//     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-//     where
-//         S: serde::Serializer,
-//     {
-//         let mut request = serializer.serialize_struct("Argument", 2)?;
-//         request.serialize_field("query", FETCH_ANIME)?;
-//         let mut variables = serializer.serialize_struct("variables", 1)?;
-//         match self {
-//             Self::Id(id) => {
-//                 variables.serialize_field("id", id)?;
-//             }
-//             Self::Search(search) => {
-//                 variables.serialize_field("search", search)?;
-//             }
-//         }
-//         request.serialize_field("variables", &variables.end()?)?;
-//         request.end()
-//     }
-// }

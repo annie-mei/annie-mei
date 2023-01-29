@@ -13,5 +13,3 @@ pub const SPOTIFY_CLIENT_ID: &str = "SPOTIFY_CLIENT_ID";
 pub const SPOTIFY_CLIENT_SECRET: &str = "SPOTIFY_CLIENT_SECRET";
 pub const MAL_CLIENT_ID: &str = "MAL_CLIENT_ID";
 pub const DATABASE_URL: &str = "DATABASE_URL";
-
-// TODO: Add reaction => <:sadge:868530481208123403>
