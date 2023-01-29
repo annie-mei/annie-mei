@@ -20,7 +20,7 @@ pub async fn run(ctx: &Context, interaction: &ApplicationCommandInteraction) {
                 .interaction_response_data(|m| {
                     m.content(format!(
                         "Hello {}! I'm Annie Mai, a bot that helps you find anime and manga!",
-                        user.name
+                        user.mention()
                     ))
                 })
         })
