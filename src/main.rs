@@ -22,7 +22,10 @@ use serenity::{
     utils::parse_emoji,
 };
 
-use utils::statics::{DISCORD_TOKEN, ENV, SENTRY_DSN};
+use utils::{
+    database::run_migration,
+    statics::{DISCORD_TOKEN, ENV, SENTRY_DSN},
+};
 
 #[hook]
 #[instrument]
@@ -148,7 +151,8 @@ async fn main() {
         },
     ));
 
-    let _connection = &mut utils::database::establish_connection();
+    let connection = &mut utils::database::establish_connection();
+    run_migration(connection);
 
     let framework = StandardFramework::new()
         .configure(|c| c.prefix("!"))
