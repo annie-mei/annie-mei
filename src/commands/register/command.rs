@@ -25,6 +25,7 @@ pub fn register(command: &mut CreateApplicationCommand) -> &mut CreateApplicatio
                 .name("anilist")
                 .description("Anilist username")
                 .kind(CommandOptionType::String)
+                .required(true)
         })
 }
 
