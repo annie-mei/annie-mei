@@ -62,34 +62,22 @@ async fn register_new_user(anilist_username: String, user: &serenity::model::use
 
     let connection = &mut database::establish_connection();
 
-    let response = match User::get_user_by_discord_id(user.id.into(), connection) {
-        Some(db_user) => {
-            info!(
-                "User with details: id: {}, anilist_id: {}, anilist_username: {} already exists",
-                db_user.discord_id, db_user.anilist_id, db_user.anilist_username
-            );
-            format!(
-                "Hello {}, This account is already associated with the Anilist user {}.",
-                user.name, db_user.anilist_username
-            )
-        }
-        None => {
-            User::create_user(
-                user.id.into(),
-                anilist_id,
-                anilist_username.to_owned(),
-                connection,
-            );
+    let response = {
+        User::create_or_update_user(
+            user.id.into(),
+            anilist_id,
+            anilist_username.to_owned(),
+            connection,
+        );
 
-            info!(
-                "Created user with details: id: {}, anilist_id: {}, anilist_username: {}",
-                user.id, anilist_id, anilist_username
-            );
-            format!(
-                "Hello {}, I have linked your Anilist account {} to your user.",
-                user.name, anilist_username
-            )
-        }
+        info!(
+            "Created user with details: id: {}, anilist_id: {}, anilist_username: {}",
+            user.id, anilist_id, anilist_username
+        );
+        format!(
+            "Hello {}, I have linked the Anilist account {} to your user.",
+            user.name, anilist_username
+        )
     };
     response
 }
