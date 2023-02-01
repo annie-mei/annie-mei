@@ -20,7 +20,7 @@ impl User {
             .ok()
     }
 
-    pub fn create_user(
+    pub fn create_or_update_user(
         discord_id: i64,
         anilist_id: i64,
         anilist_username: String,
@@ -31,10 +31,16 @@ impl User {
             .values((
                 users::discord_id.eq(discord_id),
                 users::anilist_id.eq(anilist_id),
+                users::anilist_username.eq(anilist_username.to_owned()),
+            ))
+            .on_conflict(users::discord_id)
+            .do_update()
+            .set((
+                users::anilist_id.eq(anilist_id),
                 users::anilist_username.eq(anilist_username),
             ))
             .get_result(conn)
-            .expect("Error saving new user")
+            .expect("Error saving user")
     }
 
     pub fn get_anilist_id_from_username(username: &str) -> i64 {
