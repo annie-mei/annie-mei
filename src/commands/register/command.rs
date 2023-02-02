@@ -60,9 +60,17 @@ async fn register_new_user(anilist_username: String, user: &serenity::model::use
             .await
             .unwrap();
 
+    if anilist_id.is_none() {
+        return format!(
+            "Hello {}, I could not find the Anilist account {}.",
+            user.name, anilist_username
+        );
+    };
+
     let connection = &mut database::establish_connection();
 
     let response = {
+        let anilist_id = anilist_id.unwrap();
         User::create_or_update_user(
             user.id.into(),
             anilist_id,
