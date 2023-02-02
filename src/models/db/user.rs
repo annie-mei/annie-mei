@@ -43,7 +43,7 @@ impl User {
             .expect("Error saving user")
     }
 
-    pub fn get_anilist_id_from_username(username: &str) -> i64 {
+    pub fn get_anilist_id_from_username(username: &str) -> Option<i64> {
         let body = json!({
             "query": "query ($username: String) { User (name: $username) { id } }",
             "variables": {
@@ -55,6 +55,6 @@ impl User {
         info!("Result: {:#?}", result);
         let result: serde_json::Value = serde_json::from_str(&result).unwrap();
 
-        result["data"]["User"]["id"].as_i64().unwrap()
+        result["data"]["User"]["id"].as_i64()
     }
 }
