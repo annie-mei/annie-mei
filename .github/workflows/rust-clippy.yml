@@ -15,18 +15,13 @@ jobs:
       security-events: write
       actions: read
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v2
-
-      - name: Install Rust toolchain
-        uses: actions-rs/toolchain@16499b5e05bf2e26879000db0c1d13f7e13fa3af #@v1
-        with:
-          profile: minimal
-          toolchain: stable
-          components: clippy
-          override: true
-
-      - name: Install required cargo
+      - name: Build-checkout
+        uses: actions/checkout@v3
+      - name: Install Rust
+        run: rustup update stable && rustup default stable
+      - name: Cache
+        uses: Swatinem/rust-cache@v2.2.0
+      - name: Install crates
         run: cargo install clippy-sarif sarif-fmt
       - name: Run Clippy
         run: cargo clippy
