@@ -1,6 +1,7 @@
 on:
+  workflow_dispatch:
+    description: "Build and release"
   pull_request:
-    # Sequence of patterns matched against refs/heads
     branches-ignore:
       - "dependabot/*"
 

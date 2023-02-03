@@ -1,4 +1,6 @@
 on:
+  workflow_dispatch:
+    description: "Build and release (beta)"
   push:
     paths-ignore:
       - "**/README.md"
