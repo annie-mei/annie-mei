@@ -195,6 +195,10 @@ impl Anime {
 }
 
 impl Transformers for Anime {
+    fn get_id(&self) -> u32 {
+        self.id
+    }
+
     fn get_type(&self) -> String {
         self.media_type.as_ref().unwrap().to_string().to_lowercase()
     }

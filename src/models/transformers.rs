@@ -6,6 +6,7 @@ use crate::{
 use html2md::parse_html;
 
 pub trait Transformers {
+    fn get_id(&self) -> u32;
     fn get_type(&self) -> String;
     fn get_mal_id(&self) -> Option<u32>;
     fn get_english_title(&self) -> Option<String>;
