@@ -8,3 +8,4 @@ pub mod mal_response;
 pub mod media_response;
 pub mod media_type;
 pub mod transformers;
+pub mod user_media_list;
