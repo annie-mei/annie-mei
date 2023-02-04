@@ -7,5 +7,6 @@ pub mod queries;
 pub mod redis;
 pub mod requests;
 pub mod response_fetcher;
+pub mod score;
 pub mod spotify;
 pub mod statics;
