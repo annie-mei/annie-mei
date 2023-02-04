@@ -1,5 +1,25 @@
-use serenity::model::prelude::{Guild, UserId};
+use serenity::{
+    client::Context,
+    model::application::interaction::application_command::ApplicationCommandInteraction,
+    model::prelude::{Guild, UserId},
+};
+use tracing::info;
 
-pub fn get_guild_member_ids(guild: Guild) -> Vec<UserId> {
-    guild.members.keys().map(|id| *id).collect()
+fn get_guild_member_ids(guild: Guild) -> Vec<UserId> {
+    let members: Vec<UserId> = guild.members.keys().copied().collect();
+    info!("Found {:#?} members in guild", members.len());
+    members
+}
+
+fn get_guild_from_interaction(ctx: &Context, interaction: &ApplicationCommandInteraction) -> Guild {
+    let guild_id = interaction.guild_id.unwrap();
+    guild_id.to_guild_cached(&ctx.cache).unwrap()
+}
+
+pub fn get_current_guild_members(
+    ctx: &Context,
+    interaction: &ApplicationCommandInteraction,
+) -> Vec<UserId> {
+    let guild = get_guild_from_interaction(ctx, interaction);
+    get_guild_member_ids(guild)
 }
