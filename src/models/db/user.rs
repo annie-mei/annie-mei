@@ -3,7 +3,7 @@ use serde_json::json;
 use serenity::model::prelude::UserId;
 use tracing::info;
 
-use crate::utils::requests::anilist::send_request;
+use crate::utils::{queries::FETCH_ANILIST_USER, requests::anilist::send_request};
 
 #[derive(Queryable)]
 pub struct User {
@@ -50,7 +50,7 @@ impl User {
 
     pub fn get_anilist_id_from_username(username: &str) -> Option<i64> {
         let body = json!({
-            "query": "query ($username: String) { User (name: $username) { id } }",
+            "query": FETCH_ANILIST_USER,
             "variables": {
                 "username": username
             }

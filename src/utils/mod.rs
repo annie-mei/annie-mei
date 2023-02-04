@@ -3,6 +3,7 @@ pub mod fetch_by_arguments;
 pub mod formatter;
 pub mod fuzzy;
 pub mod guild;
+pub mod queries;
 pub mod redis;
 pub mod requests;
 pub mod response_fetcher;
