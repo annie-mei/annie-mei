@@ -4,9 +4,8 @@ use crate::{
         manga::queries::{FETCH_MANGA, FETCH_MANGA_BY_ID},
     },
     models::{
-        id_response::FetchResponse as IdResponse,
-        media_list_response::FetchResponse as MediaListResponse, media_type::MediaType as Type,
-        transformers::Transformers,
+        id_response::FetchResponse as IdResponse, media_response::FetchResponse as MediaResponse,
+        media_type::MediaType as Type, transformers::Transformers,
     },
     utils::{
         fetch_by_arguments::{fetch_by_id, fetch_by_name},
@@ -66,8 +65,7 @@ pub trait Response {
                         response
                     }
                 };
-                let fetch_response: MediaListResponse<T> =
-                    serde_json::from_str(&fetched_data).unwrap();
+                let fetch_response: MediaResponse<T> = serde_json::from_str(&fetched_data).unwrap();
                 debug!("Deserialized response: {:#?}", fetch_response);
                 let result = fetch_response.fuzzy_match(value, media_type);
                 debug!("Fuzzy Response: {:#?}", result);

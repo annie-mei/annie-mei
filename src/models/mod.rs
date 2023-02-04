@@ -5,6 +5,6 @@ pub mod db;
 pub mod fetcher;
 pub mod id_response;
 pub mod mal_response;
-pub mod media_list_response;
+pub mod media_response;
 pub mod media_type;
 pub mod transformers;
