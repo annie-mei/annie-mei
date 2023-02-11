@@ -1,6 +1,10 @@
 use crate::{
     models::{anilist_anime::Anime, media_type::MediaType as Type, transformers::Transformers},
-    utils::{response_fetcher::fetcher, statics::NOT_FOUND_ANIME},
+    utils::{
+        guild::{get_current_guild_members, get_guild_scores_for_media},
+        response_fetcher::fetcher,
+        statics::NOT_FOUND_ANIME,
+    },
 };
 
 use serenity::{
@@ -45,7 +49,7 @@ pub async fn run(ctx: &Context, interaction: &mut ApplicationCommandInteraction)
         user.name,
     );
 
-    let response = task::spawn_blocking(move || fetcher(Type::Anime, arg))
+    let response: Option<Anime> = task::spawn_blocking(move || fetcher(Type::Anime, arg))
         .await
         .unwrap();
 
@@ -59,6 +63,23 @@ pub async fn run(ctx: &Context, interaction: &mut ApplicationCommandInteraction)
                 .await
         }
         Some(anime_response) => {
+            // TODO: Refactor this to fetcher.rs
+
+            let guild_members = get_current_guild_members(ctx, interaction);
+            let also_anime = anime_response.clone();
+
+            if guild_members.is_empty() {
+                info!("No users found in guild")
+            } else {
+                let scores = task::spawn_blocking(move || {
+                    get_guild_scores_for_media(also_anime, guild_members)
+                })
+                .await
+                .unwrap()
+                .await;
+                info!("Guild scores: {:#?}", scores);
+            }
+
             interaction
                 .create_interaction_response(&ctx.http, |response| {
                     { response.kind(InteractionResponseType::ChannelMessageWithSource) }
