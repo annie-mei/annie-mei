@@ -106,14 +106,18 @@ fn build_message_from_manga(
         .title(manga.transform_romaji_title())
         .description(manga.transform_description_and_mal_link())
         .fields(vec![
-            ("Type", "Manga", true),                          // Field 0
-            ("Status", &manga.transform_status(), true),      // Field 1
-            ("Serialization", &manga.transform_date(), true), // Field 2
+            ("Type", "Manga", true),                     // Field 0
+            ("Status", &manga.transform_status(), true), // Field 1
+            (
+                "Serialization",
+                &manga.transform_season_serialization(),
+                true,
+            ), // Field 2
         ])
         .fields(vec![
             ("Format", &manga.transform_format(), true), // Field 3
-            ("Chapters", &manga.transform_chapters(), true), // Field 4
-            ("Volumes", &manga.transform_volumes(), true), // Field 5
+            ("Chapters", &manga.transform_episodes_chapters(), true), // Field 4
+            ("Volumes", &manga.transform_duration_volumes(), true), // Field 5
         ])
         .fields(vec![
             ("Source", &manga.transform_source(), true), // Field 6
@@ -122,7 +126,7 @@ fn build_message_from_manga(
             ("Top Tag", &manga.transform_tags(), true), // Field 8
         ])
         .field("Genres", &manga.transform_genres(), false) // Field 9
-        .field("Staff", &manga.transform_staff(), false) // Field 10
+        .field("Staff", &manga.transform_studios_staff(), false) // Field 10
         // .field("Mangadex Link", &manga.build_mangadex_link(), false) // Field 11
         .footer(|f| f.text(manga.transform_english_title()))
         .url(&manga.transform_anilist())

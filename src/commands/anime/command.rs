@@ -106,14 +106,14 @@ fn build_message_from_anime(
         .title(anime.transform_romaji_title())
         .description(anime.transform_description_and_mal_link())
         .fields(vec![
-            ("Type", "Anime", true),                     // Field 0
-            ("Status", &anime.transform_status(), true), // Field 1
-            ("Season", &anime.transform_season(), true), // Field 2
+            ("Type", "Anime", true),                                   // Field 0
+            ("Status", &anime.transform_status(), true),               // Field 1
+            ("Season", &anime.transform_season_serialization(), true), // Field 2
         ])
         .fields(vec![
             ("Format", &anime.transform_format(), true), // Field 3
-            ("Episodes", &anime.transform_episodes(), true), // Field 4
-            ("Duration", &anime.transform_duration(), true), // Field 5
+            ("Episodes", &anime.transform_episodes_chapters(), true), // Field 4
+            ("Duration", &anime.transform_duration_volumes(), true), // Field 5
         ])
         .fields(vec![
             ("Source", &anime.transform_source(), true), // Field 6
@@ -122,7 +122,7 @@ fn build_message_from_anime(
             ("Top Tag", &anime.transform_tags(), true), // Field 8
         ])
         .field("Genres", &anime.transform_genres(), false) // Field 9
-        .field("Studios", &anime.transform_studios(), false) // Field 10
+        .field("Studios", &anime.transform_studios_staff(), false) // Field 10
         .fields(vec![
             ("Streaming", &anime.transform_links(), true), // Field 11
             ("Trailer", &anime.transform_trailer(), true), // Field 12
