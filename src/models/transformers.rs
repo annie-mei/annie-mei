@@ -1,9 +1,12 @@
+use std::collections::HashMap;
+
 use crate::{
     models::anilist_common::{CoverImage, Tag},
     utils::{formatter::*, statics::EMPTY_STR},
 };
 
 use html2md::parse_html;
+use serenity::builder::CreateEmbed;
 
 pub trait Transformers {
     fn get_id(&self) -> u32;
@@ -162,5 +165,100 @@ pub trait Transformers {
         } else {
             italics(tags_list.first().unwrap().name.to_string())
         }
+    }
+}
+
+// Creating an anti-pattern with this function
+// but I want it to eventually end up as part of the trait
+
+pub fn build_message_from_media<T: Transformers>(
+    media: T,
+    scores: Option<HashMap<i64, u32>>,
+    embed: &mut CreateEmbed,
+) -> &mut CreateEmbed {
+    let is_anime = media.get_type() == "ANIME";
+    embed
+        // General Embed Fields
+        .color(media.transform_color())
+        .title(media.transform_romaji_title())
+        .description(media.transform_description_and_mal_link())
+        .url(media.transform_anilist())
+        .thumbnail(media.transform_thumbnail())
+        .footer(|f| f.text(media.transform_english_title()))
+        // Media Data Fields
+        // First line after MAL link
+        .fields(vec![
+            ("Type", media.get_type(), true),
+            ("Status", media.transform_status(), true),
+            {
+                if is_anime {
+                    ("Season", media.transform_season_serialization(), true)
+                } else {
+                    (
+                        "Serialization",
+                        media.transform_season_serialization(),
+                        true,
+                    )
+                }
+            },
+        ])
+        // Second line after MAL link
+        .fields(vec![
+            ("Format", media.transform_format(), true),
+            {
+                if is_anime {
+                    ("Episodes", media.transform_episodes_chapters(), true)
+                } else {
+                    ("Chapters", media.transform_episodes_chapters(), true)
+                }
+            },
+            {
+                if is_anime {
+                    ("Duration", media.transform_duration_volumes(), true)
+                } else {
+                    ("Volumes", media.transform_duration_volumes(), true)
+                }
+            },
+        ])
+        // Third line after MAL link
+        .fields(vec![
+            ("Source", media.transform_source(), true), // Field 6
+            ("Average Score", media.transform_score(), true), // Field 7
+            // ("\u{200b}", &"\u{200b}".to_string(), true), // Would add a blank field
+            ("Top Tag", media.transform_tags(), true), // Field 8
+        ])
+        // Fourth line after MAL link
+        .fields(vec![("Genres", media.transform_genres(), false)])
+        // Fifth line after MAL link
+        .field(
+            {
+                if is_anime {
+                    "Studios"
+                } else {
+                    "Staff"
+                }
+            },
+            media.transform_studios_staff(),
+            false,
+        );
+
+    // Sixth line after MAL link (Only for Anime response)
+    if is_anime {
+        embed.fields(vec![
+            ("Streaming", media.transform_links(), true), // Field 11
+            ("Trailer", media.transform_trailer(), true), // Field 12
+        ]);
+    }
+
+    // Build the scores field and return the embed
+    match scores {
+        Some(scores) => {
+            let mut score_string = String::default();
+            for (user_id, score) in scores {
+                score_string.push_str(&format!("<@{user_id}>: {score}\n"));
+            }
+            embed.field("Scores", &score_string, false)
+        }
+        None => embed,
     }
 }
