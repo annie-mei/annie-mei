@@ -138,60 +138,6 @@ impl Anime {
 
         main_studios.join(" x ")
     }
-
-    pub fn transform_links(&self) -> String {
-        let return_string: String = match &self.external_links {
-            Some(links) => {
-                if links.is_empty() {
-                    EMPTY_STR.to_string()
-                } else {
-                    let parsed_links = links
-                        .iter()
-                        .filter(|link| link.url_type.to_lowercase() == "streaming")
-                        .map(|link| link.url.to_string())
-                        .collect::<Vec<String>>()
-                        .into_iter()
-                        .filter(|link| match link {
-                            _ if link.contains("hbo") => true,
-                            _ if link.contains("netflix") => true,
-                            _ if link.contains("crunchyroll") => true,
-                            _ => false,
-                        })
-                        .collect::<Vec<String>>()
-                        .into_iter()
-                        .map(|link| match link {
-                            _ if link.contains("hbo") => linker("HBO".to_string(), link),
-                            _ if link.contains("netflix") => linker("Netflix".to_string(), link),
-                            _ if link.contains("crunchyroll") => {
-                                linker("Crunchyroll".to_string(), link)
-                            }
-                            _ => "Invalid".to_string(),
-                        })
-                        .collect::<Vec<String>>()
-                        .join(" ");
-                    if !parsed_links.is_empty() {
-                        parsed_links
-                    } else {
-                        EMPTY_STR.to_string()
-                    }
-                }
-            }
-            None => EMPTY_STR.to_string(),
-        };
-
-        return_string
-    }
-
-    pub fn transform_trailer(&self) -> String {
-        match &self.trailer {
-            None => String::from("None"),
-            Some(trailer) => {
-                let url: String =
-                    format!("https://www.{}.com/watch?v={}", trailer.site, trailer.id);
-                linker("YouTube".to_string(), url)
-            }
-        }
-    }
 }
 
 impl Transformers for Anime {
@@ -281,10 +227,72 @@ impl Transformers for Anime {
     }
 
     fn transform_links(&self) -> String {
-        self.transform_links()
+        let return_string: String = match &self.external_links {
+            Some(links) => {
+                if links.is_empty() {
+                    EMPTY_STR.to_string()
+                } else {
+                    let parsed_links = links
+                        .iter()
+                        .filter(|link| link.url_type.to_lowercase() == "streaming")
+                        .map(|link| link.url.to_string())
+                        .collect::<Vec<String>>()
+                        .into_iter()
+                        .filter(|link| match link {
+                            _ if link.contains("hbo") => true,
+                            _ if link.contains("netflix") => true,
+                            _ if link.contains("crunchyroll") => true,
+                            _ => false,
+                        })
+                        .collect::<Vec<String>>()
+                        .into_iter()
+                        .map(|link| match link {
+                            _ if link.contains("hbo") => linker("HBO".to_string(), link),
+                            _ if link.contains("netflix") => linker("Netflix".to_string(), link),
+                            _ if link.contains("crunchyroll") => {
+                                linker("Crunchyroll".to_string(), link)
+                            }
+                            _ => "Invalid".to_string(),
+                        })
+                        .collect::<Vec<String>>()
+                        .join(" ");
+                    if !parsed_links.is_empty() {
+                        parsed_links
+                    } else {
+                        EMPTY_STR.to_string()
+                    }
+                }
+            }
+            None => EMPTY_STR.to_string(),
+        };
+
+        return_string
     }
 
     fn transform_trailer(&self) -> String {
-        self.transform_trailer()
+        match &self.trailer {
+            None => String::from("None"),
+            Some(trailer) => {
+                let url: String =
+                    format!("https://www.{}.com/watch?v={}", trailer.site, trailer.id);
+                linker("YouTube".to_string(), url)
+            }
+        }
+    }
+
+    fn get_season_serialization_text(&self) -> &str {
+        "Season"
+    }
+
+    fn get_episodes_chapters_text(&self) -> &str {
+        "Episodes"
+    }
+
+    fn get_duration_volumes_text(&self) -> &str {
+        "Duration"
+    }
+
+    fn get_studios_staff_text(&self) -> &str {
+        "Studios"
     }
 }

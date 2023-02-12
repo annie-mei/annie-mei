@@ -34,6 +34,11 @@ pub trait Transformers {
     fn transform_links(&self) -> String;
     fn transform_trailer(&self) -> String;
 
+    fn get_season_serialization_text(&self) -> &str;
+    fn get_episodes_chapters_text(&self) -> &str;
+    fn get_duration_volumes_text(&self) -> &str;
+    fn get_studios_staff_text(&self) -> &str;
+
     fn transform_english_title(&self) -> String {
         let english_title = self.get_english_title();
         let return_title = match english_title {
@@ -190,35 +195,25 @@ pub fn build_message_from_media<T: Transformers>(
         .fields(vec![
             ("Type", media.get_type(), true),
             ("Status", media.transform_status(), true),
-            {
-                if is_anime {
-                    ("Season", media.transform_season_serialization(), true)
-                } else {
-                    (
-                        "Serialization",
-                        media.transform_season_serialization(),
-                        true,
-                    )
-                }
-            },
+            (
+                media.get_season_serialization_text(),
+                media.transform_season_serialization(),
+                true,
+            ),
         ])
         // Second line after MAL link
         .fields(vec![
             ("Format", media.transform_format(), true),
-            {
-                if is_anime {
-                    ("Episodes", media.transform_episodes_chapters(), true)
-                } else {
-                    ("Chapters", media.transform_episodes_chapters(), true)
-                }
-            },
-            {
-                if is_anime {
-                    ("Duration", media.transform_duration_volumes(), true)
-                } else {
-                    ("Volumes", media.transform_duration_volumes(), true)
-                }
-            },
+            (
+                media.get_episodes_chapters_text(),
+                media.transform_episodes_chapters(),
+                true,
+            ),
+            (
+                media.get_duration_volumes_text(),
+                media.transform_duration_volumes(),
+                true,
+            ),
         ])
         // Third line after MAL link
         .fields(vec![
@@ -231,13 +226,7 @@ pub fn build_message_from_media<T: Transformers>(
         .fields(vec![("Genres", media.transform_genres(), false)])
         // Fifth line after MAL link
         .field(
-            {
-                if is_anime {
-                    "Studios"
-                } else {
-                    "Staff"
-                }
-            },
+            media.get_studios_staff_text(),
             media.transform_studios_staff(),
             false,
         );

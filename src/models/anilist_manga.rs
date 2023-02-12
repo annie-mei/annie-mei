@@ -280,4 +280,20 @@ impl Transformers for Manga {
     fn transform_trailer(&self) -> String {
         EMPTY_STR.to_string()
     }
+
+    fn get_season_serialization_text(&self) -> &str {
+        "Serialization"
+    }
+
+    fn get_episodes_chapters_text(&self) -> &str {
+        "Chapters"
+    }
+
+    fn get_duration_volumes_text(&self) -> &str {
+        "Volumes"
+    }
+
+    fn get_studios_staff_text(&self) -> &str {
+        "Staff"
+    }
 }
