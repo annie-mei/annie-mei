@@ -1,9 +1,12 @@
+use std::collections::HashMap;
+
 use crate::{
     models::anilist_common::{CoverImage, Tag},
     utils::{formatter::*, statics::EMPTY_STR},
 };
 
 use html2md::parse_html;
+use serenity::builder::CreateEmbed;
 
 pub trait Transformers {
     fn get_id(&self) -> u32;
@@ -24,6 +27,17 @@ pub trait Transformers {
     fn get_tags(&self) -> Vec<Tag>;
 
     fn transform_mal_id(&self) -> Option<String>;
+    fn transform_season_serialization(&self) -> String;
+    fn transform_episodes_chapters(&self) -> String;
+    fn transform_duration_volumes(&self) -> String;
+    fn transform_studios_staff(&self) -> String;
+    fn transform_links(&self) -> String;
+    fn transform_trailer(&self) -> String;
+
+    fn get_season_serialization_text(&self) -> &str;
+    fn get_episodes_chapters_text(&self) -> &str;
+    fn get_duration_volumes_text(&self) -> &str;
+    fn get_studios_staff_text(&self) -> &str;
 
     fn transform_english_title(&self) -> String {
         let english_title = self.get_english_title();
@@ -156,5 +170,79 @@ pub trait Transformers {
         } else {
             italics(tags_list.first().unwrap().name.to_string())
         }
+    }
+
+    fn transform_response_embed(&self, scores: Option<HashMap<i64, u32>>) -> CreateEmbed {
+        let is_anime = self.get_type() == "anime";
+        let mut embed = CreateEmbed::default();
+        embed
+            // General Embed Fields
+            .color(self.transform_color())
+            .title(self.transform_romaji_title())
+            .description(self.transform_description_and_mal_link())
+            .url(self.transform_anilist())
+            .thumbnail(self.transform_thumbnail())
+            .footer(|f| f.text(self.transform_english_title()))
+            // self Data Fields
+            // First line after MAL link
+            .fields(vec![
+                ("Type", titlecase(&self.get_type()), true),
+                ("Status", self.transform_status(), true),
+                (
+                    self.get_season_serialization_text(),
+                    self.transform_season_serialization(),
+                    true,
+                ),
+            ])
+            // Second line after MAL link
+            .fields(vec![
+                ("Format", self.transform_format(), true),
+                (
+                    self.get_episodes_chapters_text(),
+                    self.transform_episodes_chapters(),
+                    true,
+                ),
+                (
+                    self.get_duration_volumes_text(),
+                    self.transform_duration_volumes(),
+                    true,
+                ),
+            ])
+            // Third line after MAL link
+            .fields(vec![
+                ("Source", self.transform_source(), true),       // Field 6
+                ("Average Score", self.transform_score(), true), // Field 7
+                // ("\u{200b}", &"\u{200b}".to_string(), true), // Would add a blank field
+                ("Top Tag", self.transform_tags(), true), // Field 8
+            ])
+            // Fourth line after MAL link
+            .fields(vec![("Genres", self.transform_genres(), false)])
+            // Fifth line after MAL link
+            .field(
+                self.get_studios_staff_text(),
+                self.transform_studios_staff(),
+                false,
+            );
+
+        // Sixth line after MAL link (Only for Anime response)
+        if is_anime {
+            embed.fields(vec![
+                ("Streaming", self.transform_links(), true), // Field 11
+                ("Trailer", self.transform_trailer(), true), // Field 12
+            ]);
+        }
+
+        // Build the scores field and return the embed
+        let embed = match scores {
+            Some(scores) => {
+                let mut score_string = String::default();
+                for (user_id, score) in scores {
+                    score_string.push_str(&format!("<@{user_id}>: {score}\n"));
+                }
+                embed.field("Scores", &score_string, false)
+            }
+            None => &mut embed,
+        };
+        embed.clone()
     }
 }
