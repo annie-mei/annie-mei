@@ -70,21 +70,18 @@ pub async fn run(ctx: &Context, interaction: &mut ApplicationCommandInteraction)
             let guild_members = get_current_guild_members(ctx, interaction);
             let also_manga = manga_response.clone();
 
-            let scores = match guild_members.is_empty() {
-                true => {
-                    info!("No users found in guild");
-                    None
-                }
-                false => {
-                    let scores = task::spawn_blocking(move || {
-                        get_guild_scores_for_media(also_manga, guild_members)
-                    })
-                    .await
-                    .unwrap()
-                    .await;
-                    info!("Guild scores: {:#?}", scores);
-                    Some(scores)
-                }
+            let scores = if guild_members.is_empty() {
+                info!("No users found in guild");
+                None
+            } else {
+                let scores = task::spawn_blocking(move || {
+                    get_guild_scores_for_media(also_manga, guild_members)
+                })
+                .await
+                .unwrap()
+                .await;
+                info!("Guild scores: {:#?}", scores);
+                Some(scores)
             };
 
             interaction
