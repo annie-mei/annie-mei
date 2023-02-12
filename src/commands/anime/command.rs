@@ -133,7 +133,7 @@ fn build_message_from_anime(
 
     match scores {
         Some(scores) => {
-            let mut score_string = String::new();
+            let mut score_string = String::default();
             for (user_id, score) in scores {
                 score_string.push_str(&format!("<@{user_id}>: {score}\n"));
             }
