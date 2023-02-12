@@ -1,8 +1,9 @@
 use diesel::prelude::*;
 use serde_json::json;
+use serenity::model::prelude::UserId;
 use tracing::info;
 
-use crate::utils::requests::anilist::send_request;
+use crate::utils::{queries::FETCH_ANILIST_USER, requests::anilist::send_request};
 
 #[derive(Queryable)]
 pub struct User {
@@ -12,11 +13,15 @@ pub struct User {
 }
 
 impl User {
-    pub fn get_user_by_discord_id(user_discord_id: i64, conn: &mut PgConnection) -> Option<User> {
+    pub fn get_users_by_discord_id(
+        user_discord_ids: Vec<UserId>,
+        conn: &mut PgConnection,
+    ) -> Option<Vec<User>> {
         use crate::schema::users::dsl::*;
+        let user_discord_ids: Vec<i64> = user_discord_ids.iter().map(|id| id.0 as i64).collect();
         users
-            .filter(discord_id.eq(user_discord_id))
-            .first::<User>(conn)
+            .filter(discord_id.eq_any(user_discord_ids))
+            .load::<User>(conn)
             .ok()
     }
 
@@ -45,7 +50,7 @@ impl User {
 
     pub fn get_anilist_id_from_username(username: &str) -> Option<i64> {
         let body = json!({
-            "query": "query ($username: String) { User (name: $username) { id } }",
+            "query": FETCH_ANILIST_USER,
             "variables": {
                 "username": username
             }

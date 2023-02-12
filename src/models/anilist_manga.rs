@@ -188,6 +188,10 @@ fn get_formatted_date_string(date: &AnilistDate) -> String {
 }
 
 impl Transformers for Manga {
+    fn get_id(&self) -> u32 {
+        self.id
+    }
+
     fn get_type(&self) -> String {
         self.media_type.as_ref().unwrap().to_string().to_lowercase()
     }
