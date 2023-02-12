@@ -181,7 +181,7 @@ pub fn build_message_from_media<T: Transformers>(
     scores: Option<HashMap<i64, u32>>,
     embed: &mut CreateEmbed,
 ) -> &mut CreateEmbed {
-    let is_anime = media.get_type() == "ANIME";
+    let is_anime = media.get_type() == "anime";
     embed
         // General Embed Fields
         .color(media.transform_color())
@@ -193,7 +193,7 @@ pub fn build_message_from_media<T: Transformers>(
         // Media Data Fields
         // First line after MAL link
         .fields(vec![
-            ("Type", media.get_type(), true),
+            ("Type", titlecase(&media.get_type()), true),
             ("Status", media.transform_status(), true),
             (
                 media.get_season_serialization_text(),
