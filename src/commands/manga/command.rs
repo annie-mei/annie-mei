@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use crate::{
     models::{anilist_manga::Manga, media_type::MediaType as Type, transformers::Transformers},
     utils::{
@@ -68,23 +70,28 @@ pub async fn run(ctx: &Context, interaction: &mut ApplicationCommandInteraction)
             let guild_members = get_current_guild_members(ctx, interaction);
             let also_manga = manga_response.clone();
 
-            if guild_members.is_empty() {
-                info!("No users found in guild")
-            } else {
-                let scores = task::spawn_blocking(move || {
-                    get_guild_scores_for_media(also_manga, guild_members)
-                })
-                .await
-                .unwrap()
-                .await;
-                info!("Guild scores: {:#?}", scores);
-            }
+            let scores = match guild_members.is_empty() {
+                true => {
+                    info!("No users found in guild");
+                    None
+                }
+                false => {
+                    let scores = task::spawn_blocking(move || {
+                        get_guild_scores_for_media(also_manga, guild_members)
+                    })
+                    .await
+                    .unwrap()
+                    .await;
+                    info!("Guild scores: {:#?}", scores);
+                    Some(scores)
+                }
+            };
 
             interaction
                 .create_interaction_response(&ctx.http, |response| {
                     { response.kind(InteractionResponseType::ChannelMessageWithSource) }
                         .interaction_response_data(|m| {
-                            m.embed(|e| build_message_from_manga(manga_response, e))
+                            m.embed(|e| build_message_from_manga(manga_response, scores, e))
                         })
                 })
                 .await
@@ -92,7 +99,11 @@ pub async fn run(ctx: &Context, interaction: &mut ApplicationCommandInteraction)
     };
 }
 
-fn build_message_from_manga(manga: Manga, embed: &mut CreateEmbed) -> &mut CreateEmbed {
+fn build_message_from_manga(
+    manga: Manga,
+    scores: Option<HashMap<i64, u32>>,
+    embed: &mut CreateEmbed,
+) -> &mut CreateEmbed {
     embed
         .colour(manga.transform_color())
         .title(manga.transform_romaji_title())
@@ -118,5 +129,16 @@ fn build_message_from_manga(manga: Manga, embed: &mut CreateEmbed) -> &mut Creat
         // .field("Mangadex Link", &manga.build_mangadex_link(), false) // Field 11
         .footer(|f| f.text(manga.transform_english_title()))
         .url(&manga.transform_anilist())
-        .thumbnail(manga.transform_thumbnail())
+        .thumbnail(manga.transform_thumbnail());
+
+    match scores {
+        Some(scores) => {
+            let mut score_string = String::new();
+            for (user_id, score) in scores {
+                score_string.push_str(&format!("<@{user_id}>: {score}\n"));
+            }
+            embed.field("Scores", &score_string, false)
+        }
+        None => embed,
+    }
 }
