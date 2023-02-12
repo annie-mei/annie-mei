@@ -1,7 +1,5 @@
 use crate::{
-    models::{
-        anilist_anime::Anime, media_type::MediaType as Type, transformers::build_message_from_media,
-    },
+    models::{anilist_anime::Anime, media_type::MediaType as Type, transformers::Transformers},
     utils::{
         guild::{get_current_guild_members, get_guild_scores_for_media},
         response_fetcher::fetcher,
@@ -84,12 +82,12 @@ pub async fn run(ctx: &Context, interaction: &mut ApplicationCommandInteraction)
                 Some(scores)
             };
 
+            let anime_response_embed = anime_response.transform_response_embed(scores);
+
             interaction
                 .create_interaction_response(&ctx.http, |response| {
                     { response.kind(InteractionResponseType::ChannelMessageWithSource) }
-                        .interaction_response_data(|m| {
-                            m.embed(|e| build_message_from_media(anime_response, scores, e))
-                        })
+                        .interaction_response_data(|m| m.set_embed(anime_response_embed))
                 })
                 .await
         }
