@@ -256,4 +256,28 @@ impl Transformers for Manga {
         self.id_mal
             .map(|mal_id| format!("https://www.myanimelist.net/manga/{mal_id}"))
     }
+
+    fn transform_season_serialization(&self) -> String {
+        self.transform_date()
+    }
+
+    fn transform_episodes_chapters(&self) -> String {
+        self.transform_chapters()
+    }
+
+    fn transform_duration_volumes(&self) -> String {
+        self.transform_volumes()
+    }
+
+    fn transform_studios_staff(&self) -> String {
+        self.transform_staff()
+    }
+
+    fn transform_links(&self) -> String {
+        EMPTY_STR.to_string()
+    }
+
+    fn transform_trailer(&self) -> String {
+        EMPTY_STR.to_string()
+    }
 }

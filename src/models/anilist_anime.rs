@@ -263,4 +263,28 @@ impl Transformers for Anime {
         self.id_mal
             .map(|mal_id| format!("https://www.myanimelist.net/anime/{mal_id}"))
     }
+
+    fn transform_season_serialization(&self) -> String {
+        self.transform_season()
+    }
+
+    fn transform_episodes_chapters(&self) -> String {
+        self.transform_episodes()
+    }
+
+    fn transform_duration_volumes(&self) -> String {
+        self.transform_duration()
+    }
+
+    fn transform_studios_staff(&self) -> String {
+        self.transform_studios()
+    }
+
+    fn transform_links(&self) -> String {
+        self.transform_links()
+    }
+
+    fn transform_trailer(&self) -> String {
+        self.transform_trailer()
+    }
 }

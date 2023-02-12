@@ -24,6 +24,12 @@ pub trait Transformers {
     fn get_tags(&self) -> Vec<Tag>;
 
     fn transform_mal_id(&self) -> Option<String>;
+    fn transform_season_serialization(&self) -> String;
+    fn transform_episodes_chapters(&self) -> String;
+    fn transform_duration_volumes(&self) -> String;
+    fn transform_studios_staff(&self) -> String;
+    fn transform_links(&self) -> String;
+    fn transform_trailer(&self) -> String;
 
     fn transform_english_title(&self) -> String {
         let english_title = self.get_english_title();
