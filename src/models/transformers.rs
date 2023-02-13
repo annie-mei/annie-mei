@@ -220,7 +220,7 @@ pub trait Transformers {
             ])
             // Fourth line after MAL link
             .fields(vec![("Genres", self.transform_genres(), false)])
-            // Fifth line after MAL link
+            // Fifth line after MAL
             .field(
                 self.get_studios_staff_text(),
                 self.transform_studios_staff(),
@@ -240,7 +240,8 @@ pub trait Transformers {
             Some(scores) => {
                 let mut score_string = String::default();
                 for (user_id, score) in scores {
-                    score_string.push_str(&format!("<@{user_id}>: {score:#?}\n"));
+                    let current_member_data = score.format_for_embed();
+                    score_string.push_str(&format!("<@{user_id}>: {current_member_data}\n"));
                 }
                 embed.field("Guild Members", &score_string, false)
             }

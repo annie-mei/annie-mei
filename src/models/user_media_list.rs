@@ -57,3 +57,38 @@ impl fmt::Display for MediaListStatus {
         }
     }
 }
+
+impl MediaListData {
+    pub fn format_for_embed(&self) -> String {
+        let mut embed = String::new();
+        if let Some(status) = &self.status {
+            embed.push_str(&format!("**Status:** {}  ", status));
+        }
+        if let Some(score) = &self.score {
+            embed.push_str(&format!("**Score:** {}  ", score));
+        }
+
+        // Skip other fields if status is completed
+        match &self.status {
+            Some(MediaListStatus::Completed) => return embed,
+            _ => {
+                if let Some(progress) = &self.progress {
+                    embed.push_str(&format!("**Progress:** {progress}"));
+                }
+                if let Some(progress_volumes) = &self.progress_volumes {
+                    embed.push_str(&format!("**Progress:** {progress_volumes}"));
+                }
+                if let Some(media) = &self.media {
+                    if let Some(episodes) = &media.episodes {
+                        embed.push_str(&format!("/{episodes}"));
+                    }
+                    if let Some(volumes) = &media.volumes {
+                        embed.push_str(&format!("/{volumes}"));
+                    }
+                }
+            }
+        }
+
+        embed
+    }
+}
