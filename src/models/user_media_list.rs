@@ -69,22 +69,21 @@ impl MediaListData {
         }
 
         // Skip other fields if status is completed
-        match &self.status {
-            Some(MediaListStatus::Completed) => return embed,
-            _ => {
-                if let Some(progress) = &self.progress {
-                    embed.push_str(&format!("**Progress:** {progress}"));
+        if let Some(MediaListStatus::Completed) = &self.status {
+            return embed
+        } else {
+            if let Some(progress) = &self.progress {
+                embed.push_str(&format!("**Progress:** {progress}"));
+            }
+            if let Some(progress_volumes) = &self.progress_volumes {
+                embed.push_str(&format!("**Progress:** {progress_volumes}"));
+            }
+            if let Some(media) = &self.media {
+                if let Some(episodes) = &media.episodes {
+                    embed.push_str(&format!("/{episodes}"));
                 }
-                if let Some(progress_volumes) = &self.progress_volumes {
-                    embed.push_str(&format!("**Progress:** {progress_volumes}"));
-                }
-                if let Some(media) = &self.media {
-                    if let Some(episodes) = &media.episodes {
-                        embed.push_str(&format!("/{episodes}"));
-                    }
-                    if let Some(volumes) = &media.volumes {
-                        embed.push_str(&format!("/{volumes}"));
-                    }
+                if let Some(volumes) = &media.volumes {
+                    embed.push_str(&format!("/{volumes}"));
                 }
             }
         }
