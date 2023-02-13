@@ -1,7 +1,7 @@
 use crate::{
     models::{anilist_manga::Manga, media_type::MediaType as Type, transformers::Transformers},
     utils::{
-        guild::{get_current_guild_members, get_guild_scores_for_media},
+        guild::{get_current_guild_members, get_guild_data_for_media},
         response_fetcher::fetcher,
         statics::NOT_FOUND_MANGA,
     },
@@ -68,21 +68,21 @@ pub async fn run(ctx: &Context, interaction: &mut ApplicationCommandInteraction)
             let guild_members = get_current_guild_members(ctx, interaction);
             let also_manga = manga_response.clone();
 
-            let scores = if guild_members.is_empty() {
+            let guild_members_data = if guild_members.is_empty() {
                 info!("No users found in guild");
                 None
             } else {
-                let scores = task::spawn_blocking(move || {
-                    get_guild_scores_for_media(also_manga, guild_members)
+                let guild_members_data = task::spawn_blocking(move || {
+                    get_guild_data_for_media(also_manga, guild_members)
                 })
                 .await
                 .unwrap()
                 .await;
-                info!("Guild scores: {:#?}", scores);
-                Some(scores)
+                info!("Guild members data: {:#?}", guild_members_data);
+                Some(guild_members_data)
             };
 
-            let manga_response_embed = manga_response.transform_response_embed(scores);
+            let manga_response_embed = manga_response.transform_response_embed(guild_members_data);
 
             interaction
                 .create_interaction_response(&ctx.http, |response| {

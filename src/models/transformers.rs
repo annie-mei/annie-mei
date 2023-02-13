@@ -1,7 +1,10 @@
 use std::collections::HashMap;
 
 use crate::{
-    models::anilist_common::{CoverImage, Tag},
+    models::{
+        anilist_common::{CoverImage, Tag},
+        user_media_list::MediaListData,
+    },
     utils::{formatter::*, statics::EMPTY_STR},
 };
 
@@ -172,7 +175,10 @@ pub trait Transformers {
         }
     }
 
-    fn transform_response_embed(&self, scores: Option<HashMap<i64, u32>>) -> CreateEmbed {
+    fn transform_response_embed(
+        &self,
+        guild_members_data: Option<HashMap<i64, MediaListData>>,
+    ) -> CreateEmbed {
         let is_anime = self.get_type() == "anime";
         let mut embed = CreateEmbed::default();
         embed
@@ -217,7 +223,7 @@ pub trait Transformers {
             ])
             // Fourth line after MAL link
             .fields(vec![("Genres", self.transform_genres(), false)])
-            // Fifth line after MAL link
+            // Fifth line after MAL
             .field(
                 self.get_studios_staff_text(),
                 self.transform_studios_staff(),
@@ -233,13 +239,15 @@ pub trait Transformers {
         }
 
         // Build the scores field and return the embed
-        let embed = match scores {
-            Some(scores) => {
-                let mut score_string = String::default();
-                for (user_id, score) in scores {
-                    score_string.push_str(&format!("<@{user_id}>: {score}\n"));
+        let embed = match guild_members_data {
+            Some(guild_members_data) => {
+                let mut guild_members_data_string = String::default();
+                for (user_id, score) in guild_members_data {
+                    let current_member_data = score.format_for_embed();
+                    guild_members_data_string
+                        .push_str(&format!("<@{user_id}>: {current_member_data}\n"));
                 }
-                embed.field("Scores", &score_string, false)
+                embed.field("Guild Members", &guild_members_data_string, false)
             }
             None => &mut embed,
         };
