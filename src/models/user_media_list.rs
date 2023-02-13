@@ -60,7 +60,7 @@ impl fmt::Display for MediaListStatus {
 
 impl MediaListData {
     pub fn format_for_embed(&self) -> String {
-        let mut embed = String::new();
+        let mut embed = String::default();
         if let Some(status) = &self.status {
             embed.push_str(&format!("**Status:** {}  ", status));
         }
