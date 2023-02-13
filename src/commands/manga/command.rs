@@ -1,7 +1,7 @@
 use crate::{
     models::{anilist_manga::Manga, media_type::MediaType as Type, transformers::Transformers},
     utils::{
-        guild::{get_current_guild_members, get_guild_scores_for_media},
+        guild::{get_current_guild_members, get_guild_data_for_media},
         response_fetcher::fetcher,
         statics::NOT_FOUND_MANGA,
     },
@@ -73,7 +73,7 @@ pub async fn run(ctx: &Context, interaction: &mut ApplicationCommandInteraction)
                 None
             } else {
                 let scores = task::spawn_blocking(move || {
-                    get_guild_scores_for_media(also_manga, guild_members)
+                    get_guild_data_for_media(also_manga, guild_members)
                 })
                 .await
                 .unwrap()

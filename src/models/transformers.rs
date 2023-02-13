@@ -1,7 +1,10 @@
 use std::collections::HashMap;
 
 use crate::{
-    models::anilist_common::{CoverImage, Tag},
+    models::{
+        anilist_common::{CoverImage, Tag},
+        user_media_list::MediaListData,
+    },
     utils::{formatter::*, statics::EMPTY_STR},
 };
 
@@ -172,7 +175,7 @@ pub trait Transformers {
         }
     }
 
-    fn transform_response_embed(&self, scores: Option<HashMap<i64, u32>>) -> CreateEmbed {
+    fn transform_response_embed(&self, scores: Option<HashMap<i64, MediaListData>>) -> CreateEmbed {
         let is_anime = self.get_type() == "anime";
         let mut embed = CreateEmbed::default();
         embed
@@ -237,9 +240,9 @@ pub trait Transformers {
             Some(scores) => {
                 let mut score_string = String::default();
                 for (user_id, score) in scores {
-                    score_string.push_str(&format!("<@{user_id}>: {score}\n"));
+                    score_string.push_str(&format!("<@{user_id}>: {score:#?}\n"));
                 }
-                embed.field("Scores", &score_string, false)
+                embed.field("Guild Members", &score_string, false)
             }
             None => &mut embed,
         };

@@ -5,16 +5,19 @@ use tokio::task;
 use tracing::info;
 
 use crate::{
-    models::{db::user::User, user_media_list::UserMediaList},
+    models::{
+        db::user::User,
+        user_media_list::{MediaListData, UserMediaList},
+    },
     utils::{queries::FETCH_USER_MEDIA_LIST_DATA, requests::anilist::send_request},
 };
 
-pub async fn get_guild_scores(
+pub async fn get_guild_data(
     guild_members: Vec<User>,
     media_id: u32,
     media_type: String,
-) -> HashMap<i64, u32> {
-    let mut guild_scores: HashMap<i64, u32> = HashMap::new();
+) -> HashMap<i64, MediaListData> {
+    let mut guild_scores: HashMap<i64, MediaListData> = HashMap::new();
     for user in guild_members {
         let body = json!({
             "query": FETCH_USER_MEDIA_LIST_DATA,
@@ -35,10 +38,7 @@ pub async fn get_guild_scores(
         match media_list_data.media_list {
             None => continue,
             Some(data) => {
-                let score = data.score.unwrap();
-                if score != 0 {
-                    guild_scores.insert(user.discord_id, score);
-                }
+                guild_scores.insert(user.discord_id, data);
             }
         };
     }
