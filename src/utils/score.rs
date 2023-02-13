@@ -17,7 +17,7 @@ pub async fn get_guild_data(
     media_id: u32,
     media_type: String,
 ) -> HashMap<i64, MediaListData> {
-    let mut guild_scores: HashMap<i64, MediaListData> = HashMap::new();
+    let mut guild_members_data: HashMap<i64, MediaListData> = HashMap::new();
     for user in guild_members {
         let body = json!({
             "query": FETCH_USER_MEDIA_LIST_DATA,
@@ -38,9 +38,9 @@ pub async fn get_guild_data(
         match media_list_data.media_list {
             None => continue,
             Some(data) => {
-                guild_scores.insert(user.discord_id, data);
+                guild_members_data.insert(user.discord_id, data);
             }
         };
     }
-    guild_scores
+    guild_members_data
 }

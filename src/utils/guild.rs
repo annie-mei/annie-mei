@@ -39,6 +39,6 @@ pub async fn get_guild_data_for_media<T: Transformers>(
     let mut conn = establish_connection();
     let anilist_users = User::get_users_by_discord_id(guild_members, &mut conn);
     let anilist_users = anilist_users.unwrap();
-    let guild_scores = get_guild_data(anilist_users, media.get_id(), media.get_type()).await;
-    guild_scores
+    let guild_members_data = get_guild_data(anilist_users, media.get_id(), media.get_type()).await;
+    guild_members_data
 }
