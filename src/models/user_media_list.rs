@@ -69,7 +69,7 @@ impl MediaListData {
         }
 
         // Skip other fields if status is completed
-        if let Some(MediaListStatus::Completed) = &self.status {
+        if matches!(self.status, Some(MediaListStatus::Completed)) {
             return embed;
         } else {
             if let Some(progress) = &self.progress {
