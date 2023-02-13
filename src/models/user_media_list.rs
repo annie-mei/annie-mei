@@ -19,14 +19,6 @@ pub struct MediaListData {
     pub score: Option<u32>,
     pub progress: Option<u32>,
     pub progress_volumes: Option<u32>,
-    pub media: Option<MediaListMedia>,
-}
-
-#[derive(Deserialize, Debug)]
-#[serde(rename_all = "camelCase")]
-pub struct MediaListMedia {
-    pub episodes: Option<u32>,
-    pub volumes: Option<u32>,
 }
 
 #[derive(Deserialize, Debug)]
@@ -76,14 +68,8 @@ impl MediaListData {
                 embed.push_str(&format!("**Progress:** {progress}"));
             }
             if let Some(progress_volumes) = &self.progress_volumes {
-                embed.push_str(&format!("**Progress:** {progress_volumes}"));
-            }
-            if let Some(media) = &self.media {
-                if let Some(episodes) = &media.episodes {
-                    embed.push_str(&format!("/{episodes}"));
-                }
-                if let Some(volumes) = &media.volumes {
-                    embed.push_str(&format!("/{volumes}"));
+                if progress_volumes != &0 {
+                    embed.push_str(&format!("[{progress_volumes}]"));
                 }
             }
         }

@@ -13,10 +13,6 @@ query ($userId: Int, $type: MediaType, $mediaId: Int) {
     score(format: POINT_100)
     progress
     progressVolumes
-    media{
-      episodes
-      volumes
-    }
   }
 }
 ";
