@@ -48,8 +48,8 @@ pub enum MediaListStatus {
 impl fmt::Display for MediaListStatus {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            MediaListStatus::Current => write!(f, "Currently Watching"),
-            MediaListStatus::Planning => write!(f, "Planning to Watch"),
+            MediaListStatus::Current => write!(f, "Watching"),
+            MediaListStatus::Planning => write!(f, "Planning"),
             MediaListStatus::Completed => write!(f, "Completed"),
             MediaListStatus::Dropped => write!(f, "Dropped"),
             MediaListStatus::Paused => write!(f, "Paused"),
