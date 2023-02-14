@@ -37,7 +37,7 @@ dependencies = [
 
 [[package]]
 name = "annie-mei"
-version = "1.2.6"
+version = "1.3.0"
 dependencies = [
  "chrono",
  "diesel",

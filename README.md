@@ -16,7 +16,7 @@
 
 - Register an association with your anilist account!
   - `arg`: `anilist`: A string for your Anilist username
-- Annie Mei doesn't use this information for anything right now, but this will enable a more personalized experience in the future, which is in the works right now!
+- This is used to show guild members' Anilist scores!
 
 ###### /anime
 

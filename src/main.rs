@@ -161,7 +161,6 @@ async fn main() {
     let token = env::var(DISCORD_TOKEN).expect("Expected a token in the environment");
     let intents = GatewayIntents::GUILD_MESSAGES
         | GatewayIntents::DIRECT_MESSAGES
-        | GatewayIntents::MESSAGE_CONTENT
         | GatewayIntents::GUILD_PRESENCES
         | GatewayIntents::GUILDS;
 
