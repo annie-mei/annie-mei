@@ -9,6 +9,9 @@ on:
 
 name: ARMv7 build-release
 
+permissions:
+  contents: write
+
 jobs:
   linux_arm7:
     name: Raspberry Pi 3
@@ -31,11 +34,11 @@ jobs:
       - name: Upload artifact
         uses: actions/upload-artifact@v3
         with:
-          name: annie-mai-armv7
-          path: target/armv7-unknown-linux-gnueabihf/release/annie-mai
+          name: annie-mei-armv7
+          path: target/armv7-unknown-linux-gnueabihf/release/annie-mei
       - name: Release
         uses: softprops/action-gh-release@v1
         with:
           files: |
-            target/armv7-unknown-linux-gnueabihf/release/annie-mai
+            target/armv7-unknown-linux-gnueabihf/release/annie-mei
             LICENSE

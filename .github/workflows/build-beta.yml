@@ -9,6 +9,9 @@ on:
 
 name: ARMv7 build-beta
 
+permissions:
+  contents: write
+
 jobs:
   linux_arm7:
     name: Raspberry Pi 3 beta
@@ -31,12 +34,12 @@ jobs:
       - name: Upload artifact
         uses: actions/upload-artifact@v3
         with:
-          name: annie-mai-beta-armv7
-          path: target/armv7-unknown-linux-gnueabihf/release/annie-mai-beta
+          name: annie-mei-beta-armv7
+          path: target/armv7-unknown-linux-gnueabihf/release/annie-mei-beta
       - name: Release
         uses: softprops/action-gh-release@v1
         with:
           files: |
-            target/armv7-unknown-linux-gnueabihf/release/annie-mai-beta
+            target/armv7-unknown-linux-gnueabihf/release/annie-mei-beta
             LICENSE
           prerelease: true
