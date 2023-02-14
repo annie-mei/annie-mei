@@ -1,22 +1,22 @@
 # Annie Mai
 
-> Annie-mai now listens to /commands!
+> Annie Mei now listens to /commands!
 
 ##### Commands
 
 ###### /help
 
-- Shows a list of commands that Annie-mai supports!
+- Shows a list of commands that Annie Mei supports!
 
 ###### /ping
 
-- Shows a list of commands that Annie-mai supports!
+- Shows a list of commands that Annie Mei supports!
 
 ###### /register
 
 - Register an association with your anilist account!
   - `arg`: `anilist`: A string for your Anilist username
-- Annie-mai doesn't use this information for anything right now, but this will enable a more personalized experience in the future, which is in the works right now!
+- Annie Mei doesn't use this information for anything right now, but this will enable a more personalized experience in the future, which is in the works right now!
 
 ###### /anime
 

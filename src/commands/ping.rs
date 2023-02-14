@@ -18,7 +18,7 @@ pub async fn run(ctx: &Context, interaction: &ApplicationCommandInteraction) {
             { response.kind(InteractionResponseType::ChannelMessageWithSource) }
                 .interaction_response_data(|m| {
                     m.content(format!(
-                        "Hello {}! I'm Annie Mai, a bot that helps you find anime and manga!",
+                        "Hello {}! I'm Annie Mei, a bot that helps you find anime and manga!",
                         user.mention()
                     ))
                 })

@@ -36,7 +36,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "annie-mai"
+name = "annie-mei"
 version = "1.2.5"
 dependencies = [
  "chrono",
