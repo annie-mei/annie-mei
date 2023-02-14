@@ -1,4 +1,4 @@
-# Annie Mai
+# Annie Mei
 
 > Annie Mei now listens to /commands!
 
