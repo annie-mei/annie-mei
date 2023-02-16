@@ -51,6 +51,10 @@ pub async fn run(ctx: &Context, interaction: &mut ApplicationCommandInteraction)
         context.insert("Command".to_string(), "Manga".into());
         context.insert("Arg".to_string(), json_arg);
         scope.set_context("Manga", sentry::protocol::Context::Other(context));
+        scope.set_user(Some(sentry::User {
+            username: Some(user.name.to_string()),
+            ..Default::default()
+        }));
     });
 
     info!(
