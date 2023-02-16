@@ -3,6 +3,7 @@ use crate::{
     utils::statics::NOT_FOUND_ANIME,
 };
 
+use serde_json::json;
 use serenity::{
     builder::{CreateApplicationCommand, CreateEmbed},
     client::Context,
@@ -39,6 +40,14 @@ pub fn register(command: &mut CreateApplicationCommand) -> &mut CreateApplicatio
 pub async fn run(ctx: &Context, interaction: &mut ApplicationCommandInteraction) {
     let user = &interaction.user;
     let arg = interaction.data.options[0].resolved.to_owned().unwrap();
+    let json_arg = json!(arg);
+
+    sentry::configure_scope(|scope| {
+        let mut context = std::collections::BTreeMap::new();
+        context.insert("Command".to_string(), "Songs".into());
+        context.insert("Arg".to_string(), json_arg);
+        scope.set_context("Songs", sentry::protocol::Context::Other(context));
+    });
 
     info!(
         "Got command 'songs' by user '{}' with args: {arg:#?}",

@@ -7,6 +7,7 @@ use crate::{
     },
 };
 
+use serde_json::json;
 use serenity::{
     builder::CreateApplicationCommand,
     client::Context,
@@ -43,6 +44,14 @@ pub fn register(command: &mut CreateApplicationCommand) -> &mut CreateApplicatio
 pub async fn run(ctx: &Context, interaction: &mut ApplicationCommandInteraction) {
     let user = &interaction.user;
     let arg = interaction.data.options[0].resolved.to_owned().unwrap();
+    let json_arg = json!(arg);
+
+    sentry::configure_scope(|scope| {
+        let mut context = std::collections::BTreeMap::new();
+        context.insert("Command".to_string(), "Manga".into());
+        context.insert("Arg".to_string(), json_arg);
+        scope.set_context("Manga", sentry::protocol::Context::Other(context));
+    });
 
     info!(
         "Got command 'manga' by user '{}' with args: {arg:#?}",
