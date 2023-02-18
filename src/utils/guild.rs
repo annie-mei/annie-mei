@@ -28,9 +28,14 @@ fn get_guild_member_ids(guild: Guild) -> Vec<UserId> {
     members
 }
 
-fn get_guild_from_interaction(ctx: &Context, interaction: &ApplicationCommandInteraction) -> Guild {
-    let guild_id = interaction.guild_id.unwrap();
-    guild_id.to_guild_cached(&ctx.cache).unwrap()
+fn get_guild_from_interaction(
+    ctx: &Context,
+    interaction: &ApplicationCommandInteraction,
+) -> Option<Guild> {
+    match interaction.guild_id {
+        None => None,
+        Some(guild_id) => guild_id.to_guild_cached(&ctx.cache),
+    }
 }
 
 pub fn get_current_guild_members(
@@ -38,7 +43,10 @@ pub fn get_current_guild_members(
     interaction: &ApplicationCommandInteraction,
 ) -> Vec<UserId> {
     let guild = get_guild_from_interaction(ctx, interaction);
-    get_guild_member_ids(guild)
+    match guild {
+        None => vec![],
+        Some(guild) => get_guild_member_ids(guild),
+    }
 }
 
 pub async fn get_guild_data_for_media<T: Transformers>(
