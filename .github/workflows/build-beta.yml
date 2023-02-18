@@ -27,7 +27,8 @@ jobs:
         uses: Swatinem/rust-cache@v2.2.0
         with:
           cache-on-failure: "true"
-          shared-key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+          prefix-key: "annie-mei"
+          shared-key: "cargo"
       - name: Build-cargo-cross
         uses: actions-rs/cargo@v1
         with:
