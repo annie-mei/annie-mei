@@ -4,6 +4,14 @@ on:
   pull_request:
     branches-ignore:
       - "dependabot/*"
+  create:
+    branches:
+      - "annie-mei-release-*"
+  push:
+    branches:
+      - "annie-mei-release-*"
+    paths-ignore:
+      - "**/README.md"
 
 name: Clippy Analyze
 
