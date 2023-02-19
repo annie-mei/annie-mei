@@ -22,7 +22,7 @@ pub fn fetcher<
     media_type: Type,
     arg: CommandDataOptionValue,
 ) -> Option<T> {
-    info!("Fetched found arg: {:#?}", arg);
+    info!("Fetcher found arg: {:#?}", arg);
     let argument = return_argument(arg);
 
     match media_type {
