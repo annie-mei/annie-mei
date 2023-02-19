@@ -28,16 +28,10 @@ pub fn register(command: &mut CreateApplicationCommand) -> &mut CreateApplicatio
         .description("Fetches the details for an anime")
         .create_option(|option| {
             option
-                .name("id")
-                .description("Anilist ID")
-                .kind(CommandOptionType::Integer)
-                .min_int_value(1)
-        })
-        .create_option(|option| {
-            option
-                .name("name")
-                .description("Search term")
+                .name("search")
+                .description("Anilist ID or Search term")
                 .kind(CommandOptionType::String)
+                .required(true)
         })
 }
 
