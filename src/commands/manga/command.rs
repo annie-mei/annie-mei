@@ -12,9 +12,7 @@ use serenity::{
     builder::CreateApplicationCommand,
     client::Context,
     model::{
-        application::interaction::{
-            application_command::ApplicationCommandInteraction, InteractionResponseType,
-        },
+        application::interaction::application_command::ApplicationCommandInteraction,
         prelude::command::CommandOptionType,
     },
 };
@@ -36,6 +34,8 @@ pub fn register(command: &mut CreateApplicationCommand) -> &mut CreateApplicatio
 }
 
 pub async fn run(ctx: &Context, interaction: &mut ApplicationCommandInteraction) {
+    let _ = interaction.defer(&ctx.http).await;
+
     let user = &interaction.user;
     let arg = interaction.data.options[0].resolved.to_owned().unwrap();
     let json_arg = json!(arg);
@@ -63,9 +63,8 @@ pub async fn run(ctx: &Context, interaction: &mut ApplicationCommandInteraction)
     let _manga_response = match response {
         None => {
             interaction
-                .create_interaction_response(&ctx.http, |response| {
-                    { response.kind(InteractionResponseType::ChannelMessageWithSource) }
-                        .interaction_response_data(|m| m.content(NOT_FOUND_MANGA))
+                .edit_original_interaction_response(&ctx.http, |response| {
+                    response.content(NOT_FOUND_MANGA)
                 })
                 .await
         }
@@ -92,9 +91,8 @@ pub async fn run(ctx: &Context, interaction: &mut ApplicationCommandInteraction)
             let manga_response_embed = manga_response.transform_response_embed(guild_members_data);
 
             interaction
-                .create_interaction_response(&ctx.http, |response| {
-                    { response.kind(InteractionResponseType::ChannelMessageWithSource) }
-                        .interaction_response_data(|m| m.set_embed(manga_response_embed))
+                .edit_original_interaction_response(&ctx.http, |response| {
+                    response.set_embed(manga_response_embed)
                 })
                 .await
         }
