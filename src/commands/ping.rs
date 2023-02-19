@@ -13,6 +13,16 @@ pub fn register(command: &mut CreateApplicationCommand) -> &mut CreateApplicatio
 pub async fn run(ctx: &Context, interaction: &ApplicationCommandInteraction) {
     let user = &interaction.user;
 
+    sentry::configure_scope(|scope| {
+        let mut context = std::collections::BTreeMap::new();
+        context.insert("Command".to_string(), "Register".into());
+        scope.set_context("Ping", sentry::protocol::Context::Other(context));
+        scope.set_user(Some(sentry::User {
+            username: Some(user.name.to_string()),
+            ..Default::default()
+        }));
+    });
+
     let _ping = interaction
         .create_interaction_response(&ctx.http, |response| {
             { response.kind(InteractionResponseType::ChannelMessageWithSource) }

@@ -20,25 +20,22 @@
 
 ###### /anime
 
-- `arg` variants
-  1. `id`: Anilist ID for lookup
-  2. `search`: A string for fuzzy matching lookup
+- Arguments
+  - _search_: The Anilist ID or a search term lookup
 
 ###### /manga
 
-- `arg` variants
-  1. `id`: Anilist ID for lookup
-  2. `search`: A string for fuzzy matching lookup
+- Arguments
+  - _search_: The Anilist ID or a search term lookup
 
 ###### /songs
 
-- variants
-  1. `id`: Anilist ID for lookup
-  2. `search`: A string for fuzzy matching lookup
+- Arguments
+  - _search_: The Anilist ID or a search term lookup
 
 ###### `search`
 
-- The `search` variant for `arg` has kana support!
+- Search terms have kana support!
   Try !manga きめつのやいば
 
 <!-- TODO: Optimize Binary -> https://lifthrasiir.github.io/rustlog/why-is-a-rust-executable-large.html -->

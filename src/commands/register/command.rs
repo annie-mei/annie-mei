@@ -1,12 +1,11 @@
 use crate::{models::db::user::User, utils::database};
 
+use serde_json::json;
 use serenity::{
     builder::CreateApplicationCommand,
     client::Context,
     model::{
-        application::interaction::{
-            application_command::ApplicationCommandInteraction, InteractionResponseType,
-        },
+        application::interaction::application_command::ApplicationCommandInteraction,
         prelude::{
             command::CommandOptionType,
             interaction::application_command::CommandDataOptionValue::String as StringArg,
@@ -30,8 +29,22 @@ pub fn register(command: &mut CreateApplicationCommand) -> &mut CreateApplicatio
 }
 
 pub async fn run(ctx: &Context, interaction: &mut ApplicationCommandInteraction) {
+    let _ = interaction.defer(&ctx.http).await;
+
     let user = &interaction.user;
     let arg = interaction.data.options[0].resolved.to_owned().unwrap();
+    let json_arg = json!(arg);
+
+    sentry::configure_scope(|scope| {
+        let mut context = std::collections::BTreeMap::new();
+        context.insert("Command".to_string(), "Register".into());
+        context.insert("Arg".to_string(), json_arg);
+        scope.set_context("Register", sentry::protocol::Context::Other(context));
+        scope.set_user(Some(sentry::User {
+            username: Some(user.name.to_string()),
+            ..Default::default()
+        }));
+    });
 
     info!(
         "Got command 'register' by user '{}' with args: {arg:#?}",
@@ -46,9 +59,8 @@ pub async fn run(ctx: &Context, interaction: &mut ApplicationCommandInteraction)
     let response_message = register_new_user(anilist_username.to_owned(), user).await;
 
     let _register = interaction
-        .create_interaction_response(&ctx.http, |response| {
-            { response.kind(InteractionResponseType::ChannelMessageWithSource) }
-                .interaction_response_data(|m| m.content(response_message))
+        .edit_original_interaction_response(&ctx.http, |response| {
+            response.content(response_message)
         })
         .await;
 }
