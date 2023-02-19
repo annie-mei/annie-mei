@@ -5,9 +5,7 @@ use serenity::{
     builder::CreateApplicationCommand,
     client::Context,
     model::{
-        application::interaction::{
-            application_command::ApplicationCommandInteraction, InteractionResponseType,
-        },
+        application::interaction::application_command::ApplicationCommandInteraction,
         prelude::{
             command::CommandOptionType,
             interaction::application_command::CommandDataOptionValue::String as StringArg,
@@ -31,6 +29,8 @@ pub fn register(command: &mut CreateApplicationCommand) -> &mut CreateApplicatio
 }
 
 pub async fn run(ctx: &Context, interaction: &mut ApplicationCommandInteraction) {
+    let _ = interaction.defer(&ctx.http).await;
+
     let user = &interaction.user;
     let arg = interaction.data.options[0].resolved.to_owned().unwrap();
     let json_arg = json!(arg);
@@ -59,9 +59,8 @@ pub async fn run(ctx: &Context, interaction: &mut ApplicationCommandInteraction)
     let response_message = register_new_user(anilist_username.to_owned(), user).await;
 
     let _register = interaction
-        .create_interaction_response(&ctx.http, |response| {
-            { response.kind(InteractionResponseType::ChannelMessageWithSource) }
-                .interaction_response_data(|m| m.content(response_message))
+        .edit_original_interaction_response(&ctx.http, |response| {
+            response.content(response_message)
         })
         .await;
 }
