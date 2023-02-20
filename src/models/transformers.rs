@@ -243,7 +243,7 @@ pub trait Transformers {
             Some(guild_members_data) => {
                 let mut guild_members_data_string = String::default();
                 for (user_id, score) in guild_members_data {
-                    let current_member_data = score.format_for_embed();
+                    let current_member_data = score.format_for_embed(is_anime);
                     guild_members_data_string
                         .push_str(&format!("<@{user_id}>: {current_member_data}\n"));
                 }
