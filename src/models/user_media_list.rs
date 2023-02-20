@@ -51,9 +51,16 @@ impl fmt::Display for MediaListStatus {
 }
 
 impl MediaListData {
-    pub fn format_for_embed(&self) -> String {
+    pub fn format_for_embed(&self, is_anime: bool) -> String {
         let mut embed = String::default();
         if let Some(status) = &self.status {
+            let status = {
+                if !is_anime && matches!(status, MediaListStatus::Current) {
+                    "Reading".to_string()
+                } else {
+                    status.to_string()
+                }
+            };
             embed.push_str(&format!("**Status:** {}  ", status));
         }
         if let Some(score) = &self.score {
