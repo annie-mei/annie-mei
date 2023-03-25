@@ -14,7 +14,7 @@ name: Clippy Analyze
 
 jobs:
   rust-clippy-analyze:
-    if: ${{ github.triggering_actor != 'dependabot[bot]' }}
+    if: ${{ github.actor != 'dependabot[bot]' }}
     name: Clippy Analysis
     runs-on: ubuntu-latest
     env:
