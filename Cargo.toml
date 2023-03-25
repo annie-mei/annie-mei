@@ -1,6 +1,6 @@
 [package]
 name = "annie-mei"
-version = "1.4.0"
+version = "1.4.1"
 edition = "2021"
 license = "GPL-3.0-or-later"
 
@@ -17,7 +17,7 @@ chrono = "0.4"
 diesel = { version = "2.0.3", features = ["postgres"] }
 diesel_migrations = "2.0.0"
 env_logger = "0.10"
-futures = "0.3.26"
+futures = "0.3.27"
 html2md = "0.2.14"
 log = "0.4"
 ngrammatic = "0.4.0"
@@ -28,13 +28,13 @@ rspotify = { version = "0.11.6", default-features = false, features = [
   "client-ureq",
   "ureq-rustls-tls",
 ] }
-sentry = "0.29.3"
+sentry = "0.30.0"
 serde = "1.0"
 serde_json = "1.0"
 serenity = "0.11"
 strum = { version = "0.24", features = ["derive"] }
 titlecase = "2.2.1"
-tokio = { version = "1.25", features = ["full"] }
+tokio = { version = "1.26", features = ["full"] }
 tracing = "0.1"
 tracing-subscriber = "0.3"
 wana_kana = "3.0.0"
