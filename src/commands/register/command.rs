@@ -81,7 +81,7 @@ async fn register_new_user(anilist_username: String, user: &serenity::model::use
 
     let connection = &mut database::establish_connection();
 
-    let response = {
+    {
         let anilist_id = anilist_id.unwrap();
         User::create_or_update_user(
             user.id.into(),
@@ -98,6 +98,5 @@ async fn register_new_user(anilist_username: String, user: &serenity::model::use
             "Hello {}, I have linked the Anilist account {} to your user.",
             user.name, anilist_username
         )
-    };
-    response
+    }
 }
