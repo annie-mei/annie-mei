@@ -4,19 +4,26 @@ use crate::models::{
     transformers::Transformers,
 };
 use serenity::model::prelude::interaction::application_command::CommandDataOptionValue::{
-    self, String,
+    self, String as StringData,
 };
 use tracing::info;
 
+fn strip_quotes(string: &str) -> String {
+    string.replace("\"", "")
+}
+
 fn return_argument(arg: CommandDataOptionValue) -> Argument {
     let val = match arg {
-        String(name) => name,
+        StringData(name) => name,
         _ => panic!("Invalid argument type"),
     };
 
     match val.parse::<u32>() {
         Ok(id) => Argument::Id(id),
-        Err(_) => Argument::Search(val),
+        Err(_) => {
+            let val = strip_quotes(&val);
+            Argument::Search(val)
+        }
     }
 }
 
