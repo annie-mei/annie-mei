@@ -32,6 +32,7 @@
 
 - Arguments
   - _search_: The Anilist ID or a search term lookup
+  - **Note**: If you want to look up something that has a numeric name, you can wrap the search term in quotes! => `"86"`
 
 ###### `search`
 
