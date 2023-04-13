@@ -4,15 +4,19 @@ use crate::models::{
     transformers::Transformers,
 };
 use serenity::model::prelude::interaction::application_command::CommandDataOptionValue::{
-    self, Integer, String,
+    self, String,
 };
 use tracing::info;
 
 fn return_argument(arg: CommandDataOptionValue) -> Argument {
-    match arg {
-        Integer(id) => Argument::Id(id as u32),
-        String(name) => Argument::Search(name),
+    let val = match arg {
+        String(name) => name,
         _ => panic!("Invalid argument type"),
+    };
+
+    match val.parse::<u32>() {
+        Ok(id) => Argument::Id(id),
+        Err(_) => Argument::Search(val),
     }
 }
 
