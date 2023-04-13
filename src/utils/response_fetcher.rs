@@ -9,7 +9,7 @@ use serenity::model::prelude::interaction::application_command::CommandDataOptio
 use tracing::info;
 
 fn strip_quotes(string: &str) -> String {
-    string.replace("\"", "")
+    string.replace('"', "")
 }
 
 fn return_argument(arg: CommandDataOptionValue) -> Argument {
