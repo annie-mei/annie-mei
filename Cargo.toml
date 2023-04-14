@@ -26,7 +26,7 @@ html2md = "0.2.14"
 log = "0.4"
 ngrammatic = "0.4.0"
 openssl = { version = "0.10", features = ["vendored"] }
-reqwest = { version = "0.11.14", features = ["blocking", "rustls-tls"] }
+reqwest = { version = "0.11.16", features = ["blocking", "rustls-tls"] }
 redis = "0.22.3"
 rspotify = { version = "0.11.6", default-features = false, features = [
   "client-ureq",
