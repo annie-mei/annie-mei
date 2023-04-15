@@ -5,5 +5,6 @@ diesel::table! {
         discord_id -> Int8,
         anilist_id -> Int8,
         anilist_username -> Text,
+        access_token -> Nullable<Text>,
     }
 }
