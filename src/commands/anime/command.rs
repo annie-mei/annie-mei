@@ -85,7 +85,11 @@ pub async fn run(ctx: &Context, interaction: &mut ApplicationCommandInteraction)
                 .unwrap()
                 .await;
                 info!("Guild members data: {:#?}", guild_members_data);
-                Some(guild_members_data)
+                if guild_members_data.is_empty() {
+                    None
+                } else {
+                    Some(guild_members_data)
+                }
             };
 
             let anime_response_embed = anime_response.transform_response_embed(guild_members_data);
