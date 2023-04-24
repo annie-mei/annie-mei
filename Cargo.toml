@@ -18,7 +18,7 @@ codegen-units = 1
 
 [dependencies]
 chrono = "0.4"
-diesel = { version = "2.0.3", features = ["postgres"] }
+diesel = { version = "2.0.4", features = ["postgres"] }
 diesel_migrations = "2.0.0"
 env_logger = "0.10"
 futures = "0.3.28"
