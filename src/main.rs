@@ -5,7 +5,9 @@ mod utils;
 
 use std::env;
 
+use sentry::integrations::tracing as sentry_tracing;
 use tracing::{debug, info, instrument};
+use tracing_subscriber::{prelude::*, util::SubscriberInitExt, EnvFilter};
 
 use serenity::{
     async_trait,
@@ -135,8 +137,6 @@ impl EventHandler for Handler {
 #[tokio::main]
 #[instrument]
 async fn main() {
-    tracing_subscriber::fmt::init();
-
     let environment = env::var(ENV).expect("Expected an environment in the environment");
     let sentry_dsn = env::var(SENTRY_DSN).expect("Expected a sentry dsn in the environment");
 
@@ -148,6 +148,12 @@ async fn main() {
             ..Default::default()
         },
     ));
+
+    let subscriber = tracing_subscriber::fmt()
+        .with_env_filter(EnvFilter::from_default_env())
+        .finish();
+
+    subscriber.with(sentry_tracing::layer()).init();
 
     let connection = &mut utils::database::establish_connection();
     run_migration(connection);
