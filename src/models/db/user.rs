@@ -10,6 +10,7 @@ pub struct User {
     pub discord_id: i64,
     pub anilist_id: i64,
     pub anilist_username: String,
+    pub access_token: Option<String>,
 }
 
 impl User {
@@ -61,5 +62,18 @@ impl User {
         let result: serde_json::Value = serde_json::from_str(&result).unwrap();
 
         result["data"]["User"]["id"].as_i64()
+    }
+
+    pub fn get_access_token_for_discord_id(
+        user_discord_id: i64,
+        conn: &mut PgConnection,
+    ) -> Option<String> {
+        use crate::schema::users::dsl::*;
+        users
+            .filter(discord_id.eq(user_discord_id))
+            .select(access_token)
+            .first::<Option<String>>(conn)
+            .ok()
+            .flatten()
     }
 }
