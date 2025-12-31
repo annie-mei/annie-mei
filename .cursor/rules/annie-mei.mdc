@@ -126,6 +126,20 @@ Command::set_global_application_commands(&ctx.http, |commands| {
 ### Gateway Intents
 Current intents: `GUILD_MESSAGES`, `DIRECT_MESSAGES`, `GUILD_PRESENCES`, `GUILDS`
 
+## Git Conventions
+
+### Commits
+- Use conventional commit format: `type: description`
+- Types: `feat`, `fix`, `docs`, `chore`, `refactor`, `test`
+
+### Pull Requests
+- Title format: `[ANNIE-XXX]/Description`
+- Example: `[ANNIE-84]/Prepare for AI Dev`
+- Always link to Linear issue in PR body
+
+### Branches
+- Use Linear's suggested branch name: `annie-XXX-description`
+
 ## Formatting
 
 - Follow `rustfmt.toml` settings (Edition 2018 style)

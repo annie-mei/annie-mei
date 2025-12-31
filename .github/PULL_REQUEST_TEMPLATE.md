@@ -1,10 +1,15 @@
+<!--
+PR Title Format: [ANNIE-XXX]/Description
+Example: [ANNIE-84]/Prepare for AI Dev
+-->
+
 ## Description
 
 <!-- What does this PR do? Why is this change needed? -->
 
 ## Related Issue
 
-<!-- Link to Linear issue: ANNIE-XXX -->
+<!-- Link to Linear issue, e.g., Closes ANNIE-XXX -->
 
 ## Type of Change
 

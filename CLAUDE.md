@@ -98,15 +98,15 @@ let result = task::spawn_blocking(move || {
 
 ## Environment Variables
 
-| Variable | Description |
-|----------|-------------|
-| `DISCORD_TOKEN` | Discord bot token |
-| `SENTRY_DSN` | Sentry error tracking DSN |
-| `ENV` | Environment name (development/production) |
-| `DATABASE_URL` | PostgreSQL connection string |
-| `REDIS_URL` | Redis connection URL |
-| `RSPOTIFY_CLIENT_ID` | Spotify client ID |
-| `RSPOTIFY_CLIENT_SECRET` | Spotify client secret |
+| Variable                 | Description                               |
+| ------------------------ | ----------------------------------------- |
+| `DISCORD_TOKEN`          | Discord bot token                         |
+| `SENTRY_DSN`             | Sentry error tracking DSN                 |
+| `ENV`                    | Environment name (development/production) |
+| `DATABASE_URL`           | PostgreSQL connection string              |
+| `REDIS_URL`              | Redis connection URL                      |
+| `RSPOTIFY_CLIENT_ID`     | Spotify client ID                         |
+| `RSPOTIFY_CLIENT_SECRET` | Spotify client secret                     |
 
 ## Code Style
 
@@ -116,3 +116,8 @@ let result = task::spawn_blocking(move || {
 - Prefer `?` operator over `unwrap()` where possible
 - Constants go in `src/utils/statics.rs`
 
+## Git Conventions
+
+- **Commits**: Conventional format - `type: description` (feat, fix, docs, chore, refactor, test)
+- **PR titles**: `[ANNIE-XXX]/Description` (e.g., `[ANNIE-84]/Prepare for AI Dev`)
+- **Branches**: Use Linear's format - `annie-XXX-description`
