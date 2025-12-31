@@ -12,8 +12,16 @@ target/
 
 # MSVC Windows builds of rustc generate these, which store debugging information
 *.pdb
+
+# Environment
 .env
+.env.local
 
-
-#vscode files
+# IDE/Editor
 .vscode/
+.idea/
+
+# Local settings (use *.local.* or .local/ for machine-specific config)
+*.local
+*.local.*
+.local/
