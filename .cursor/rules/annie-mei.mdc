@@ -1,0 +1,155 @@
+---
+description: Annie Mei Discord Bot - Rust development guidelines
+globs: ["**/*.rs", "**/*.sql", "Cargo.toml", "diesel.toml"]
+alwaysApply: true
+---
+
+# Annie Mei - Discord Bot Development Rules
+
+## Project Overview
+
+Annie Mei is a Discord bot written in Rust that integrates with AniList, MyAnimeList, and Spotify to provide anime/manga information and theme songs. It uses slash commands for Discord interactions.
+
+### Tech Stack
+- **Language**: Rust (Edition 2021)
+- **Discord Framework**: Serenity 0.11
+- **Database**: PostgreSQL via Diesel ORM
+- **Caching**: Redis
+- **HTTP Client**: Reqwest (blocking for API calls)
+- **Error Tracking**: Sentry
+- **Logging**: Tracing + tracing-subscriber
+
+## Project Structure
+
+```
+src/
+├── commands/           # Discord slash commands
+│   ├── anime/         # /anime command
+│   ├── manga/         # /manga command
+│   ├── songs/         # /songs command
+│   ├── register/      # /register command
+│   ├── help.rs        # /help command
+│   └── ping.rs        # /ping command
+├── models/            # Data structures and transformers
+│   ├── db/           # Database models (Diesel)
+│   ├── anilist_*.rs  # AniList response types
+│   └── transformers.rs
+├── utils/             # Utility functions
+│   ├── requests/     # External API clients
+│   ├── database.rs   # DB connection handling
+│   └── statics.rs    # Constants and static values
+├── schema.rs          # Diesel schema (auto-generated)
+└── main.rs            # Entry point and event handler
+```
+
+## Coding Conventions
+
+### Command Structure
+Each command follows a consistent pattern:
+
+```rust
+// command.rs
+pub fn register(command: &mut CreateApplicationCommand) -> &mut CreateApplicationCommand {
+    command
+        .name("command_name")
+        .description("Description")
+        .create_option(|option| {
+            option
+                .name("arg_name")
+                .description("Arg description")
+                .kind(CommandOptionType::String)
+                .required(true)
+        })
+}
+
+pub async fn run(ctx: &Context, interaction: &mut ApplicationCommandInteraction) {
+    let _ = interaction.defer(&ctx.http).await;
+    // Command logic
+}
+```
+
+### Module Organization
+- Commands with multiple files use directory modules with `mod.rs`
+- Simple commands can be single files (e.g., `ping.rs`, `help.rs`)
+- Always re-export submodules in `mod.rs`
+
+### Error Handling
+- Use `unwrap()` sparingly - prefer `?` operator or explicit error handling
+- Log errors with `tracing::info!` or `tracing::error!`
+- Configure Sentry scope for user context in commands
+- Return user-friendly messages for errors
+
+### Async Patterns
+- Use `tokio::task::spawn_blocking` for blocking operations (DB, HTTP)
+- Defer interactions immediately for long-running commands
+- Use `interaction.edit_original_interaction_response` after processing
+
+### Logging
+- Use `tracing` macros: `info!`, `debug!`, `error!`
+- Add `#[instrument]` attribute to functions for automatic span creation
+- Include relevant context in log messages
+
+### Database (Diesel)
+- Models live in `src/models/db/`
+- Schema is auto-generated in `src/schema.rs` - don't edit manually
+- Use migrations for schema changes in `migrations/`
+- Connection is established via `utils::database::establish_connection()`
+
+### External API Requests
+- Use blocking reqwest client for API calls
+- API clients live in `src/utils/requests/`
+- GraphQL queries for AniList are defined in `queries.rs` files
+- Cache responses in Redis when appropriate
+
+### Statics and Constants
+- Define constants in `src/utils/statics.rs`
+- Environment variable names should be constant strings
+- Error messages and default values go here
+
+## Discord Patterns
+
+### Slash Command Registration
+Commands are registered globally in `main.rs` `ready` event:
+
+```rust
+Command::set_global_application_commands(&ctx.http, |commands| {
+    commands
+        .create_application_command(|command| commands::name::register(command))
+})
+```
+
+### Response Embeds
+- Use the `Transformers` trait to convert API responses to Discord embeds
+- Implement `transform_response_embed` for each media type
+- Include guild member data when available
+
+### Gateway Intents
+Current intents: `GUILD_MESSAGES`, `DIRECT_MESSAGES`, `GUILD_PRESENCES`, `GUILDS`
+
+## Formatting
+
+- Follow `rustfmt.toml` settings (Edition 2018 style)
+- Run `cargo fmt` before committing
+- Use `cargo clippy` for linting
+
+## Testing
+
+- Run `cargo test` for unit tests
+- Integration tests should mock external APIs
+- Use `cargo check` for quick compilation verification
+
+## Building
+
+- Debug: `cargo build`
+- Release: `cargo build --release` (uses LTO and single codegen unit)
+- Cross-compile for ARM: Use `cross` with configuration in `Cargo.toml`
+
+## Environment Variables
+
+Required environment variables:
+- `DISCORD_TOKEN` - Discord bot token
+- `SENTRY_DSN` - Sentry error tracking DSN
+- `ENV` - Environment name (development/production)
+- Database connection string (via Diesel)
+- Redis connection URL
+- Spotify credentials (for rspotify)
