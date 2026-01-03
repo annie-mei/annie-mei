@@ -64,17 +64,6 @@ pub trait Transformers {
         };
         titlecase(&return_title)
     }
-    fn transform_native_title(&self) -> String {
-        let native_title = self.get_native_title();
-        let return_title = match native_title {
-            Some(title) => title,
-            None => match self.get_romaji_title() {
-                Some(title) => title,
-                None => self.get_english_title().unwrap_or_default(),
-            },
-        };
-        titlecase(&return_title)
-    }
 
     fn transform_format(&self) -> String {
         match self.get_format() {
