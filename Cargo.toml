@@ -11,6 +11,9 @@ pre-build = [
 ]
 image = "ghcr.io/cross-rs/armv7-unknown-linux-gnueabihf:latest"
 
+[profile.dev]
+split-debuginfo = "unpacked"
+
 [profile.release]
 lto = true
 codegen-units = 1
