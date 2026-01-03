@@ -30,15 +30,15 @@ use utils::{
 };
 
 #[hook]
-#[instrument]
-async fn before(_: &Context, msg: &Message, command_name: &str) -> bool {
+#[instrument(skip(_ctx, msg))]
+async fn before(_ctx: &Context, msg: &Message, command_name: &str) -> bool {
     info!("Got command '{command_name}' by user '{}'", msg.author.name);
     true
 }
 
 #[hook]
-#[instrument]
-async fn after(_: &Context, _msg: &Message, command_name: &str, command_result: CommandResult) {
+#[instrument(skip(_ctx, _msg))]
+async fn after(_ctx: &Context, _msg: &Message, command_name: &str, command_result: CommandResult) {
     match command_result {
         Ok(()) => info!("Processed command '{command_name}'"),
         Err(why) => info!("Command '{command_name}' returned error {:?}", why),
@@ -46,7 +46,7 @@ async fn after(_: &Context, _msg: &Message, command_name: &str, command_result: 
 }
 
 #[hook]
-#[instrument]
+#[instrument(skip(ctx, msg))]
 async fn unknown_command(ctx: &Context, msg: &Message, unknown_command_name: &str) {
     info!("Could not find command named '{unknown_command_name}'");
     let reaction = parse_emoji("<:wtf:953730408158228570>").unwrap();

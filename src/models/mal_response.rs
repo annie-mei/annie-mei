@@ -105,12 +105,7 @@ impl MalResponse {
         info!("Romaji Song Name: {:#?}", romaji_name);
         info!("Kana Song Name: {:#?}", kana_name);
 
-        Some(get_song_url(
-            romaji_name,
-            kana_name,
-            artist_name.to_string(),
-        ))
-        .unwrap_or(None)
+        get_song_url(romaji_name, kana_name, artist_name.to_string())
     }
 
     fn get_artist_names(song: &str) -> Option<String> {
