@@ -40,7 +40,7 @@ pub fn fuzzy_matcher(
 
     let results = corpus.search(pattern, threshold);
 
-    let response: Option<FuzzyResponse> = if results.first().is_some() {
+    let response: Option<FuzzyResponse> = if !results.is_empty() {
         let top_match = results.first();
         info!("Top Match: {:#?}", top_match);
         let top_match_index = string_list
