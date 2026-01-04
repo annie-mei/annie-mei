@@ -7,7 +7,7 @@ use std::env;
 
 use sentry::integrations::tracing as sentry_tracing;
 use tracing::{info, instrument};
-use tracing_subscriber::{prelude::*, util::SubscriberInitExt, EnvFilter};
+use tracing_subscriber::{EnvFilter, prelude::*, util::SubscriberInitExt};
 
 use serenity::{
     all::{CreateEmbed, CreateMessage},
