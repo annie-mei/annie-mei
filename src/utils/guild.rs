@@ -31,7 +31,8 @@ fn get_guild_member_ids(guild: &Guild) -> Vec<UserId> {
 fn get_guild_from_interaction(ctx: &Context, interaction: &CommandInteraction) -> Option<Guild> {
     interaction
         .guild_id
-        .and_then(|guild_id| guild_id.to_guild_cached(&ctx.cache).map(|g| g.clone()))
+        .and_then(|guild_id| guild_id.to_guild_cached(&ctx.cache))
+        .map(|g| g.clone())
 }
 
 pub fn get_current_guild_members(ctx: &Context, interaction: &CommandInteraction) -> Vec<UserId> {
