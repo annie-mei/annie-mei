@@ -37,7 +37,7 @@
 ###### `search`
 
 - Search terms have kana support!
-  Try !manga きめつのやいば
+  Try /manga きめつのやいば
 
 <!-- TODO: Optimize Binary -> https://lifthrasiir.github.io/rustlog/why-is-a-rust-executable-large.html -->
 <!-- TODO: Maybe Try to get Spotify links for songs? -->

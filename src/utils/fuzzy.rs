@@ -28,19 +28,18 @@ pub fn fuzzy_matcher(
         pattern, string_list, threshold
     );
 
-    let mut corpus = CorpusBuilder::new()
+    let mut corpus = CorpusBuilder::default()
         .arity(2)
         .pad_full(Pad::Auto)
-        .case_insensitive()
         .finish();
 
     for string in string_list.iter() {
-        corpus.add_text(string)
+        corpus.add_text(&string.to_lowercase())
     }
 
-    let results = corpus.search(pattern, threshold);
+    let results = corpus.search(&pattern.to_lowercase(), threshold, 10);
 
-    let response: Option<FuzzyResponse> = if results.first().is_some() {
+    let response: Option<FuzzyResponse> = if !results.is_empty() {
         let top_match = results.first();
         info!("Top Match: {:#?}", top_match);
         let top_match_index = string_list

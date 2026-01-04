@@ -13,7 +13,6 @@ use serde::Deserialize;
 
 #[derive(Deserialize, Debug, Clone)]
 #[serde(rename_all = "camelCase")]
-
 pub struct Anime {
     #[serde(rename = "type")]
     media_type: Option<String>,
@@ -49,14 +48,12 @@ pub struct Studios {
 #[derive(Deserialize, Debug, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct Edges {
-    pub id: u32,
     pub is_main: bool,
 }
 
 #[derive(Deserialize, Debug, Clone)]
 
 pub struct Nodes {
-    pub id: u32,
     pub name: String,
 }
 
@@ -78,7 +75,7 @@ impl Anime {
             None => "".to_string(),
         };
 
-        let built_string = vec![season, year];
+        let built_string = [season, year];
         let return_string = titlecase(built_string.join(" ").trim());
 
         match return_string {

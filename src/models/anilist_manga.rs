@@ -53,16 +53,13 @@ pub struct Staff {
 
 #[derive(Deserialize, Debug, Clone)]
 pub struct Edges {
-    pub id: u32,
     pub role: String,
 }
 
 #[derive(Deserialize, Debug, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct Nodes {
-    pub id: u32,
     pub name: StaffName,
-    pub site_url: String,
 }
 
 #[derive(Deserialize, Debug, Clone)]

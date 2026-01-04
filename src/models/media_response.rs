@@ -19,19 +19,8 @@ pub struct Page<T> {
 #[derive(Deserialize, Debug)]
 #[serde(rename_all = "camelCase")]
 pub struct PageData<T> {
-    pub page_info: Option<PageInfo>,
     #[serde(rename = "media")]
     pub media_list: Option<Vec<T>>,
-}
-
-#[derive(Deserialize, Debug)]
-#[serde(rename_all = "camelCase")]
-pub struct PageInfo {
-    pub total: Option<u32>,
-    pub current_page: Option<u32>,
-    pub last_page: Option<u32>,
-    pub has_next_page: Option<bool>,
-    pub per_page: Option<u32>,
 }
 
 impl<T: Transformers + std::clone::Clone> FetchResponse<T> {

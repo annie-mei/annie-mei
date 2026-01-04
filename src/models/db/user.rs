@@ -6,6 +6,7 @@ use tracing::info;
 use crate::utils::{queries::FETCH_ANILIST_USER, requests::anilist::send_request};
 
 #[derive(Queryable)]
+#[allow(dead_code)]
 pub struct User {
     pub discord_id: i64,
     pub anilist_id: i64,
