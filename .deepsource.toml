@@ -6,9 +6,5 @@ exclude_patterns = ["migrations/**"]
 name = "rust"
 enabled = true
 
-  [analyzers.meta]
-  msrv = "stable"
-
-[[transformers]]
-name = "rustfmt"
-enabled = true
+[analyzers.meta]
+msrv = "stable"
