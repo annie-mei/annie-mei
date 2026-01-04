@@ -5,35 +5,33 @@ use crate::{
 
 use serde_json::json;
 use serenity::{
-    builder::{CreateApplicationCommand, CreateEmbed},
+    all::{CommandInteraction, CreateCommandOption, CreateEmbed, EditInteractionResponse},
+    builder::CreateCommand,
     client::Context,
-    model::{
-        application::interaction::application_command::ApplicationCommandInteraction,
-        prelude::command::CommandOptionType,
-    },
+    model::application::CommandOptionType,
 };
 
 use tokio::task;
 use tracing::info;
 
-pub fn register(command: &mut CreateApplicationCommand) -> &mut CreateApplicationCommand {
-    command
-        .name("songs")
+pub fn register() -> CreateCommand {
+    CreateCommand::new("songs")
         .description("Fetches the songs of an anime")
-        .create_option(|option| {
-            option
-                .name("search")
-                .description("Anilist ID or Search term")
-                .kind(CommandOptionType::String)
-                .required(true)
-        })
+        .add_option(
+            CreateCommandOption::new(
+                CommandOptionType::String,
+                "search",
+                "Anilist ID or Search term",
+            )
+            .required(true),
+        )
 }
 
-pub async fn run(ctx: &Context, interaction: &mut ApplicationCommandInteraction) {
+pub async fn run(ctx: &Context, interaction: &mut CommandInteraction) {
     let _ = interaction.defer(&ctx.http).await;
 
     let user = &interaction.user;
-    let arg = interaction.data.options[0].resolved.to_owned().unwrap();
+    let arg = interaction.data.options[0].value.clone();
     let json_arg = json!(arg);
 
     sentry::configure_scope(|scope| {
@@ -58,28 +56,22 @@ pub async fn run(ctx: &Context, interaction: &mut ApplicationCommandInteraction)
 
     let _songs_response = match response {
         None => {
-            interaction
-                .edit_original_interaction_response(&ctx.http, |response| {
-                    response.content(NOT_FOUND_ANIME)
-                })
-                .await
+            let builder = EditInteractionResponse::new().content(NOT_FOUND_ANIME);
+            interaction.edit_response(&ctx.http, builder).await
         }
         Some(song_response) => {
-            interaction
-                .edit_original_interaction_response(&ctx.http, |response| {
-                    response.set_embed(build_message_from_song_response(song_response))
-                })
-                .await
+            let builder = EditInteractionResponse::new()
+                .embed(build_message_from_song_response(song_response));
+            interaction.edit_response(&ctx.http, builder).await
         }
     };
 }
 
 fn build_message_from_song_response(mal_response: MalResponse) -> CreateEmbed {
-    CreateEmbed::default()
+    CreateEmbed::new()
         .title(mal_response.transform_title())
         .field("Openings", mal_response.transform_openings(), false)
         .field("Endings", mal_response.transform_endings(), false)
         .thumbnail(mal_response.transform_thumbnail())
         .field("\u{200b}", mal_response.transform_mal_link(), false)
-        .clone()
 }

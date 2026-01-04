@@ -9,35 +9,33 @@ use crate::{
 
 use serde_json::json;
 use serenity::{
-    builder::CreateApplicationCommand,
+    all::{CommandInteraction, CreateCommandOption, EditInteractionResponse},
+    builder::CreateCommand,
     client::Context,
-    model::{
-        application::interaction::application_command::ApplicationCommandInteraction,
-        prelude::command::CommandOptionType,
-    },
+    model::application::CommandOptionType,
 };
 
 use tokio::task;
 use tracing::info;
 
-pub fn register(command: &mut CreateApplicationCommand) -> &mut CreateApplicationCommand {
-    command
-        .name("manga")
+pub fn register() -> CreateCommand {
+    CreateCommand::new("manga")
         .description("Fetches the details for a manga")
-        .create_option(|option| {
-            option
-                .name("search")
-                .description("Anilist ID or Search term")
-                .kind(CommandOptionType::String)
-                .required(true)
-        })
+        .add_option(
+            CreateCommandOption::new(
+                CommandOptionType::String,
+                "search",
+                "Anilist ID or Search term",
+            )
+            .required(true),
+        )
 }
 
-pub async fn run(ctx: &Context, interaction: &mut ApplicationCommandInteraction) {
+pub async fn run(ctx: &Context, interaction: &mut CommandInteraction) {
     let _ = interaction.defer(&ctx.http).await;
 
     let user = &interaction.user;
-    let arg = interaction.data.options[0].resolved.to_owned().unwrap();
+    let arg = interaction.data.options[0].value.clone();
     let json_arg = json!(arg);
 
     sentry::configure_scope(|scope| {
@@ -62,11 +60,8 @@ pub async fn run(ctx: &Context, interaction: &mut ApplicationCommandInteraction)
 
     let _manga_response = match response {
         None => {
-            interaction
-                .edit_original_interaction_response(&ctx.http, |response| {
-                    response.content(NOT_FOUND_MANGA)
-                })
-                .await
+            let builder = EditInteractionResponse::new().content(NOT_FOUND_MANGA);
+            interaction.edit_response(&ctx.http, builder).await
         }
         Some(manga_response) => {
             // TODO: Refactor this to fetcher.rs
@@ -94,11 +89,8 @@ pub async fn run(ctx: &Context, interaction: &mut ApplicationCommandInteraction)
 
             let manga_response_embed = manga_response.transform_response_embed(guild_members_data);
 
-            interaction
-                .edit_original_interaction_response(&ctx.http, |response| {
-                    response.set_embed(manga_response_embed)
-                })
-                .await
+            let builder = EditInteractionResponse::new().embed(manga_response_embed);
+            interaction.edit_response(&ctx.http, builder).await
         }
     };
 }
