@@ -44,7 +44,7 @@ pub trait Response {
         &self,
         media_type: Type,
     ) -> Option<T> {
-        let response = match self.get_argument() {
+        match self.get_argument() {
             Argument::Id(value) => {
                 let fetched_data = fetch_by_id(self.get_id_query(), *value);
                 let fetch_response: IdResponse<T> = serde_json::from_str(&fetched_data).unwrap();
@@ -71,9 +71,7 @@ pub trait Response {
                 debug!("Fuzzy Response: {:#?}", result);
                 result
             }
-        };
-
-        response
+        }
     }
 }
 
