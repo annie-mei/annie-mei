@@ -1,9 +1,9 @@
 [package]
 name = "annie-mei"
 version = "1.4.2"
-edition = "2021"
+edition = "2024"
 license = "GPL-3.0-or-later"
-rust-version = "1.85"
+rust-version = "1.92"
 
 [package.metadata.cross.target.armv7-unknown-linux-gnueabihf]
 pre-build = [
