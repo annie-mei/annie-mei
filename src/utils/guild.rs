@@ -13,8 +13,8 @@ use crate::{
 };
 
 use serenity::{
+    all::CommandInteraction,
     client::Context,
-    model::application::interaction::application_command::ApplicationCommandInteraction,
     model::prelude::{Guild, UserId},
 };
 
@@ -22,30 +22,24 @@ use serde_json::json;
 use tokio::task;
 use tracing::info;
 
-fn get_guild_member_ids(guild: Guild) -> Vec<UserId> {
+fn get_guild_member_ids(guild: &Guild) -> Vec<UserId> {
     let members: Vec<UserId> = guild.members.keys().copied().collect();
     info!("Found {:#?} members in guild", members.len());
     members
 }
 
-fn get_guild_from_interaction(
-    ctx: &Context,
-    interaction: &ApplicationCommandInteraction,
-) -> Option<Guild> {
+fn get_guild_from_interaction(ctx: &Context, interaction: &CommandInteraction) -> Option<Guild> {
     match interaction.guild_id {
         None => None,
-        Some(guild_id) => guild_id.to_guild_cached(&ctx.cache),
+        Some(guild_id) => guild_id.to_guild_cached(&ctx.cache).map(|g| g.clone()),
     }
 }
 
-pub fn get_current_guild_members(
-    ctx: &Context,
-    interaction: &ApplicationCommandInteraction,
-) -> Vec<UserId> {
+pub fn get_current_guild_members(ctx: &Context, interaction: &CommandInteraction) -> Vec<UserId> {
     let guild = get_guild_from_interaction(ctx, interaction);
     match guild {
         None => vec![],
-        Some(guild) => get_guild_member_ids(guild),
+        Some(ref guild) => get_guild_member_ids(guild),
     }
 }
 
