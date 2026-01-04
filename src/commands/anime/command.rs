@@ -9,41 +9,39 @@ use crate::{
 
 use serde_json::json;
 use serenity::{
-    builder::CreateApplicationCommand,
+    all::{CommandInteraction, CreateCommandOption, EditInteractionResponse},
+    builder::CreateCommand,
     client::Context,
-    model::{
-        application::interaction::application_command::ApplicationCommandInteraction,
-        prelude::command::CommandOptionType,
-    },
+    model::application::CommandOptionType,
 };
 
 use tokio::task;
 use tracing::info;
 
-pub fn register(command: &mut CreateApplicationCommand) -> &mut CreateApplicationCommand {
-    command
-        .name("anime")
+pub fn register() -> CreateCommand {
+    CreateCommand::new("anime")
         .description("Fetches the details for an anime")
-        .create_option(|option| {
-            option
-                .name("search")
-                .description("Anilist ID or Search term")
-                .kind(CommandOptionType::String)
-                .required(true)
-        })
+        .add_option(
+            CreateCommandOption::new(
+                CommandOptionType::String,
+                "search",
+                "Anilist ID or Search term",
+            )
+            .required(true),
+        )
 }
 
-pub async fn run(ctx: &Context, interaction: &mut ApplicationCommandInteraction) {
+pub async fn run(ctx: &Context, interaction: &mut CommandInteraction) {
     let _ = interaction.defer(&ctx.http).await;
 
     let user = &interaction.user;
-    let arg = interaction.data.options[0].resolved.to_owned().unwrap();
-    let json_arg = json!(arg);
+    let arg = interaction.data.options[0].value.clone();
+    let arg_str = format!("{:?}", arg);
 
     sentry::configure_scope(|scope| {
         let mut context = std::collections::BTreeMap::new();
         context.insert("Command".to_string(), "Anime".into());
-        context.insert("Arg".to_string(), json_arg);
+        context.insert("Arg".to_string(), json!(arg_str));
         scope.set_context("Anime", sentry::protocol::Context::Other(context));
         scope.set_user(Some(sentry::User {
             username: Some(user.name.to_string()),
@@ -62,11 +60,8 @@ pub async fn run(ctx: &Context, interaction: &mut ApplicationCommandInteraction)
 
     let _anime_response = match response {
         None => {
-            interaction
-                .edit_original_interaction_response(&ctx.http, |response| {
-                    response.content(NOT_FOUND_ANIME)
-                })
-                .await
+            let builder = EditInteractionResponse::new().content(NOT_FOUND_ANIME);
+            interaction.edit_response(&ctx.http, builder).await
         }
         Some(anime_response) => {
             // TODO: Refactor this to fetcher.rs
@@ -94,11 +89,8 @@ pub async fn run(ctx: &Context, interaction: &mut ApplicationCommandInteraction)
 
             let anime_response_embed = anime_response.transform_response_embed(guild_members_data);
 
-            interaction
-                .edit_original_interaction_response(&ctx.http, |response| {
-                    response.set_embed(anime_response_embed)
-                })
-                .await
+            let builder = EditInteractionResponse::new().embed(anime_response_embed);
+            interaction.edit_response(&ctx.http, builder).await
         }
     };
 }

@@ -2,43 +2,35 @@ use crate::{models::db::user::User, utils::database};
 
 use serde_json::json;
 use serenity::{
-    builder::CreateApplicationCommand,
+    all::{CommandInteraction, CreateCommandOption, EditInteractionResponse, ResolvedValue},
+    builder::CreateCommand,
     client::Context,
-    model::{
-        application::interaction::application_command::ApplicationCommandInteraction,
-        prelude::{
-            command::CommandOptionType,
-            interaction::application_command::CommandDataOptionValue::String as StringArg,
-        },
-    },
+    model::application::CommandOptionType,
 };
 use tokio::task;
 use tracing::info;
 
-pub fn register(command: &mut CreateApplicationCommand) -> &mut CreateApplicationCommand {
-    command
-        .name("register")
+pub fn register() -> CreateCommand {
+    CreateCommand::new("register")
         .description("Command to register your user's Anilist account")
-        .create_option(|option| {
-            option
-                .name("anilist")
-                .description("Anilist username")
-                .kind(CommandOptionType::String)
-                .required(true)
-        })
+        .add_option(
+            CreateCommandOption::new(CommandOptionType::String, "anilist", "Anilist username")
+                .required(true),
+        )
 }
 
-pub async fn run(ctx: &Context, interaction: &mut ApplicationCommandInteraction) {
+pub async fn run(ctx: &Context, interaction: &mut CommandInteraction) {
     let _ = interaction.defer(&ctx.http).await;
 
     let user = &interaction.user;
-    let arg = interaction.data.options[0].resolved.to_owned().unwrap();
-    let json_arg = json!(arg);
+    let options = interaction.data.options();
+    let arg = &options[0].value;
+    let arg_str = format!("{:?}", arg);
 
     sentry::configure_scope(|scope| {
         let mut context = std::collections::BTreeMap::new();
         context.insert("Command".to_string(), "Register".into());
-        context.insert("Arg".to_string(), json_arg);
+        context.insert("Arg".to_string(), json!(arg_str));
         scope.set_context("Register", sentry::protocol::Context::Other(context));
         scope.set_user(Some(sentry::User {
             username: Some(user.name.to_string()),
@@ -52,17 +44,14 @@ pub async fn run(ctx: &Context, interaction: &mut ApplicationCommandInteraction)
     );
 
     let anilist_username = match arg {
-        StringArg(name) => name,
+        ResolvedValue::String(name) => name.to_string(),
         _ => panic!("Invalid argument type"),
     };
 
     let response_message = register_new_user(anilist_username.to_owned(), user).await;
 
-    let _register = interaction
-        .edit_original_interaction_response(&ctx.http, |response| {
-            response.content(response_message)
-        })
-        .await;
+    let builder = EditInteractionResponse::new().content(response_message);
+    let _register = interaction.edit_response(&ctx.http, builder).await;
 }
 
 async fn register_new_user(anilist_username: String, user: &serenity::model::user::User) -> String {
@@ -84,7 +73,7 @@ async fn register_new_user(anilist_username: String, user: &serenity::model::use
     {
         let anilist_id = anilist_id.unwrap();
         User::create_or_update_user(
-            user.id.into(),
+            user.id.get() as i64,
             anilist_id,
             anilist_username.to_owned(),
             connection,
