@@ -9,7 +9,7 @@ use crate::{
 };
 
 use html2md::parse_html;
-use serenity::builder::CreateEmbed;
+use serenity::all::{CreateEmbed, CreateEmbedFooter};
 
 pub trait Transformers {
     fn get_id(&self) -> u32;
@@ -60,17 +60,6 @@ pub trait Transformers {
             None => match self.get_english_title() {
                 Some(title) => title,
                 None => self.get_native_title().unwrap_or_default(),
-            },
-        };
-        titlecase(&return_title)
-    }
-    fn transform_native_title(&self) -> String {
-        let native_title = self.get_native_title();
-        let return_title = match native_title {
-            Some(title) => title,
-            None => match self.get_romaji_title() {
-                Some(title) => title,
-                None => self.get_english_title().unwrap_or_default(),
             },
         };
         titlecase(&return_title)
@@ -180,15 +169,14 @@ pub trait Transformers {
         guild_members_data: Option<HashMap<i64, MediaListData>>,
     ) -> CreateEmbed {
         let is_anime = self.get_type() == "anime";
-        let mut embed = CreateEmbed::default();
-        embed
+        let mut embed = CreateEmbed::new()
             // General Embed Fields
             .color(self.transform_color())
             .title(self.transform_romaji_title())
             .description(self.transform_description_and_mal_link())
             .url(self.transform_anilist())
             .thumbnail(self.transform_thumbnail())
-            .footer(|f| f.text(self.transform_english_title()))
+            .footer(CreateEmbedFooter::new(self.transform_english_title()))
             // self Data Fields
             // First line after MAL link
             .fields(vec![
@@ -232,14 +220,14 @@ pub trait Transformers {
 
         // Sixth line after MAL link (Only for Anime response)
         if is_anime {
-            embed.fields(vec![
+            embed = embed.fields(vec![
                 ("Streaming", self.transform_links(), true), // Field 11
                 ("Trailer", self.transform_trailer(), true), // Field 12
             ]);
         }
 
         // Build the scores field and return the embed
-        let embed = match guild_members_data {
+        match guild_members_data {
             Some(guild_members_data) => {
                 let mut guild_members_data_string = String::default();
                 for (user_id, score) in guild_members_data {
@@ -249,8 +237,7 @@ pub trait Transformers {
                 }
                 embed.field("Guild Members", &guild_members_data_string, false)
             }
-            None => &mut embed,
-        };
-        embed.clone()
+            None => embed,
+        }
     }
 }

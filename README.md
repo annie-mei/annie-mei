@@ -1,44 +1,31 @@
 # Annie Mei
 
-> Annie Mei now listens to /commands!
+A Discord bot written in Rust that fetches anime and manga information from AniList, with theme song lookups powered by MyAnimeList and Spotify.
 
-##### Commands
+![Rust](https://img.shields.io/badge/Rust-2024-orange?logo=rust)
+![Serenity](https://img.shields.io/badge/Serenity-0.12-blue)
+![License](https://img.shields.io/badge/License-GPL--3.0-blue)
 
-###### /help
+## Features
 
-- Shows a list of commands that Annie Mei supports!
+- Fetch detailed anime/manga information from AniList
+- Look up opening and ending theme songs with Spotify links
+- Link your AniList account to show guild members' scores
+- Full Japanese kana support for searches
 
-###### /ping
+## Commands
 
-- Shows a list of commands that Annie Mei supports!
+| Command | Description |
+|---------|-------------|
+| `/help` | Shows available commands |
+| `/ping` | Bot health check |
+| `/register` | Link your AniList account |
+| `/anime <search>` | Look up anime by name or AniList ID |
+| `/manga <search>` | Look up manga by name or AniList ID |
+| `/songs <search>` | Find theme songs for an anime |
 
-###### /register
+### Search Tips
 
-- Register an association with your anilist account!
-  - `arg`: `anilist`: A string for your Anilist username
-- This is used to show guild members' Anilist scores!
-
-###### /anime
-
-- Arguments
-  - _search_: The Anilist ID or a search term lookup
-
-###### /manga
-
-- Arguments
-  - _search_: The Anilist ID or a search term lookup
-
-###### /songs
-
-- Arguments
-  - _search_: The Anilist ID or a search term lookup
-  - **Note**: If you want to look up something that has a numeric name, you can wrap the search term in quotes! => `"86"`
-
-###### `search`
-
-- Search terms have kana support!
-  Try !manga きめつのやいば
-
-<!-- TODO: Optimize Binary -> https://lifthrasiir.github.io/rustlog/why-is-a-rust-executable-large.html -->
-<!-- TODO: Maybe Try to get Spotify links for songs? -->
-<!-- TODO: Add Character and Studio query -->
+- Use AniList IDs for exact matches
+- Japanese kana is supported: `/manga きめつのやいば`
+- Wrap numeric titles in quotes: `/songs "86"`

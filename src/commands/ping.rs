@@ -1,16 +1,14 @@
 use serenity::{
-    builder::CreateApplicationCommand,
-    model::application::interaction::{
-        application_command::ApplicationCommandInteraction, InteractionResponseType,
-    },
+    all::{CommandInteraction, CreateInteractionResponse, CreateInteractionResponseMessage},
+    builder::CreateCommand,
     prelude::*,
 };
 
-pub fn register(command: &mut CreateApplicationCommand) -> &mut CreateApplicationCommand {
-    command.name("ping").description("A ping command")
+pub fn register() -> CreateCommand {
+    CreateCommand::new("ping").description("A ping command")
 }
 
-pub async fn run(ctx: &Context, interaction: &ApplicationCommandInteraction) {
+pub async fn run(ctx: &Context, interaction: &CommandInteraction) {
     let user = &interaction.user;
 
     sentry::configure_scope(|scope| {
@@ -23,15 +21,11 @@ pub async fn run(ctx: &Context, interaction: &ApplicationCommandInteraction) {
         }));
     });
 
-    let _ping = interaction
-        .create_interaction_response(&ctx.http, |response| {
-            { response.kind(InteractionResponseType::ChannelMessageWithSource) }
-                .interaction_response_data(|m| {
-                    m.content(format!(
-                        "Hello {}! I'm Annie Mei, a bot that helps you find anime and manga!",
-                        user.mention()
-                    ))
-                })
-        })
-        .await;
+    let response_message = CreateInteractionResponseMessage::new().content(format!(
+        "Hello {}! I'm Annie Mei, a bot that helps you find anime and manga!",
+        user.mention()
+    ));
+    let response = CreateInteractionResponse::Message(response_message);
+
+    let _ = interaction.create_response(&ctx.http, response).await;
 }

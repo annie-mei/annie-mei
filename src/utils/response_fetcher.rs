@@ -3,9 +3,7 @@ use crate::models::{
     media_type::MediaType as Type,
     transformers::Transformers,
 };
-use serenity::model::prelude::interaction::application_command::CommandDataOptionValue::{
-    self, String as StringData,
-};
+use serenity::all::CommandDataOptionValue;
 use tracing::info;
 
 fn strip_quotes(string: &str) -> String {
@@ -14,7 +12,7 @@ fn strip_quotes(string: &str) -> String {
 
 fn return_argument(arg: CommandDataOptionValue) -> Argument {
     let val = match arg {
-        StringData(name) => name,
+        CommandDataOptionValue::String(name) => name,
         _ => panic!("Invalid argument type"),
     };
 

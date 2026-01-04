@@ -74,10 +74,10 @@ impl MediaListData {
             if let Some(progress) = &self.progress {
                 embed.push_str(&format!("**Progress:** {progress}"));
             }
-            if let Some(progress_volumes) = &self.progress_volumes {
-                if progress_volumes != &0 {
-                    embed.push_str(&format!("[{progress_volumes}]"));
-                }
+            if let Some(progress_volumes) = &self.progress_volumes
+                && progress_volumes != &0
+            {
+                embed.push_str(&format!("[{progress_volumes}]"));
             }
         }
 

@@ -6,7 +6,7 @@ use crate::{
     utils::{requests::my_anime_list, response_fetcher::fetcher as anime_fetcher},
 };
 
-use serenity::model::prelude::interaction::application_command::CommandDataOptionValue;
+use serenity::all::CommandDataOptionValue;
 use tracing::info;
 
 pub fn fetcher(args: CommandDataOptionValue) -> Option<MalResponse> {

@@ -83,14 +83,13 @@ impl MalResponse {
             }
 
             // Add artist names if they exist
-            if artist_names.is_some() {
-                write!(song_string, " by {}", artist_names.unwrap()).unwrap();
+            if let Some(artist_names) = artist_names {
+                write!(song_string, " by {}", artist_names).unwrap();
             }
 
             // Add episode numbers if they exist
-            if episode_numbers.is_some() {
-                // Use write
-                write!(song_string, " | {}", episode_numbers.unwrap()).unwrap();
+            if let Some(episode_numbers) = episode_numbers {
+                write!(song_string, " | {}", episode_numbers).unwrap();
             }
             return_string.push(song_string);
         }
@@ -105,12 +104,7 @@ impl MalResponse {
         info!("Romaji Song Name: {:#?}", romaji_name);
         info!("Kana Song Name: {:#?}", kana_name);
 
-        Some(get_song_url(
-            romaji_name,
-            kana_name,
-            artist_name.to_string(),
-        ))
-        .unwrap_or(None)
+        get_song_url(romaji_name, kana_name, artist_name.to_string())
     }
 
     fn get_artist_names(song: &str) -> Option<String> {

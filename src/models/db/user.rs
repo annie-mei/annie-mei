@@ -6,6 +6,7 @@ use tracing::info;
 use crate::utils::{queries::FETCH_ANILIST_USER, requests::anilist::send_request};
 
 #[derive(Queryable)]
+#[allow(dead_code)]
 pub struct User {
     pub discord_id: i64,
     pub anilist_id: i64,
@@ -18,7 +19,8 @@ impl User {
         conn: &mut PgConnection,
     ) -> Option<Vec<User>> {
         use crate::schema::users::dsl::*;
-        let user_discord_ids: Vec<i64> = user_discord_ids.iter().map(|id| id.0 as i64).collect();
+        let user_discord_ids: Vec<i64> =
+            user_discord_ids.iter().map(|id| id.get() as i64).collect();
         users
             .filter(discord_id.eq_any(user_discord_ids))
             .load::<User>(conn)

@@ -14,7 +14,7 @@ pub fn fetch_by_id(query: String, id: u32) -> String {
 }
 
 pub fn fetch_by_name(query: String, name: String) -> String {
-    let searchable_name = if name.is_japanese() {
+    let searchable_name = if name.as_str().is_japanese() {
         name.to_romaji()
     } else {
         name.clone()
