@@ -25,12 +25,12 @@ pub async fn run(ctx: &Context, interaction: &mut CommandInteraction) {
     let user = &interaction.user;
     let options = interaction.data.options();
     let arg = &options[0].value;
-    let json_arg = json!(interaction.data.options[0].value);
+    let arg_str = format!("{:?}", arg);
 
     sentry::configure_scope(|scope| {
         let mut context = std::collections::BTreeMap::new();
         context.insert("Command".to_string(), "Register".into());
-        context.insert("Arg".to_string(), json_arg);
+        context.insert("Arg".to_string(), json!(arg_str));
         scope.set_context("Register", sentry::protocol::Context::Other(context));
         scope.set_user(Some(sentry::User {
             username: Some(user.name.to_string()),

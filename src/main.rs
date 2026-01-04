@@ -14,62 +14,15 @@ use serenity::{
     async_trait,
     builder::CreateCommand,
     client::{Client, Context, EventHandler},
-    framework::standard::{macros::hook, CommandResult, DispatchError, StandardFramework},
     gateway::ActivityData,
-    model::{application::Command, application::Interaction, channel::Message, gateway::Ready},
+    model::{application::Command, application::Interaction, gateway::Ready},
     prelude::*,
-    utils::parse_emoji,
 };
 
 use utils::{
     database::run_migration,
     statics::{DISCORD_TOKEN, ENV, SENTRY_DSN},
 };
-
-#[hook]
-#[instrument(skip(_ctx, msg))]
-async fn before(_ctx: &Context, msg: &Message, command_name: &str) -> bool {
-    info!("Got command '{command_name}' by user '{}'", msg.author.name);
-    true
-}
-
-#[hook]
-#[instrument(skip(_ctx, _msg))]
-async fn after(_ctx: &Context, _msg: &Message, command_name: &str, command_result: CommandResult) {
-    match command_result {
-        Ok(()) => info!("Processed command '{command_name}'"),
-        Err(why) => info!("Command '{command_name}' returned error {:?}", why),
-    }
-}
-
-#[hook]
-#[instrument(skip(ctx, msg))]
-async fn unknown_command(ctx: &Context, msg: &Message, unknown_command_name: &str) {
-    info!("Could not find command named '{unknown_command_name}'");
-    let reaction = parse_emoji("<:wtf:953730408158228570>").unwrap();
-    let _ = msg.react(ctx, reaction).await;
-}
-#[hook]
-async fn delay_action(ctx: &Context, msg: &Message) {
-    // You may want to handle a Discord rate limit if this fails.
-    let _ = msg.react(ctx, '⏱').await;
-}
-
-#[hook]
-async fn dispatch_error(ctx: &Context, msg: &Message, error: DispatchError, _command_name: &str) {
-    if let DispatchError::Ratelimited(info) = error {
-        // We notify them only once.
-        if info.is_first_try {
-            let _ = msg
-                .channel_id
-                .say(
-                    &ctx.http,
-                    &format!("Try this again in {} seconds.", info.as_secs()),
-                )
-                .await;
-        }
-    }
-}
 
 struct Handler;
 
@@ -147,8 +100,6 @@ async fn main() {
     let connection = &mut utils::database::establish_connection();
     run_migration(connection);
 
-    let framework = StandardFramework::new();
-    framework.configure(|c| c.prefix("!"));
     let token = env::var(DISCORD_TOKEN).expect("Expected a token in the environment");
     let intents = GatewayIntents::GUILD_MESSAGES
         | GatewayIntents::DIRECT_MESSAGES
@@ -157,7 +108,6 @@ async fn main() {
 
     let mut client = Client::builder(&token, intents)
         .event_handler(Handler)
-        .framework(framework)
         .await
         .expect("Err creating client");
 
