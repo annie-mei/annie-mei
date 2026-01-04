@@ -110,7 +110,7 @@ let result = task::spawn_blocking(move || {
 
 ## Code Style
 
-- Edition 2021, rustfmt edition 2018
+- Edition 2024, rustfmt edition 2024
 - Use `tracing` macros (`info!`, `debug!`, `error!`) for logging
 - Add `#[instrument]` to functions for automatic tracing spans
 - Prefer `?` operator over `unwrap()` where possible
@@ -121,3 +121,26 @@ let result = task::spawn_blocking(move || {
 - **Commits**: Conventional format - `type: description` (feat, fix, docs, chore, refactor, test)
 - **PR titles**: `[ANNIE-XXX]/Description` (e.g., `[ANNIE-84]/Prepare for AI Dev`)
 - **Branches**: Use Linear's format - `annie-XXX-description`
+- **Branch structure**: `next` (development), `current` (production/release)
+
+### Pull Requests
+
+- Always assign PRs to `@InfernapeXavier`
+- Always link to Linear issue in PR body
+
+### Release Process
+
+1. Create PR from `next` to `current`:
+   - Title: `[Annie Mei]/Release X.X.X`
+   - Add the `release` label
+   - Assign to `@InfernapeXavier`
+
+2. After merge, create release with AI-generated notes:
+   ```bash
+   gh release create vX.X.X --target current --notes "AI-generated release notes"
+   ```
+
+3. Release notes sections:
+   - **Breaking Changes** - API changes, major upgrades
+   - **Improvements** - New features, enhancements
+   - **Dependencies** - Package updates with version changes

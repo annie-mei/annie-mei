@@ -10,8 +10,8 @@ Annie Mei is a Rust Discord bot using Serenity 0.11 that fetches anime/manga dat
 
 | Component | Technology                   |
 | --------- | ---------------------------- |
-| Language  | Rust 2021 Edition            |
-| Discord   | Serenity 0.11                |
+| Language  | Rust 2024 Edition            |
+| Discord   | Serenity 0.12                |
 | Database  | PostgreSQL + Diesel ORM      |
 | Cache     | Redis                        |
 | HTTP      | Reqwest (blocking)           |
@@ -63,10 +63,33 @@ diesel migration run     # Apply database migrations
 - Title format: `[ANNIE-XXX]/Description`
 - Example: `[ANNIE-84]/Prepare for AI Dev`
 - Always link to Linear issue in PR body
+- Always assign the PR to `@InfernapeXavier`
+
+### Release Pull Requests
+
+- Title format: `[Annie Mei]/Release X.X.X`
+- Example: `[Annie Mei]/Release 2.0.0`
+- Add the `release` label to the PR
+- Always assign the PR to `@InfernapeXavier`
+- Target branch: `current` (from `next`)
+
+### Creating Releases
+
+After the release PR is merged:
+1. Create the release with AI-generated notes:
+   ```bash
+   gh release create vX.X.X --target current --notes "AI-generated release notes here"
+   ```
+2. Generate release notes with these sections:
+   - **Breaking Changes** - API changes, major upgrades
+   - **Improvements** - New features, enhancements
+   - **Dependencies** - Package updates with version changes
 
 ### Branches
 
 - Use Linear's suggested branch name: `annie-XXX-description`
+- `next` - Development branch (default)
+- `current` - Production/release branch
 
 ### Adding Commands
 

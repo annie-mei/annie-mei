@@ -11,8 +11,8 @@ alwaysApply: true
 Annie Mei is a Discord bot written in Rust that integrates with AniList, MyAnimeList, and Spotify to provide anime/manga information and theme songs. It uses slash commands for Discord interactions.
 
 ### Tech Stack
-- **Language**: Rust (Edition 2021)
-- **Discord Framework**: Serenity 0.11
+- **Language**: Rust (Edition 2024)
+- **Discord Framework**: Serenity 0.12
 - **Database**: PostgreSQL via Diesel ORM
 - **Caching**: Redis
 - **HTTP Client**: Reqwest (blocking for API calls)
@@ -136,9 +136,30 @@ Current intents: `GUILD_MESSAGES`, `DIRECT_MESSAGES`, `GUILD_PRESENCES`, `GUILDS
 - Title format: `[ANNIE-XXX]/Description`
 - Example: `[ANNIE-84]/Prepare for AI Dev`
 - Always link to Linear issue in PR body
+- Always assign PRs to `@InfernapeXavier`
+
+### Release Pull Requests
+- Title format: `[Annie Mei]/Release X.X.X`
+- Example: `[Annie Mei]/Release 2.0.0`
+- Add the `release` label
+- Assign to `@InfernapeXavier`
+- Target branch: `current` (from `next`)
+
+### Creating Releases
+After the release PR is merged:
+1. Create the release with AI-generated notes:
+   ```bash
+   gh release create vX.X.X --target current --notes "AI-generated release notes"
+   ```
+2. Release notes sections:
+   - **Breaking Changes** - API changes, major upgrades
+   - **Improvements** - New features, enhancements
+   - **Dependencies** - Package updates with version changes
 
 ### Branches
 - Use Linear's suggested branch name: `annie-XXX-description`
+- `next` - Development branch (default)
+- `current` - Production/release branch
 
 ## Formatting
 
