@@ -6,20 +6,17 @@ mod utils;
 use std::env;
 
 use sentry::integrations::tracing as sentry_tracing;
-use tracing::{debug, info, instrument};
+use tracing::{info, instrument};
 use tracing_subscriber::{prelude::*, util::SubscriberInitExt, EnvFilter};
 
 use serenity::{
+    all::{CreateEmbed, CreateMessage},
     async_trait,
+    builder::CreateCommand,
     client::{Client, Context, EventHandler},
     framework::standard::{macros::hook, CommandResult, DispatchError, StandardFramework},
-    model::{
-        application::{command::Command, interaction::Interaction},
-        channel::Message,
-        event::ResumedEvent,
-        gateway::Ready,
-        prelude::Activity,
-    },
+    gateway::ActivityData,
+    model::{application::Command, application::Interaction, channel::Message, gateway::Ready},
     prelude::*,
     utils::parse_emoji,
 };
@@ -79,7 +76,7 @@ struct Handler;
 #[async_trait]
 impl EventHandler for Handler {
     async fn interaction_create(&self, ctx: Context, interaction: Interaction) {
-        if let Interaction::ApplicationCommand(mut command) = interaction {
+        if let Interaction::Command(mut command) = interaction {
             info!("Received command interaction: {:#?}", command);
 
             match command.data.name.as_str() {
@@ -90,12 +87,11 @@ impl EventHandler for Handler {
                 "anime" => commands::anime::command::run(&ctx, &mut command).await,
                 "register" => commands::register::command::run(&ctx, &mut command).await,
                 _ => {
-                    let msg = command
-                        .channel_id
-                        .send_message(&ctx.http, |msg| {
-                            msg.embed(|e| e.title("Error").description("Not implemented"))
-                        })
-                        .await;
+                    let embed = CreateEmbed::new()
+                        .title("Error")
+                        .description("Not implemented");
+                    let builder = CreateMessage::new().embed(embed);
+                    let msg = command.channel_id.send_message(&ctx.http, builder).await;
                     if let Err(why) = msg {
                         println!("Error sending message: {why:?}");
                         info!("Cannot respond to slash command: {why}");
@@ -106,31 +102,24 @@ impl EventHandler for Handler {
     }
 
     async fn ready(&self, ctx: Context, ready: Ready) {
-        let guild_commands = Command::set_global_application_commands(&ctx.http, |commands| {
-            commands
-                .create_application_command(|command| commands::ping::register(command))
-                .create_application_command(|command| commands::help::register(command))
-                .create_application_command(|command| commands::songs::command::register(command))
-                .create_application_command(|command| commands::manga::command::register(command))
-                .create_application_command(|command| commands::anime::command::register(command))
-                .create_application_command(|command| {
-                    commands::register::command::register(command)
-                })
-        })
-        .await;
+        let commands: Vec<CreateCommand> = vec![
+            commands::ping::register(),
+            commands::help::register(),
+            commands::songs::command::register(),
+            commands::manga::command::register(),
+            commands::anime::command::register(),
+            commands::register::command::register(),
+        ];
 
-        ctx.set_activity(Activity::listening("/help")).await;
+        let guild_commands = Command::set_global_commands(&ctx.http, commands).await;
+
+        ctx.set_activity(Some(ActivityData::listening("/help")));
 
         info!(
             "I created the following global slash command: {:#?}",
             guild_commands
         );
         info!("{} is connected!", ready.user.name);
-    }
-
-    #[instrument(skip(self, _ctx))]
-    async fn resume(&self, _ctx: Context, resume: ResumedEvent) {
-        debug!("Resumed; trace: {:?}", resume.trace);
     }
 }
 
@@ -158,12 +147,8 @@ async fn main() {
     let connection = &mut utils::database::establish_connection();
     run_migration(connection);
 
-    let framework = StandardFramework::new()
-        .configure(|c| c.prefix("!"))
-        .before(before)
-        .after(after)
-        .unrecognised_command(unknown_command)
-        .on_dispatch_error(dispatch_error);
+    let framework = StandardFramework::new();
+    framework.configure(|c| c.prefix("!"));
     let token = env::var(DISCORD_TOKEN).expect("Expected a token in the environment");
     let intents = GatewayIntents::GUILD_MESSAGES
         | GatewayIntents::DIRECT_MESSAGES
