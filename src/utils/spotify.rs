@@ -4,9 +4,9 @@ use crate::utils::{
 };
 
 use rspotify::{
+    ClientCredsSpotify, ClientError, Credentials,
     model::{Country, Market, SearchResult, SearchType},
     prelude::*,
-    ClientCredsSpotify, ClientError, Credentials,
 };
 
 use std::env;
@@ -57,7 +57,9 @@ pub fn get_song_url(
                 let kana_search = send_search_request(&kana_name, &artist_name);
                 match kana_search {
                     Ok(search_result) => {
-                        info!("Searched track using Track: {kana_name:#?} Artist: {artist_name:#?}: {search_result:#?}");
+                        info!(
+                            "Searched track using Track: {kana_name:#?} Artist: {artist_name:#?}: {search_result:#?}"
+                        );
                         match get_url_from_search_result(search_result) {
                             Some(url) => {
                                 try_to_cache_response(&cache_key, &url);
