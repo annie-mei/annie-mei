@@ -32,6 +32,7 @@ fn get_guild_from_interaction(ctx: &Context, interaction: &CommandInteraction) -
     interaction
         .guild_id
         .and_then(|guild_id| guild_id.to_guild_cached(&ctx.cache))
+        // skipcq: RS-W1206 - CacheRef requires explicit clone via Deref
         .map(|g| g.clone())
 }
 
