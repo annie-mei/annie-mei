@@ -29,3 +29,11 @@ A Discord bot written in Rust that fetches anime and manga information from AniL
 - Use AniList IDs for exact matches
 - Japanese kana is supported: `/manga きめつのやいば`
 - Wrap numeric titles in quotes: `/songs "86"`
+
+## Infrastructure
+
+| Component | Service |
+|-----------|---------|
+| Database | Neon (PostgreSQL) |
+| Cache | Upstash (Redis) |
+| Secrets | Doppler |

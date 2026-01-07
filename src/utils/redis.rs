@@ -2,16 +2,12 @@ use redis::{Commands, Connection, RedisResult};
 use std::env;
 use tracing::info;
 
-use crate::utils::statics::{REDIS_HOST, REDIS_PASSWORD, REDIS_USERNAME};
+use crate::utils::statics::REDIS_URL;
 
 fn get_redis_client() -> RedisResult<Connection> {
-    let user_name = env::var(REDIS_USERNAME).expect("Expected a redis username in the environment");
-    let password = env::var(REDIS_PASSWORD).expect("Expected a redis password in the environment");
-    let host = env::var(REDIS_HOST).expect("Expected a redis host in the environment");
+    let redis_url = env::var(REDIS_URL).expect("Expected REDIS_URL in the environment");
 
-    let redis_connection_string = format!("redis://{user_name}:{password}@{host}");
-
-    let client = redis::Client::open(redis_connection_string)?;
+    let client = redis::Client::open(redis_url)?;
     let connection = client.get_connection()?;
     info!("Redis connection established");
     Ok(connection)

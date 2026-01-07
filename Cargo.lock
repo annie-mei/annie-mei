@@ -185,7 +185,7 @@ dependencies = [
 
 [[package]]
 name = "annie-mei"
-version = "1.4.2"
+version = "2.0.1"
 dependencies = [
  "chrono",
  "diesel",
@@ -2489,6 +2489,7 @@ dependencies = [
  "arcstr",
  "combine",
  "itoa",
+ "native-tls",
  "num-bigint",
  "percent-encoding",
  "ryu",
