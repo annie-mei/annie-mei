@@ -58,6 +58,19 @@ diesel migration run     # Apply database migrations
 - Use conventional commit format: `type: description`
 - Types: `feat`, `fix`, `docs`, `chore`, `refactor`, `test`
 
+### Versioning
+
+Bump the version in `Cargo.toml` with every PR using semantic versioning:
+
+- **MAJOR** (X.0.0): Breaking changes, incompatible API changes
+- **MINOR** (0.X.0): New features, backwards-compatible functionality
+- **PATCH** (0.0.X): Bug fixes, backwards-compatible patches
+
+Examples:
+- New command or feature → bump minor
+- Bug fix or refactor → bump patch
+- Breaking change to existing behavior → bump major
+
 ### Pull Requests
 
 - Title format: `[ANNIE-XXX]/Description`
