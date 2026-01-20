@@ -21,7 +21,7 @@ codegen-units = 1
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-chrono = "0.4.42"
+chrono = "0.4.43"
 diesel = { version = "2.2.12", features = ["postgres"] }
 diesel_migrations = "2.2.0"
 env_logger = "0.11.8"
