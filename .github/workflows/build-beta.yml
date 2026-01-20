@@ -42,7 +42,7 @@ jobs:
       #     name: annie-mei-beta-armv7
       #     path: target/armv7-unknown-linux-gnueabihf/release/annie-mei-beta
       - name: Release
-        uses: softprops/action-gh-release@v1
+        uses: softprops/action-gh-release@v2
         with:
           files: |
             # target/armv7-unknown-linux-gnueabihf/release/annie-mei-beta
