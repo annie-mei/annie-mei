@@ -150,21 +150,21 @@ Examples:
 - Always assign PRs to `@InfernapeXavier`
 - Always link to Linear issue in PR body
 
-### Release Process
+### Creating Releases
 
-This project uses trunk-based development. Releases are created by tagging commits on `main`.
+This project uses trunk-based development with a single `main` branch. Releases are created by tagging commits.
 
-1. Ensure version is bumped in `Cargo.toml` (should already be done per PR)
+1. Ensure the version is bumped in `Cargo.toml` (should already be done per PR)
 2. Create and push a tag:
    ```bash
    git tag vX.X.X
    git push origin vX.X.X
    ```
-3. Create GitHub release:
+3. Create the GitHub release with AI-generated notes:
    ```bash
    gh release create vX.X.X --generate-notes
    ```
-4. Edit release notes to include:
+4. Edit release notes to include these sections:
    - **Breaking Changes** - API changes, major upgrades
    - **Improvements** - New features, enhancements
    - **Dependencies** - Package updates with version changes
