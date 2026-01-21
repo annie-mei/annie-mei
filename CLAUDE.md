@@ -123,6 +123,15 @@ let result = task::spawn_blocking(move || {
 - **Branches**: Use Linear's format - `annie-XXX-description`
 - **Branch structure**: `next` (development), `current` (production/release)
 
+### Git Safety
+
+- **Never force push** - Always ask before any destructive git operation
+- **When git issues occur** (failed push, wrong commit, merge conflicts, etc.):
+  1. Explain what went wrong
+  2. Present the available options
+  3. Ask the user how they want to resolve it
+- If a push didn't go through, prefer `git reset --hard origin/<branch>` over amending and force pushing
+
 ### Versioning
 
 Bump the version in `Cargo.toml` with every PR using semantic versioning:
