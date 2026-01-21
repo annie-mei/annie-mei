@@ -87,22 +87,18 @@ Examples:
 - Always link to Linear issue in PR body
 - Always assign the PR to `@InfernapeXavier`
 
-### Release Pull Requests
-
-- Title format: `[Annie Mei]/Release X.X.X`
-- Example: `[Annie Mei]/Release 2.0.0`
-- Add the `release` label to the PR
-- Always assign the PR to `@InfernapeXavier`
-- Target branch: `current` (from `next`)
-
 ### Creating Releases
 
-After the release PR is merged:
-1. Create the release with AI-generated notes:
+This project uses trunk-based development with a single `main` branch. Releases are created by tagging commits.
+
+1. Ensure the version is bumped in `Cargo.toml` (should already be done per PR)
+2. Create and push a tag:
    ```bash
-   gh release create vX.X.X --target current --notes "AI-generated release notes here"
+   git tag vX.X.X
+   git push origin vX.X.X
    ```
-2. Generate release notes with these sections:
+3. The `build-release.yml` workflow automatically creates the GitHub release
+4. Edit release notes to include these sections:
    - **Breaking Changes** - API changes, major upgrades
    - **Improvements** - New features, enhancements
    - **Dependencies** - Package updates with version changes
@@ -110,8 +106,7 @@ After the release PR is merged:
 ### Branches
 
 - Use Linear's suggested branch name: `annie-XXX-description`
-- `next` - Development branch (default)
-- `current` - Production/release branch
+- `main` - Single trunk branch (all PRs target this)
 
 ### Adding Commands
 

@@ -6,7 +6,7 @@ on:
       - "dependabot/*"
   push:
     branches:
-      - "next"
+      - "main"
     paths-ignore:
       - "**/README.md"
 
