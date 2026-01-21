@@ -73,8 +73,22 @@ jobs:
           key: ${{ secrets.ORACLE_SSH_KEY }}
           script: |
             cd /opt/annie-mei || exit 1
-            sudo systemctl stop annie-mei
             chmod +x annie-mei.new/annie-mei
+            # Validate new binary before stopping service
+            ./annie-mei.new/annie-mei --version || { echo "Binary validation failed"; exit 1; }
+            # Backup current binary
+            cp annie-mei annie-mei.backup || true
+            # Stop, replace, start
+            sudo systemctl stop annie-mei
             mv annie-mei.new/annie-mei annie-mei
             rm -rf annie-mei.new
             sudo systemctl start annie-mei
+            # Verify service started
+            sleep 2
+            sudo systemctl is-active annie-mei || { 
+              echo "Service failed to start, rolling back"
+              mv annie-mei.backup annie-mei
+              sudo systemctl start annie-mei
+              exit 1
+            }
+            rm -f annie-mei.backup
