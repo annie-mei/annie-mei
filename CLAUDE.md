@@ -121,7 +121,7 @@ let result = task::spawn_blocking(move || {
 - **Commits**: Conventional format - `type: description` (feat, fix, docs, chore, refactor, test)
 - **PR titles**: `[ANNIE-XXX]/Description` (e.g., `[ANNIE-84]/Prepare for AI Dev`)
 - **Branches**: Use Linear's format - `annie-XXX-description`
-- **Branch structure**: `next` (development), `current` (production/release)
+- **Branch structure**: Trunk-based development with `main` as the single trunk branch
 
 ### Git Safety
 
@@ -152,17 +152,19 @@ Examples:
 
 ### Release Process
 
-1. Create PR from `next` to `current`:
-   - Title: `[Annie Mei]/Release X.X.X`
-   - Add the `release` label
-   - Assign to `@InfernapeXavier`
+This project uses trunk-based development. Releases are created by tagging commits on `main`.
 
-2. After merge, create release with AI-generated notes:
+1. Ensure version is bumped in `Cargo.toml` (should already be done per PR)
+2. Create and push a tag:
    ```bash
-   gh release create vX.X.X --target current --notes "AI-generated release notes"
+   git tag vX.X.X
+   git push origin vX.X.X
    ```
-
-3. Release notes sections:
+3. Create GitHub release:
+   ```bash
+   gh release create vX.X.X --generate-notes
+   ```
+4. Edit release notes to include:
    - **Breaking Changes** - API changes, major upgrades
    - **Improvements** - New features, enhancements
    - **Dependencies** - Package updates with version changes
