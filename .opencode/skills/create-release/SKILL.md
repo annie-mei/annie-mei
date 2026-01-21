@@ -60,27 +60,24 @@ git tag vX.X.X
 git push origin vX.X.X
 ```
 
-The `build-release.yml` workflow will automatically:
-- Build the ARM64 binary
-- Create a GitHub release with the binary attached
-- Deploy to Oracle Cloud
+### Step 4: Create GitHub Release
 
-### Step 4: Wait for Workflow and Edit Release Notes
-
-The `build-release.yml` workflow automatically creates the release. Wait for it to complete:
+Create the release with auto-generated notes:
 
 ```bash
-# Wait for and verify the workflow completed
-gh run list --workflow=build-release.yml --limit=1
-
-# View the created release
-gh release view vX.X.X
+gh release create vX.X.X --generate-notes
 ```
 
-Then edit the release notes to organize them into these sections:
+The `build-release.yml` workflow will automatically:
+- Build the ARM64 binary
+- Attach the binary to the release
+- Deploy to Oracle Cloud
 
-```bash
-gh release edit vX.X.X --notes "$(cat <<'EOF'
+### Step 5: Edit Release Notes
+
+Edit the release notes to organize them into these sections:
+
+```markdown
 ## Breaking Changes
 - List any breaking changes (API changes, major upgrades)
 
@@ -93,11 +90,19 @@ gh release edit vX.X.X --notes "$(cat <<'EOF'
 
 ## Dependencies
 - Package updates with version changes (e.g., "Bump serde from 1.0.148 to 1.0.149")
-EOF
-)"
 ```
 
-Or edit directly in the GitHub UI.
+You can edit via CLI or directly in the GitHub UI.
+
+### Step 6: Verify Release
+
+```bash
+# Check the release was created with assets
+gh release view vX.X.X
+
+# Verify the workflow completed
+gh run list --workflow=build-release.yml --limit=1
+```
 
 ## Rollback Procedure
 

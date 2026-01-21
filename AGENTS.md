@@ -97,8 +97,12 @@ This project uses trunk-based development with a single `main` branch. Releases 
    git tag vX.X.X
    git push origin vX.X.X
    ```
-3. The `build-release.yml` workflow automatically creates the GitHub release
-4. Edit release notes to include these sections:
+3. Create the GitHub release with generated notes:
+   ```bash
+   gh release create vX.X.X --generate-notes
+   ```
+4. The `build-release.yml` workflow will attach binaries and deploy automatically
+5. Edit release notes to include these sections:
    - **Breaking Changes** - API changes, major upgrades
    - **Improvements** - New features, enhancements
    - **Dependencies** - Package updates with version changes
