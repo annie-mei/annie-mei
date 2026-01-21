@@ -19,13 +19,14 @@ jobs:
     runs-on: ubuntu-latest
     env:
       CARGO_TERM_COLOR: always
+      RUSTC_WRAPPER: ""
     permissions:
       contents: read
       security-events: write
       actions: read
     steps:
       - name: Build-checkout
-        uses: actions/checkout@v3
+        uses: actions/checkout@v6
       - name: Install Rust
         run: rustup update stable && rustup default stable
       - name: Cache
@@ -42,7 +43,7 @@ jobs:
           --message-format=json | clippy-sarif | tee rust-clippy-results.sarif | sarif-fmt
         continue-on-error: true
       - name: Annotate PR
-        uses: github/codeql-action/upload-sarif@v2
+        uses: github/codeql-action/upload-sarif@v4
         with:
           sarif_file: rust-clippy-results.sarif
           wait-for-processing: true
