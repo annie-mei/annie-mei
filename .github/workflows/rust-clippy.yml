@@ -19,6 +19,7 @@ jobs:
     runs-on: ubuntu-latest
     env:
       CARGO_TERM_COLOR: always
+      RUSTC_WRAPPER: ""
     permissions:
       contents: read
       security-events: write
