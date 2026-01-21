@@ -65,19 +65,22 @@ The `build-release.yml` workflow will automatically:
 - Create a GitHub release with the binary attached
 - Deploy to Oracle Cloud
 
-### Step 4: Generate Release Notes
+### Step 4: Wait for Workflow and Edit Release Notes
 
-Create the GitHub release with auto-generated notes:
+The `build-release.yml` workflow automatically creates the release. Wait for it to complete:
 
 ```bash
-gh release create vX.X.X --generate-notes
+# Wait for and verify the workflow completed
+gh run list --workflow=build-release.yml --limit=1
+
+# View the created release
+gh release view vX.X.X
 ```
 
-Then edit the release to organize notes into these sections:
+Then edit the release notes to organize them into these sections:
 
-#### Release Notes Template
-
-```markdown
+```bash
+gh release edit vX.X.X --notes "$(cat <<'EOF'
 ## Breaking Changes
 - List any breaking changes (API changes, major upgrades)
 
@@ -90,17 +93,11 @@ Then edit the release to organize notes into these sections:
 
 ## Dependencies
 - Package updates with version changes (e.g., "Bump serde from 1.0.148 to 1.0.149")
+EOF
+)"
 ```
 
-### Step 5: Verify Release
-
-```bash
-# Check the release was created
-gh release view vX.X.X
-
-# Verify the workflow completed
-gh run list --workflow=build-release.yml --limit=1
-```
+Or edit directly in the GitHub UI.
 
 ## Rollback Procedure
 
