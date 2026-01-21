@@ -125,6 +125,9 @@ let result = task::spawn_blocking(move || {
 
 ### Git Safety
 
+- **NEVER commit or push directly to `main`** - Always create a feature branch first
+- **All branches must have a Linear ticket** - Use the ticket's suggested branch name (e.g., `annie-XXX-description`). Only create a ticketless branch if the user explicitly approves it
+- **Don't create tickets automatically** - Check for existing/recent tickets that the work might fit under, and ask the user before creating a new one
 - **Never force push** - Always ask before any destructive git operation
 - **When git issues occur** (failed push, wrong commit, merge conflicts, etc.):
   1. Explain what went wrong
