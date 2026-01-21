@@ -1,15 +1,9 @@
 [package]
 name = "annie-mei"
-version = "2.0.1"
+version = "2.0.2"
 edition = "2024"
 license = "GPL-3.0-or-later"
 rust-version = "1.92"
-
-[package.metadata.cross.target.armv7-unknown-linux-gnueabihf]
-pre-build = [
-  "dpkg --add-architecture armhf && apt-get update && apt-get install --assume-yes libpq-dev:armhf",
-]
-image = "ghcr.io/cross-rs/armv7-unknown-linux-gnueabihf:latest"
 
 [profile.dev]
 split-debuginfo = "unpacked"
