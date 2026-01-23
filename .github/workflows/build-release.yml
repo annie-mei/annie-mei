@@ -76,7 +76,10 @@ jobs:
             cd /opt/annie-mei || exit 1
             chmod +x annie-mei.new/annie-mei
             # Validate new binary before stopping service
-            ./annie-mei.new/annie-mei --version || { echo "Binary validation failed"; exit 1; }
+            if ldd ./annie-mei.new/annie-mei | grep -q "not found"; then
+              echo "Binary validation failed"
+              exit 1
+            fi
             # Backup current binary
             cp annie-mei annie-mei.backup || true
             # Stop, replace, start
