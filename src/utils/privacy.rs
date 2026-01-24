@@ -20,7 +20,8 @@ pub struct HashedUserId(String);
 
 impl HashedUserId {
     /// Returns the hash as a string slice.
-    pub fn as_str(&self) -> &str {
+    #[cfg(test)]
+    fn as_str(&self) -> &str {
         &self.0
     }
 }
