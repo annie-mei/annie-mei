@@ -45,7 +45,9 @@ jobs:
         uses: actions/upload-artifact@v6
         with:
           name: annie-mei-arm64
-          path: target/release/annie-mei
+          path: |
+            target/release/annie-mei
+            mei.jpg
       - name: Release
         if: startsWith(github.ref, 'refs/tags/')
         uses: softprops/action-gh-release@v2
@@ -53,6 +55,7 @@ jobs:
           files: |
             target/release/annie-mei
             LICENSE
+            mei.jpg
 
   deploy:
     name: Deploy to Oracle Cloud
@@ -70,7 +73,7 @@ jobs:
           host: ${{ secrets.ORACLE_HOST }}
           username: ${{ secrets.ORACLE_USER }}
           key: ${{ secrets.ORACLE_SSH_KEY }}
-          source: annie-mei
+          source: "annie-mei,mei.jpg"
           target: /opt/annie-mei/annie-mei.new
           strip_components: 0
       - name: Restart service
@@ -96,11 +99,16 @@ jobs:
               echo "Binary validation failed"
               exit 1
             fi
+            if ! test -f ./annie-mei.new/mei.jpg; then
+              echo "Missing mei.jpg"
+              exit 1
+            fi
             # Backup current binary
             cp annie-mei annie-mei.backup || true
             # Stop, replace, start
             sudo systemctl stop annie-mei
             mv annie-mei.new/annie-mei annie-mei
+            cp annie-mei.new/mei.jpg mei.jpg
             rm -rf annie-mei.new
             sudo systemctl start annie-mei
             # Verify service started
