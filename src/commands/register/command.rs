@@ -1,4 +1,7 @@
-use crate::{models::db::user::User, utils::database};
+use crate::{
+    models::db::user::User,
+    utils::{database, privacy::configure_sentry_scope},
+};
 
 use serde_json::json;
 use serenity::{
@@ -27,21 +30,9 @@ pub async fn run(ctx: &Context, interaction: &mut CommandInteraction) {
     let arg = &options[0].value;
     let arg_str = format!("{:?}", arg);
 
-    sentry::configure_scope(|scope| {
-        let mut context = std::collections::BTreeMap::new();
-        context.insert("Command".to_string(), "Register".into());
-        context.insert("Arg".to_string(), json!(arg_str));
-        scope.set_context("Register", sentry::protocol::Context::Other(context));
-        scope.set_user(Some(sentry::User {
-            username: Some(user.name.to_string()),
-            ..Default::default()
-        }));
-    });
+    configure_sentry_scope("Register", user.id.get(), Some(json!(arg_str)));
 
-    info!(
-        "Got command 'register' by user '{}' with args: {arg:#?}",
-        user.name
-    );
+    info!("Got command 'register' with args: {arg:#?}");
 
     let anilist_username = match arg {
         ResolvedValue::String(name) => name.to_string(),
