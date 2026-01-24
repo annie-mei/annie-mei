@@ -1,6 +1,5 @@
 on:
   workflow_dispatch:
-    description: "Build and release"
   pull_request:
     branches-ignore:
       - "dependabot/*"
@@ -38,9 +37,11 @@ jobs:
       - name: Install crates
         run: cargo install clippy-sarif sarif-fmt
       - name: Run Clippy
-        run: cargo clippy
-          --all-features
-          --message-format=json | clippy-sarif | tee rust-clippy-results.sarif | sarif-fmt
+        run: |
+          cargo clippy \
+            --all-features \
+            --message-format=json \
+            | clippy-sarif | tee rust-clippy-results.sarif | sarif-fmt
         continue-on-error: true
       - name: Annotate PR
         uses: github/codeql-action/upload-sarif@v4

@@ -34,11 +34,15 @@ jobs:
           shared-key: "cargo"
       - name: Build
         run: cargo build --release
+      - name: Prepare artifact
+        run: cp target/release/annie-mei ./annie-mei
       - name: Upload artifact
         uses: actions/upload-artifact@v6
         with:
           name: annie-mei-beta-arm64
-          path: target/release/annie-mei
+          path: |
+            annie-mei
+            mei.jpg
       - name: Release
         if: startsWith(github.ref, 'refs/tags/')
         uses: softprops/action-gh-release@v2
@@ -46,4 +50,5 @@ jobs:
           files: |
             target/release/annie-mei
             LICENSE
+            mei.jpg
           prerelease: true
