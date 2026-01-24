@@ -35,7 +35,7 @@ jobs:
       - name: Build
         run: cargo build --release
       - name: Upload artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: annie-mei-arm64
           path: target/release/annie-mei
