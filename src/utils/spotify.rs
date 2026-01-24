@@ -4,9 +4,9 @@ use crate::utils::{
 };
 
 use rspotify::{
+    ClientCredsSpotify, ClientError, Credentials,
     model::{Country, Market, SearchResult, SearchType},
     prelude::*,
-    ClientCredsSpotify, ClientError, Credentials,
 };
 
 use std::env;
