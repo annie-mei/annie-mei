@@ -3,8 +3,11 @@
 //! This module provides utilities for hashing user IDs and redacting
 //! sensitive information from logs and error reports.
 
+use std::collections::BTreeMap;
 use std::env;
 use std::fmt;
+
+use serde_json::Value;
 
 use crate::utils::statics::USERID_HASH_SALT;
 
@@ -60,6 +63,40 @@ pub fn hash_user_id(user_id: u64) -> HashedUserId {
 
     // Truncate to 16 characters (64 bits)
     HashedUserId(hex[..16].to_string())
+}
+
+/// Configures the Sentry scope for a command with privacy-safe user identification.
+///
+/// This function:
+/// - Sets a context with the command name and optional arguments
+/// - Sets the user with a hashed user ID (no PII like username)
+///
+/// # Arguments
+///
+/// * `command` - The name of the command being executed
+/// * `user_id` - The Discord user ID (will be hashed)
+/// * `args` - Optional command arguments to include in the context
+///
+/// # Example
+///
+/// ```ignore
+/// configure_sentry_scope("anime", user.id.get(), Some(json!(arg_str)));
+/// ```
+pub fn configure_sentry_scope(command: &str, user_id: u64, args: Option<Value>) {
+    let hashed_id = hash_user_id(user_id);
+
+    sentry::configure_scope(|scope| {
+        let mut context = BTreeMap::new();
+        context.insert("Command".to_string(), command.into());
+        if let Some(arg_value) = args {
+            context.insert("Arg".to_string(), arg_value);
+        }
+        scope.set_context(command, sentry::protocol::Context::Other(context));
+        scope.set_user(Some(sentry::User {
+            id: Some(hashed_id.to_string()),
+            ..Default::default()
+        }));
+    });
 }
 
 #[cfg(test)]
