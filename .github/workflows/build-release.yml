@@ -76,7 +76,16 @@ jobs:
             cd /opt/annie-mei || exit 1
             chmod +x annie-mei.new/annie-mei
             # Validate new binary before stopping service
-            if ldd ./annie-mei.new/annie-mei | grep -q "not found"; then
+            if ! test -x ./annie-mei.new/annie-mei; then
+              echo "Binary validation failed"
+              exit 1
+            fi
+            ldd_output=$(ldd ./annie-mei.new/annie-mei 2>&1) || {
+              echo "Binary validation failed"
+              echo "$ldd_output"
+              exit 1
+            }
+            if echo "$ldd_output" | grep -q "not found"; then
               echo "Binary validation failed"
               exit 1
             fi
