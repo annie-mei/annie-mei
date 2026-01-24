@@ -15,7 +15,9 @@ codegen-units = 1
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+blake3 = "1.8"
 chrono = "0.4.43"
+clap = { version = "4", features = ["derive"] }
 diesel = { version = "2.2.12", features = ["postgres"] }
 diesel_migrations = "2.2.0"
 env_logger = "0.11.8"
@@ -39,4 +41,5 @@ titlecase = "3.6.0"
 tokio = { version = "1.49.0", features = ["full"] }
 tracing = "0.1.44"
 tracing-subscriber = { version = "0.3.22", features = ["env-filter"] }
+url = "2.5"
 wana_kana = "4.0.0"
