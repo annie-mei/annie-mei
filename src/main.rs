@@ -4,6 +4,7 @@ mod schema;
 mod utils;
 
 use std::env;
+use std::sync::Arc;
 
 use sentry::integrations::tracing as sentry_tracing;
 use tracing::{info, instrument};
@@ -21,6 +22,7 @@ use serenity::{
 
 use utils::{
     database::run_migration,
+    privacy::redact_url_credentials,
     statics::{DISCORD_TOKEN, ENV, SENTRY_DSN},
 };
 
@@ -87,6 +89,28 @@ async fn main() {
         sentry::ClientOptions {
             release: sentry::release_name!(),
             environment: Some(environment.into()),
+            before_send: Some(Arc::new(|mut event| {
+                // Redact URLs with credentials from exception messages
+                for exception in event.exception.values.iter_mut() {
+                    if let Some(ref mut value) = exception.value {
+                        *value = redact_url_credentials(value);
+                    }
+                }
+
+                // Redact URLs from the event message
+                if let Some(ref mut message) = event.message {
+                    *message = redact_url_credentials(message);
+                }
+
+                // Redact URLs from breadcrumb messages
+                for breadcrumb in event.breadcrumbs.values.iter_mut() {
+                    if let Some(ref mut message) = breadcrumb.message {
+                        *message = redact_url_credentials(message);
+                    }
+                }
+
+                Some(event)
+            })),
             ..Default::default()
         },
     ));
