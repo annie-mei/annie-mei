@@ -72,29 +72,71 @@ fn hash_user_id_with_salt(user_id: u64, salt: &str) -> HashedUserId {
     HashedUserId(hex[..16].to_string())
 }
 
-/// Redacts credentials from a URL string.
+/// Redacts credentials from URLs found anywhere in the input string.
 ///
-/// If the URL contains a username or password, they are replaced with
-/// `REDACTED_USERNAME` and `REDACTED_PASSWORD` respectively.
+/// This function finds all URLs embedded in the text and redacts any
+/// usernames or passwords they contain. Non-URL text is preserved.
 ///
 /// # Arguments
 ///
-/// * `input` - A string that may contain a URL with credentials
+/// * `input` - A string that may contain URLs with credentials
 ///
 /// # Returns
 ///
-/// The input string with any URL credentials redacted. If the input is not
-/// a valid URL, it is returned unchanged.
+/// The input string with any URL credentials redacted. URLs without
+/// credentials and non-URL text are preserved unchanged.
 ///
 /// # Example
 ///
 /// ```ignore
-/// let url = "postgres://user:pass@localhost:5432/db";
-/// let redacted = redact_url_credentials(url);
-/// assert_eq!(redacted, "postgres://REDACTED_USERNAME:REDACTED_PASSWORD@localhost:5432/db");
+/// let text = "Error connecting to postgres://user:pass@localhost:5432/db: connection refused";
+/// let redacted = redact_url_credentials(text);
+/// assert_eq!(redacted, "Error connecting to postgres://REDACTED_USERNAME:REDACTED_PASSWORD@localhost:5432/db: connection refused");
 /// ```
 pub fn redact_url_credentials(input: &str) -> String {
-    match url::Url::parse(input) {
+    use linkify::{LinkFinder, LinkKind};
+
+    // First, try to parse the entire input as a URL (handles standalone URLs
+    // and URLs with percent-encoded characters that linkify might truncate)
+    if let Ok(parsed) = url::Url::parse(input)
+        && (!parsed.username().is_empty() || parsed.password().is_some())
+    {
+        return redact_single_url(input);
+    }
+
+    let mut finder = LinkFinder::new();
+    finder.kinds(&[LinkKind::Url]);
+
+    let links: Vec<_> = finder.links(input).collect();
+
+    if links.is_empty() {
+        return input.to_string();
+    }
+
+    let mut result = String::with_capacity(input.len());
+    let mut last_end = 0;
+
+    for link in links {
+        // Append text before this link
+        result.push_str(&input[last_end..link.start()]);
+
+        // Try to parse and redact the URL
+        let url_str = link.as_str();
+        let redacted = redact_single_url(url_str);
+        result.push_str(&redacted);
+
+        last_end = link.end();
+    }
+
+    // Append any remaining text after the last link
+    result.push_str(&input[last_end..]);
+
+    result
+}
+
+/// Redacts credentials from a single URL string.
+fn redact_single_url(url_str: &str) -> String {
+    match url::Url::parse(url_str) {
         Ok(mut parsed_url) => {
             let has_username = !parsed_url.username().is_empty();
             let has_password = parsed_url.password().is_some();
@@ -108,10 +150,10 @@ pub fn redact_url_credentials(input: &str) -> String {
                 }
                 parsed_url.to_string()
             } else {
-                input.to_string()
+                url_str.to_string()
             }
         }
-        Err(_) => input.to_string(),
+        Err(_) => url_str.to_string(),
     }
 }
 
@@ -233,12 +275,63 @@ mod tests {
     }
 
     #[test]
-    fn test_redact_url_with_special_characters() {
-        let url = "postgres://user%40domain:p%3Ass%40word@localhost:5432/db";
+    fn test_redact_standalone_url_with_percent_encoding() {
+        // Standalone URLs with percent-encoded characters should be handled
+        // even if linkify truncates them, because we try direct URL parsing first
+        let url = "postgres://admin:p%23ss%21word@localhost:5432/db";
         let redacted = redact_url_credentials(url);
         assert!(redacted.contains("REDACTED_USERNAME"));
         assert!(redacted.contains("REDACTED_PASSWORD"));
-        assert!(!redacted.contains("user%40domain"));
-        assert!(!redacted.contains("p%3Ass%40word"));
+        assert!(!redacted.contains("admin"));
+        assert!(!redacted.contains("p%23ss%21word"));
+    }
+
+    #[test]
+    fn test_redact_embedded_url_in_error_message() {
+        let text = "Error connecting to postgres://user:pass@localhost:5432/db: connection refused";
+        let redacted = redact_url_credentials(text);
+        assert_eq!(
+            redacted,
+            "Error connecting to postgres://REDACTED_USERNAME:REDACTED_PASSWORD@localhost:5432/db: connection refused"
+        );
+    }
+
+    #[test]
+    fn test_redact_multiple_embedded_urls() {
+        let text = "Failed to connect to postgres://admin:secret@db.example.com/prod and redis://:password@cache.example.com:6379";
+        let redacted = redact_url_credentials(text);
+        assert!(
+            redacted.contains("postgres://REDACTED_USERNAME:REDACTED_PASSWORD@db.example.com/prod")
+        );
+        assert!(redacted.contains("redis://:REDACTED_PASSWORD@cache.example.com:6379"));
+        assert!(!redacted.contains("admin"));
+        assert!(!redacted.contains("secret"));
+        assert!(!redacted.contains("password"));
+    }
+
+    #[test]
+    fn test_redact_url_preserves_surrounding_text() {
+        let text = "prefix https://user:pass@example.com suffix";
+        let redacted = redact_url_credentials(text);
+        assert!(redacted.starts_with("prefix "));
+        assert!(redacted.ends_with(" suffix"));
+        assert!(redacted.contains("REDACTED_USERNAME"));
+        assert!(redacted.contains("REDACTED_PASSWORD"));
+    }
+
+    #[test]
+    fn test_redact_url_no_credentials_in_embedded() {
+        let text = "Check out https://example.com/page for more info";
+        let redacted = redact_url_credentials(text);
+        assert_eq!(redacted, text);
+    }
+
+    #[test]
+    fn test_redact_url_mixed_with_and_without_credentials() {
+        let text = "Connect to postgres://user:pass@localhost/db or visit https://docs.example.com";
+        let redacted = redact_url_credentials(text);
+        assert!(redacted.contains("postgres://REDACTED_USERNAME:REDACTED_PASSWORD@localhost/db"));
+        assert!(redacted.contains("https://docs.example.com"));
+        assert!(!redacted.contains("user:pass"));
     }
 }
