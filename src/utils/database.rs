@@ -8,16 +8,15 @@ use tracing::{error, info};
 
 pub fn establish_connection() -> PgConnection {
     let database_url = env::var(DATABASE_URL).expect("DATABASE_URL must be set");
-    PgConnection::establish(&database_url)
-        .unwrap_or_else(|error| {
-            let redacted_url = redact_database_url(&database_url);
-            error!(
-                error = %error,
-                database_url = %redacted_url,
-                "Failed to connect to database"
-            );
-            panic!("Error connecting to {redacted_url}: {error}")
-        })
+    PgConnection::establish(&database_url).unwrap_or_else(|error| {
+        let redacted_url = redact_database_url(&database_url);
+        error!(
+            error = %error,
+            database_url = %redacted_url,
+            "Failed to connect to database"
+        );
+        panic!("Error connecting to {redacted_url}: {error}")
+    })
 }
 
 fn redact_database_url(database_url: &str) -> String {

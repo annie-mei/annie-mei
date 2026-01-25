@@ -1,3 +1,5 @@
+use crate::utils::privacy::configure_sentry_scope;
+
 use serenity::{
     all::{CommandInteraction, CreateInteractionResponse, CreateInteractionResponseMessage},
     builder::CreateCommand,
@@ -11,15 +13,7 @@ pub fn register() -> CreateCommand {
 pub async fn run(ctx: &Context, interaction: &CommandInteraction) {
     let user = &interaction.user;
 
-    sentry::configure_scope(|scope| {
-        let mut context = std::collections::BTreeMap::new();
-        context.insert("Command".to_string(), "Register".into());
-        scope.set_context("Ping", sentry::protocol::Context::Other(context));
-        scope.set_user(Some(sentry::User {
-            username: Some(user.name.to_string()),
-            ..Default::default()
-        }));
-    });
+    configure_sentry_scope("Ping", user.id.get(), None);
 
     let response_message = CreateInteractionResponseMessage::new().content(format!(
         "Hello {}! I'm Annie Mei, a bot that helps you find anime and manga!",

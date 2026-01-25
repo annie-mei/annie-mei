@@ -2,6 +2,7 @@ use crate::{
     models::{anilist_anime::Anime, media_type::MediaType as Type, transformers::Transformers},
     utils::{
         guild::{get_current_guild_members, get_guild_data_for_media},
+        privacy::configure_sentry_scope,
         response_fetcher::fetcher,
         statics::NOT_FOUND_ANIME,
     },
@@ -38,21 +39,9 @@ pub async fn run(ctx: &Context, interaction: &mut CommandInteraction) {
     let arg = interaction.data.options[0].value.clone();
     let arg_str = format!("{:?}", arg);
 
-    sentry::configure_scope(|scope| {
-        let mut context = std::collections::BTreeMap::new();
-        context.insert("Command".to_string(), "Anime".into());
-        context.insert("Arg".to_string(), json!(arg_str));
-        scope.set_context("Anime", sentry::protocol::Context::Other(context));
-        scope.set_user(Some(sentry::User {
-            username: Some(user.name.to_string()),
-            ..Default::default()
-        }));
-    });
+    configure_sentry_scope("Anime", user.id.get(), Some(json!(arg_str)));
 
-    info!(
-        "Got command 'anime' by user '{}' with args: {arg:#?}",
-        user.name,
-    );
+    info!("Got command 'anime' with args: {arg:#?}");
 
     let response: Option<Anime> = task::spawn_blocking(move || fetcher(Type::Anime, arg))
         .await

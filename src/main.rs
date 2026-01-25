@@ -4,7 +4,9 @@ mod schema;
 mod utils;
 
 use std::env;
+use std::sync::Arc;
 
+use clap::{Parser, Subcommand};
 use sentry::integrations::tracing as sentry_tracing;
 use tracing::{info, instrument};
 use tracing_subscriber::{EnvFilter, prelude::*, util::SubscriberInitExt};
@@ -21,8 +23,27 @@ use serenity::{
 
 use utils::{
     database::run_migration,
+    privacy::{hash_user_id, redact_url_credentials},
     statics::{DISCORD_TOKEN, ENV, SENTRY_DSN},
 };
+
+/// Annie Mei Discord Bot
+#[derive(Parser)]
+#[command(name = "annie-mei")]
+#[command(about = "A Discord bot for anime and manga information", long_about = None)]
+struct Cli {
+    #[command(subcommand)]
+    command: Option<Commands>,
+}
+
+#[derive(Subcommand)]
+enum Commands {
+    /// Compute the hashed user ID for Sentry log lookup
+    Hash {
+        /// The Discord user ID to hash
+        user_id: u64,
+    },
+}
 
 struct Handler;
 
@@ -79,6 +100,16 @@ impl EventHandler for Handler {
 #[tokio::main]
 #[instrument]
 async fn main() {
+    let cli = Cli::parse();
+
+    // Handle CLI subcommands
+    if let Some(Commands::Hash { user_id }) = cli.command {
+        let hashed = hash_user_id(user_id);
+        println!("{}", hashed);
+        return;
+    }
+
+    // Default: run the bot
     let environment = env::var(ENV).expect("Expected an environment in the environment");
     let sentry_dsn = env::var(SENTRY_DSN).expect("Expected a sentry dsn in the environment");
 
@@ -87,6 +118,28 @@ async fn main() {
         sentry::ClientOptions {
             release: sentry::release_name!(),
             environment: Some(environment.into()),
+            before_send: Some(Arc::new(|mut event| {
+                // Redact URLs with credentials from exception messages
+                for exception in event.exception.values.iter_mut() {
+                    if let Some(ref mut value) = exception.value {
+                        *value = redact_url_credentials(value);
+                    }
+                }
+
+                // Redact URLs from the event message
+                if let Some(ref mut message) = event.message {
+                    *message = redact_url_credentials(message);
+                }
+
+                // Redact URLs from breadcrumb messages
+                for breadcrumb in event.breadcrumbs.values.iter_mut() {
+                    if let Some(ref mut message) = breadcrumb.message {
+                        *message = redact_url_credentials(message);
+                    }
+                }
+
+                Some(event)
+            })),
             ..Default::default()
         },
     ));

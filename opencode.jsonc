@@ -4,7 +4,12 @@
     "linear": {
       "type": "local",
       "command": ["npx", "-y", "mcp-remote", "https://mcp.linear.app/mcp"],
-      "enabled": true
-    }
-  }
+      "enabled": true,
+    },
+    "sentry": {
+      "type": "remote",
+      "url": "https://mcp.sentry.dev/mcp",
+      "enabled": true,
+    },
+  },
 }

@@ -1,6 +1,7 @@
 use crate::{
-    commands::songs::fetcher::fetcher as SongFetcher, models::mal_response::MalResponse,
-    utils::statics::NOT_FOUND_ANIME,
+    commands::songs::fetcher::fetcher as SongFetcher,
+    models::mal_response::MalResponse,
+    utils::{privacy::configure_sentry_scope, statics::NOT_FOUND_ANIME},
 };
 
 use serde_json::json;
@@ -34,21 +35,9 @@ pub async fn run(ctx: &Context, interaction: &mut CommandInteraction) {
     let arg = interaction.data.options[0].value.clone();
     let arg_str = format!("{:?}", arg);
 
-    sentry::configure_scope(|scope| {
-        let mut context = std::collections::BTreeMap::new();
-        context.insert("Command".to_string(), "Songs".into());
-        context.insert("Arg".to_string(), json!(arg_str));
-        scope.set_context("Songs", sentry::protocol::Context::Other(context));
-        scope.set_user(Some(sentry::User {
-            username: Some(user.name.to_string()),
-            ..Default::default()
-        }));
-    });
+    configure_sentry_scope("Songs", user.id.get(), Some(json!(arg_str)));
 
-    info!(
-        "Got command 'songs' by user '{}' with args: {arg:#?}",
-        user.name
-    );
+    info!("Got command 'songs' with args: {arg:#?}");
 
     let response = task::spawn_blocking(move || SongFetcher(arg))
         .await

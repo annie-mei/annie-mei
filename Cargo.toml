@@ -1,6 +1,6 @@
 [package]
 name = "annie-mei"
-version = "2.0.4"
+version = "2.1.0"
 edition = "2024"
 license = "GPL-3.0-or-later"
 rust-version = "1.92"
@@ -15,12 +15,15 @@ codegen-units = 1
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+blake3 = "1.8"
 chrono = "0.4.43"
+clap = { version = "4", features = ["derive"] }
 diesel = { version = "2.2.12", features = ["postgres"] }
 diesel_migrations = "2.2.0"
 env_logger = "0.11.8"
 futures = "0.3.31"
 html2md = "0.2.15"
+linkify = "0.10"
 log = "0.4.29"
 ngrammatic = "0.7.0"
 openssl = { version = "0.10.75", features = ["vendored"] }
@@ -39,4 +42,5 @@ titlecase = "3.6.0"
 tokio = { version = "1.49.0", features = ["full"] }
 tracing = "0.1.44"
 tracing-subscriber = { version = "0.3.22", features = ["env-filter"] }
+url = "2.5"
 wana_kana = "4.0.0"
