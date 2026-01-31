@@ -224,46 +224,37 @@ impl Transformers for Anime {
     }
 
     fn transform_links(&self) -> String {
-        let return_string: String = match &self.external_links {
-            Some(links) => {
-                if links.is_empty() {
-                    EMPTY_STR.to_string()
-                } else {
-                    let parsed_links = links
-                        .iter()
-                        .filter(|link| link.url_type.to_lowercase() == "streaming")
-                        .map(|link| link.url.to_string())
-                        .collect::<Vec<String>>()
-                        .into_iter()
-                        .filter(|link| match link {
-                            _ if link.contains("hbo") => true,
-                            _ if link.contains("netflix") => true,
-                            _ if link.contains("crunchyroll") => true,
-                            _ => false,
-                        })
-                        .collect::<Vec<String>>()
-                        .into_iter()
-                        .map(|link| match link {
-                            _ if link.contains("hbo") => linker("HBO".to_string(), link),
-                            _ if link.contains("netflix") => linker("Netflix".to_string(), link),
-                            _ if link.contains("crunchyroll") => {
-                                linker("Crunchyroll".to_string(), link)
-                            }
-                            _ => "Invalid".to_string(),
-                        })
-                        .collect::<Vec<String>>()
-                        .join(" ");
-                    if !parsed_links.is_empty() {
-                        parsed_links
-                    } else {
-                        EMPTY_STR.to_string()
-                    }
-                }
-            }
-            None => EMPTY_STR.to_string(),
+        let Some(links) = &self.external_links else {
+            return EMPTY_STR.to_string();
         };
 
-        return_string
+        if links.is_empty() {
+            return EMPTY_STR.to_string();
+        }
+
+        let parsed_links: String = links
+            .iter()
+            .filter(|link| link.url_type.to_lowercase() == "streaming")
+            .filter_map(|link| {
+                let url = &link.url;
+                if url.contains("hbo") {
+                    Some(linker("HBO".to_string(), url.to_string()))
+                } else if url.contains("netflix") {
+                    Some(linker("Netflix".to_string(), url.to_string()))
+                } else if url.contains("crunchyroll") {
+                    Some(linker("Crunchyroll".to_string(), url.to_string()))
+                } else {
+                    None
+                }
+            })
+            .collect::<Vec<String>>()
+            .join(" ");
+
+        if parsed_links.is_empty() {
+            EMPTY_STR.to_string()
+        } else {
+            parsed_links
+        }
     }
 
     fn transform_trailer(&self) -> String {
