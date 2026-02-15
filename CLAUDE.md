@@ -119,6 +119,7 @@ let result = task::spawn_blocking(move || {
 ## Git Conventions
 
 - **Commits**: Conventional format - `type: description` (feat, fix, docs, chore, refactor, test)
+- **Commit cadence**: Make small, sensible commits as you go; avoid batching unrelated changes into one commit
 - **PR titles**: `[ANNIE-XXX]/Description` (e.g., `[ANNIE-84]/Prepare for AI Dev`)
 - **Branches**: Use Linear's format - `annie-XXX-description`
 - **Branch structure**: Trunk-based development with `main` as the single trunk branch
