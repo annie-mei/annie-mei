@@ -20,14 +20,16 @@ use serenity::{
 
 use serde_json::json;
 use tokio::task;
-use tracing::info;
+use tracing::{info, instrument};
 
+#[instrument(name = "discord.guild.member_ids", skip(guild))]
 fn get_guild_member_ids(guild: &Guild) -> Vec<UserId> {
     let members: Vec<UserId> = guild.members.keys().copied().collect();
     info!("Found {:#?} members in guild", members.len());
     members
 }
 
+#[instrument(name = "discord.guild.from_interaction", skip(ctx, interaction))]
 fn get_guild_from_interaction(ctx: &Context, interaction: &CommandInteraction) -> Option<Guild> {
     interaction
         .guild_id
@@ -36,6 +38,7 @@ fn get_guild_from_interaction(ctx: &Context, interaction: &CommandInteraction) -
         .map(|g| g.clone())
 }
 
+#[instrument(name = "discord.guild.current_members", skip(ctx, interaction))]
 pub fn get_current_guild_members(ctx: &Context, interaction: &CommandInteraction) -> Vec<UserId> {
     get_guild_from_interaction(ctx, interaction)
         .as_ref()
@@ -43,6 +46,7 @@ pub fn get_current_guild_members(ctx: &Context, interaction: &CommandInteraction
         .unwrap_or_default()
 }
 
+#[instrument(name = "guild.fetch_media_data", skip(media, guild_members), fields(member_count = guild_members.len()))]
 pub async fn get_guild_data_for_media<T: Transformers>(
     media: T,
     guild_members: Vec<UserId>,
@@ -54,6 +58,7 @@ pub async fn get_guild_data_for_media<T: Transformers>(
     get_guild_anilist_data(anilist_users, media.get_id(), media.get_type()).await
 }
 
+#[instrument(name = "guild.fetch_anilist_data", skip(guild_members, media_type), fields(member_count = guild_members.len(), media_id, media_type = %media_type))]
 async fn get_guild_anilist_data(
     guild_members: Vec<User>,
     media_id: u32,

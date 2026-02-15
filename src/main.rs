@@ -8,7 +8,7 @@ use std::sync::Arc;
 
 use clap::{Parser, Subcommand};
 use sentry::integrations::tracing as sentry_tracing;
-use tracing::{info, instrument};
+use tracing::{info, info_span, instrument};
 use tracing_subscriber::{EnvFilter, prelude::*, util::SubscriberInitExt};
 
 use serenity::{
@@ -49,9 +49,18 @@ struct Handler;
 
 #[async_trait]
 impl EventHandler for Handler {
+    #[instrument(name = "discord.interaction_create", skip_all)]
     async fn interaction_create(&self, ctx: Context, interaction: Interaction) {
         if let Interaction::Command(mut command) = interaction {
-            info!("Received command interaction: {:#?}", command);
+            let command_span = info_span!(
+                "discord.command",
+                command_name = %command.data.name,
+                user_id = command.user.id.get(),
+                guild_id = ?command.guild_id
+            );
+            let _command_span = command_span.enter();
+
+            info!("Received command interaction");
 
             match command.data.name.as_str() {
                 "ping" => commands::ping::run(&ctx, &command).await,
@@ -75,6 +84,7 @@ impl EventHandler for Handler {
         }
     }
 
+    #[instrument(name = "discord.ready", skip_all)]
     async fn ready(&self, ctx: Context, ready: Ready) {
         let commands: Vec<CreateCommand> = vec![
             commands::ping::register(),
@@ -98,7 +108,7 @@ impl EventHandler for Handler {
 }
 
 #[tokio::main]
-#[instrument]
+#[instrument(name = "app.main")]
 async fn main() {
     let cli = Cli::parse();
 
@@ -150,6 +160,7 @@ async fn main() {
 
     subscriber.with(sentry_tracing::layer()).init();
 
+    info!("Initializing database connection");
     let connection = &mut utils::database::establish_connection();
     run_migration(connection);
 
@@ -159,11 +170,13 @@ async fn main() {
         | GatewayIntents::GUILD_PRESENCES
         | GatewayIntents::GUILDS;
 
+    info!("Creating Discord client");
     let mut client = Client::builder(&token, intents)
         .event_handler(Handler)
         .await
         .expect("Err creating client");
 
+    info!("Starting Discord client");
     if let Err(why) = client.start().await {
         println!("Client error: {why:?}");
     }
