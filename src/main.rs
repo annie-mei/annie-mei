@@ -9,7 +9,7 @@ use std::sync::Arc;
 use clap::{Parser, Subcommand};
 use sentry::integrations::tracing as sentry_tracing;
 use tracing::{info, info_span, instrument};
-use tracing_subscriber::{EnvFilter, prelude::*, util::SubscriberInitExt};
+use tracing_subscriber::{EnvFilter, fmt::format::FmtSpan, prelude::*, util::SubscriberInitExt};
 
 use serenity::{
     all::{CreateEmbed, CreateMessage},
@@ -24,7 +24,7 @@ use serenity::{
 use utils::{
     database::run_migration,
     privacy::{hash_user_id, redact_url_credentials},
-    statics::{DISCORD_TOKEN, ENV, SENTRY_DSN},
+    statics::{DISCORD_TOKEN, ENV, SENTRY_DSN, SENTRY_TRACES_SAMPLE_RATE},
 };
 
 /// Annie Mei Discord Bot
@@ -122,12 +122,25 @@ async fn main() {
     // Default: run the bot
     let environment = env::var(ENV).expect("Expected an environment in the environment");
     let sentry_dsn = env::var(SENTRY_DSN).expect("Expected a sentry dsn in the environment");
+    let sentry_traces_sample_rate = env::var(SENTRY_TRACES_SAMPLE_RATE)
+        .ok()
+        .and_then(|raw| raw.parse::<f32>().ok())
+        .map(|rate| rate.clamp(0.0, 1.0))
+        .unwrap_or(0.0);
+
+    if sentry_traces_sample_rate > 0.0 {
+        info!(
+            sample_rate = sentry_traces_sample_rate,
+            "Sentry trace sampling enabled"
+        );
+    }
 
     let _guard = sentry::init((
         sentry_dsn,
         sentry::ClientOptions {
             release: sentry::release_name!(),
             environment: Some(environment.into()),
+            traces_sample_rate: sentry_traces_sample_rate,
             before_send: Some(Arc::new(|mut event| {
                 // Redact URLs with credentials from exception messages
                 for exception in event.exception.values.iter_mut() {
@@ -154,8 +167,10 @@ async fn main() {
         },
     ));
 
+    let env_filter = EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("info"));
     let subscriber = tracing_subscriber::fmt()
-        .with_env_filter(EnvFilter::from_default_env())
+        .with_env_filter(env_filter)
+        .with_span_events(FmtSpan::NEW | FmtSpan::CLOSE)
         .finish();
 
     subscriber.with(sentry_tracing::layer()).init();
