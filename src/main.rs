@@ -9,7 +9,7 @@ use std::sync::Arc;
 use clap::{Parser, Subcommand};
 use sentry::integrations::tracing as sentry_tracing;
 use tracing::{info, info_span, instrument};
-use tracing_subscriber::{EnvFilter, fmt::format::FmtSpan, prelude::*, util::SubscriberInitExt};
+use tracing_subscriber::{EnvFilter, prelude::*, util::SubscriberInitExt};
 
 use serenity::{
     all::{CreateEmbed, CreateMessage},
@@ -167,10 +167,10 @@ async fn main() {
         },
     ));
 
-    let env_filter = EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("info"));
+    let env_filter =
+        EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("info,serenity=warn"));
     let subscriber = tracing_subscriber::fmt()
         .with_env_filter(env_filter)
-        .with_span_events(FmtSpan::NEW | FmtSpan::CLOSE)
         .finish();
 
     subscriber.with(sentry_tracing::layer()).init();
