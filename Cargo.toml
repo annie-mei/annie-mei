@@ -27,7 +27,7 @@ linkify = "0.10"
 log = "0.4.29"
 ngrammatic = "0.7.0"
 openssl = { version = "0.10.75", features = ["vendored"] }
-reqwest = { version = "0.13.1", features = ["blocking", "rustls"] }
+reqwest = { version = "0.13.2", features = ["blocking", "rustls"] }
 redis = { version = "1.0.3", features = ["tls-native-tls"] }
 rspotify = { version = "0.15.3", default-features = false, features = [
   "client-ureq",
