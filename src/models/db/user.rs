@@ -28,7 +28,7 @@ impl User {
             .ok()
     }
 
-    #[instrument(name = "db.user.create_or_update", skip(conn, anilist_username), fields(discord_id, anilist_id, username_len = anilist_username.len()))]
+    #[instrument(name = "db.user.create_or_update", skip(conn, anilist_username), fields(discord_id = discord_id, anilist_id = anilist_id, username_len = anilist_username.len()))]
     pub fn create_or_update_user(
         discord_id: i64,
         anilist_id: i64,

@@ -8,7 +8,7 @@ use std::sync::Arc;
 
 use clap::{Parser, Subcommand};
 use sentry::integrations::tracing as sentry_tracing;
-use tracing::{info, info_span, instrument};
+use tracing::{Instrument, info, info_span, instrument};
 use tracing_subscriber::{EnvFilter, prelude::*, util::SubscriberInitExt};
 
 use serenity::{
@@ -55,32 +55,35 @@ impl EventHandler for Handler {
             let command_span = info_span!(
                 "discord.command",
                 command_name = %command.data.name,
-                user_id = command.user.id.get(),
+                user_id = %hash_user_id(command.user.id.get()),
                 guild_id = ?command.guild_id
             );
-            let _command_span = command_span.enter();
 
-            info!("Received command interaction");
+            async {
+                info!("Received command interaction");
 
-            match command.data.name.as_str() {
-                "ping" => commands::ping::run(&ctx, &command).await,
-                "help" => commands::help::run(&ctx, &command).await,
-                "songs" => commands::songs::command::run(&ctx, &mut command).await,
-                "manga" => commands::manga::command::run(&ctx, &mut command).await,
-                "anime" => commands::anime::command::run(&ctx, &mut command).await,
-                "register" => commands::register::command::run(&ctx, &mut command).await,
-                _ => {
-                    let embed = CreateEmbed::new()
-                        .title("Error")
-                        .description("Not implemented");
-                    let builder = CreateMessage::new().embed(embed);
-                    let msg = command.channel_id.send_message(&ctx.http, builder).await;
-                    if let Err(why) = msg {
-                        println!("Error sending message: {why:?}");
-                        info!("Cannot respond to slash command: {why}");
+                match command.data.name.as_str() {
+                    "ping" => commands::ping::run(&ctx, &command).await,
+                    "help" => commands::help::run(&ctx, &command).await,
+                    "songs" => commands::songs::command::run(&ctx, &mut command).await,
+                    "manga" => commands::manga::command::run(&ctx, &mut command).await,
+                    "anime" => commands::anime::command::run(&ctx, &mut command).await,
+                    "register" => commands::register::command::run(&ctx, &mut command).await,
+                    _ => {
+                        let embed = CreateEmbed::new()
+                            .title("Error")
+                            .description("Not implemented");
+                        let builder = CreateMessage::new().embed(embed);
+                        let msg = command.channel_id.send_message(&ctx.http, builder).await;
+                        if let Err(why) = msg {
+                            println!("Error sending message: {why:?}");
+                            info!("Cannot respond to slash command: {why}");
+                        }
                     }
-                }
-            };
+                };
+            }
+            .instrument(command_span)
+            .await;
         }
     }
 
@@ -128,13 +131,6 @@ async fn main() {
         .map(|rate| rate.clamp(0.0, 1.0))
         .unwrap_or(0.0);
 
-    if sentry_traces_sample_rate > 0.0 {
-        info!(
-            sample_rate = sentry_traces_sample_rate,
-            "Sentry trace sampling enabled"
-        );
-    }
-
     let _guard = sentry::init((
         sentry_dsn,
         sentry::ClientOptions {
@@ -174,6 +170,13 @@ async fn main() {
         .finish();
 
     subscriber.with(sentry_tracing::layer()).init();
+
+    if sentry_traces_sample_rate > 0.0 {
+        info!(
+            sample_rate = sentry_traces_sample_rate,
+            "Sentry trace sampling enabled"
+        );
+    }
 
     info!("Initializing database connection");
     let connection = &mut utils::database::establish_connection();

@@ -6,7 +6,6 @@ use crate::models::{
 use serenity::all::CommandDataOptionValue;
 use tracing::{info, instrument};
 
-#[instrument(name = "fetcher.strip_quotes", skip(string), fields(input_len = string.len()))]
 fn strip_quotes(string: &str) -> String {
     string.replace('"', "")
 }

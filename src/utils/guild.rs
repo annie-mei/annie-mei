@@ -58,7 +58,7 @@ pub async fn get_guild_data_for_media<T: Transformers>(
     get_guild_anilist_data(anilist_users, media.get_id(), media.get_type()).await
 }
 
-#[instrument(name = "guild.fetch_anilist_data", skip(guild_members, media_type), fields(member_count = guild_members.len(), media_id, media_type = %media_type))]
+#[instrument(name = "guild.fetch_anilist_data", skip(guild_members, media_type), fields(member_count = guild_members.len(), media_id = media_id, media_type = %media_type))]
 async fn get_guild_anilist_data(
     guild_members: Vec<User>,
     media_id: u32,
