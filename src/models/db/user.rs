@@ -3,7 +3,9 @@ use serde_json::json;
 use serenity::model::prelude::UserId;
 use tracing::{info, instrument};
 
-use crate::utils::{queries::FETCH_ANILIST_USER, requests::anilist::send_request};
+use crate::utils::{
+    privacy::hash_user_id, queries::FETCH_ANILIST_USER, requests::anilist::send_request,
+};
 
 #[derive(Queryable)]
 #[allow(dead_code)]
@@ -28,7 +30,7 @@ impl User {
             .ok()
     }
 
-    #[instrument(name = "db.user.create_or_update", skip(conn, anilist_username), fields(discord_id = discord_id, anilist_id = anilist_id, username_len = anilist_username.len()))]
+    #[instrument(name = "db.user.create_or_update", skip(conn, anilist_username), fields(discord_user_id = %hash_user_id(discord_id as u64), anilist_id = anilist_id, username_len = anilist_username.len()))]
     pub fn create_or_update_user(
         discord_id: i64,
         anilist_id: i64,

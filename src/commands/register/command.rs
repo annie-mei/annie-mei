@@ -76,8 +76,10 @@ async fn register_new_user(anilist_username: String, user: &serenity::model::use
         );
 
         info!(
-            "Created user with details: id: {}, anilist_id: {}, anilist_username: {}",
-            user.id, anilist_id, anilist_username
+            discord_user_id = %hash_user_id(user.id.get()),
+            anilist_id,
+            anilist_username = %anilist_username,
+            "Created user with details"
         );
         format!(
             "Hello {}, I have linked the Anilist account {} to your user.",
