@@ -22,14 +22,14 @@ use serde_json::json;
 use tokio::task;
 use tracing::{info, instrument};
 
-#[instrument(name = "discord.guild.member_ids", skip(guild))]
+#[instrument(name = "discord.guild.member_ids", skip(guild), fields(member_count = guild.members.len()))]
 fn get_guild_member_ids(guild: &Guild) -> Vec<UserId> {
     let members: Vec<UserId> = guild.members.keys().copied().collect();
     info!("Found {:#?} members in guild", members.len());
     members
 }
 
-#[instrument(name = "discord.guild.from_interaction", skip(ctx, interaction))]
+#[instrument(name = "discord.guild.from_interaction", skip(ctx, interaction), fields(has_guild_id = interaction.guild_id.is_some()))]
 fn get_guild_from_interaction(ctx: &Context, interaction: &CommandInteraction) -> Option<Guild> {
     interaction
         .guild_id
@@ -38,7 +38,7 @@ fn get_guild_from_interaction(ctx: &Context, interaction: &CommandInteraction) -
         .map(|g| g.clone())
 }
 
-#[instrument(name = "discord.guild.current_members", skip(ctx, interaction))]
+#[instrument(name = "discord.guild.current_members", skip(ctx, interaction), fields(has_guild_id = interaction.guild_id.is_some()))]
 pub fn get_current_guild_members(ctx: &Context, interaction: &CommandInteraction) -> Vec<UserId> {
     get_guild_from_interaction(ctx, interaction)
         .as_ref()

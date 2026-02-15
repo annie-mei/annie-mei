@@ -8,7 +8,6 @@ use crate::utils::statics::MAL_CLIENT_ID;
 const MY_ANIME_LIST_BASE: &str = "https://api.myanimelist.net/v2";
 const FIELDS_TO_FETCH: [&str; 3] = ["id", "opening_themes", "ending_themes"];
 
-#[instrument(name = "http.mal.build_url")]
 fn build_mal_url(mal_id: u32) -> String {
     let mal_url = format!(
         "{MY_ANIME_LIST_BASE}/anime/{mal_id}?fields={}",
