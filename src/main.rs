@@ -128,8 +128,7 @@ async fn main() {
     let sentry_traces_sample_rate = env::var(SENTRY_TRACES_SAMPLE_RATE)
         .ok()
         .and_then(|raw| raw.parse::<f32>().ok())
-        .map(|rate| rate.clamp(0.0, 1.0))
-        .unwrap_or(0.0);
+        .map_or(0.0, |rate| rate.clamp(0.0, 1.0));
 
     let _guard = sentry::init((
         sentry_dsn,
