@@ -4,12 +4,14 @@ use crate::models::{
     transformers::Transformers,
 };
 use serenity::all::CommandDataOptionValue;
-use tracing::info;
+use tracing::{info, instrument};
 
+#[instrument(name = "fetcher.strip_quotes", skip(string), fields(input_len = string.len()))]
 fn strip_quotes(string: &str) -> String {
     string.replace('"', "")
 }
 
+#[instrument(name = "fetcher.return_argument", skip(arg))]
 fn return_argument(arg: CommandDataOptionValue) -> Argument {
     let val = match arg {
         CommandDataOptionValue::String(name) => name,
@@ -25,6 +27,7 @@ fn return_argument(arg: CommandDataOptionValue) -> Argument {
     }
 }
 
+#[instrument(name = "fetcher.fetch", skip(arg), fields(media_type = ?media_type))]
 pub fn fetcher<
     T: serde::de::DeserializeOwned + Transformers + std::fmt::Debug + std::clone::Clone,
 >(

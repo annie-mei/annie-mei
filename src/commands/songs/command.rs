@@ -13,7 +13,7 @@ use serenity::{
 };
 
 use tokio::task;
-use tracing::info;
+use tracing::{info, instrument};
 
 pub fn register() -> CreateCommand {
     CreateCommand::new("songs")
@@ -28,6 +28,7 @@ pub fn register() -> CreateCommand {
         )
 }
 
+#[instrument(name = "command.songs.run", skip(ctx, interaction))]
 pub async fn run(ctx: &Context, interaction: &mut CommandInteraction) {
     let _ = interaction.defer(&ctx.http).await;
 
@@ -56,6 +57,7 @@ pub async fn run(ctx: &Context, interaction: &mut CommandInteraction) {
     };
 }
 
+#[instrument(name = "command.songs.build_message", skip(mal_response))]
 fn build_message_from_song_response(mal_response: MalResponse) -> CreateEmbed {
     CreateEmbed::new()
         .title(mal_response.transform_title())
