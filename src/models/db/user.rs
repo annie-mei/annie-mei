@@ -1,9 +1,11 @@
 use diesel::prelude::*;
 use serde_json::json;
 use serenity::model::prelude::UserId;
-use tracing::info;
+use tracing::{info, instrument};
 
-use crate::utils::{queries::FETCH_ANILIST_USER, requests::anilist::send_request};
+use crate::utils::{
+    privacy::hash_user_id, queries::FETCH_ANILIST_USER, requests::anilist::send_request,
+};
 
 #[derive(Queryable)]
 #[allow(dead_code)]
@@ -14,6 +16,7 @@ pub struct User {
 }
 
 impl User {
+    #[instrument(name = "db.user.get_by_discord_ids", skip(conn, user_discord_ids), fields(user_count = user_discord_ids.len()))]
     pub fn get_users_by_discord_id(
         user_discord_ids: Vec<UserId>,
         conn: &mut PgConnection,
@@ -27,6 +30,7 @@ impl User {
             .ok()
     }
 
+    #[instrument(name = "db.user.create_or_update", skip(conn, anilist_username, discord_id), fields(discord_user_id = %hash_user_id(discord_id as u64), anilist_id = anilist_id, username_len = anilist_username.len()))]
     pub fn create_or_update_user(
         discord_id: i64,
         anilist_id: i64,
@@ -50,6 +54,7 @@ impl User {
             .expect("Error saving user")
     }
 
+    #[instrument(name = "http.anilist.lookup_user", fields(username_len = username.len()))]
     pub fn get_anilist_id_from_username(username: &str) -> Option<i64> {
         let body = json!({
             "query": FETCH_ANILIST_USER,

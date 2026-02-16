@@ -4,8 +4,9 @@ use diesel::pg::PgConnection;
 use diesel::prelude::*;
 use diesel_migrations::{EmbeddedMigrations, MigrationHarness, embed_migrations};
 use std::env;
-use tracing::{error, info};
+use tracing::{error, info, instrument};
 
+#[instrument(name = "db.establish_connection", skip_all)]
 pub fn establish_connection() -> PgConnection {
     let database_url = env::var(DATABASE_URL).expect("DATABASE_URL must be set");
     PgConnection::establish(&database_url).unwrap_or_else(|error| {
@@ -36,6 +37,8 @@ fn redact_database_url(database_url: &str) -> String {
 }
 
 pub const MIGRATIONS: EmbeddedMigrations = embed_migrations!();
+
+#[instrument(name = "db.run_migrations", skip(conn))]
 pub fn run_migration(conn: &mut PgConnection) {
     info!("Running database migrations ... ");
     conn.run_pending_migrations(MIGRATIONS).unwrap();

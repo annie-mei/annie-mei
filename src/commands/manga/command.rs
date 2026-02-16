@@ -17,7 +17,7 @@ use serenity::{
 };
 
 use tokio::task;
-use tracing::info;
+use tracing::{info, instrument};
 
 pub fn register() -> CreateCommand {
     CreateCommand::new("manga")
@@ -32,6 +32,7 @@ pub fn register() -> CreateCommand {
         )
 }
 
+#[instrument(name = "command.manga.run", skip(ctx, interaction))]
 pub async fn run(ctx: &Context, interaction: &mut CommandInteraction) {
     let _ = interaction.defer(&ctx.http).await;
 

@@ -185,7 +185,7 @@ dependencies = [
 
 [[package]]
 name = "annie-mei"
-version = "2.1.1"
+version = "2.1.2"
 dependencies = [
  "blake3",
  "chrono",

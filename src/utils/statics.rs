@@ -5,6 +5,7 @@ pub const EMPTY_STR: &str = "-";
 // Environment variables
 pub const ENV: &str = "ENV";
 pub const SENTRY_DSN: &str = "SENTRY_DSN";
+pub const SENTRY_TRACES_SAMPLE_RATE: &str = "SENTRY_TRACES_SAMPLE_RATE";
 pub const DISCORD_TOKEN: &str = "DISCORD_TOKEN";
 pub const REDIS_URL: &str = "REDIS_URL";
 pub const SPOTIFY_CLIENT_ID: &str = "SPOTIFY_CLIENT_ID";

@@ -7,8 +7,9 @@ use crate::{
 };
 
 use serenity::all::CommandDataOptionValue;
-use tracing::info;
+use tracing::{info, instrument};
 
+#[instrument(name = "command.songs.fetcher", skip(args))]
 pub fn fetcher(args: CommandDataOptionValue) -> Option<MalResponse> {
     let anime_response: Option<Anime> = anime_fetcher(Type::Anime, args);
     match anime_response {

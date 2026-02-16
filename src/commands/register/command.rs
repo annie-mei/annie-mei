@@ -1,6 +1,9 @@
 use crate::{
     models::db::user::User,
-    utils::{database, privacy::configure_sentry_scope},
+    utils::{
+        database,
+        privacy::{configure_sentry_scope, hash_user_id},
+    },
 };
 
 use serde_json::json;
@@ -11,7 +14,7 @@ use serenity::{
     model::application::CommandOptionType,
 };
 use tokio::task;
-use tracing::info;
+use tracing::{info, instrument};
 
 pub fn register() -> CreateCommand {
     CreateCommand::new("register")
@@ -22,6 +25,7 @@ pub fn register() -> CreateCommand {
         )
 }
 
+#[instrument(name = "command.register.run", skip(ctx, interaction))]
 pub async fn run(ctx: &Context, interaction: &mut CommandInteraction) {
     let _ = interaction.defer(&ctx.http).await;
 
@@ -45,6 +49,7 @@ pub async fn run(ctx: &Context, interaction: &mut CommandInteraction) {
     let _register = interaction.edit_response(&ctx.http, builder).await;
 }
 
+#[instrument(name = "command.register.register_new_user", skip(user), fields(discord_user_id = %hash_user_id(user.id.get()), username_len = anilist_username.len()))]
 async fn register_new_user(anilist_username: String, user: &serenity::model::user::User) -> String {
     let username = anilist_username.to_string();
     let anilist_id =
@@ -71,8 +76,10 @@ async fn register_new_user(anilist_username: String, user: &serenity::model::use
         );
 
         info!(
-            "Created user with details: id: {}, anilist_id: {}, anilist_username: {}",
-            user.id, anilist_id, anilist_username
+            discord_user_id = %hash_user_id(user.id.get()),
+            anilist_id,
+            anilist_username = %anilist_username,
+            "Created user with details"
         );
         format!(
             "Hello {}, I have linked the Anilist account {} to your user.",

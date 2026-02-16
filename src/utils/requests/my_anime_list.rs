@@ -1,7 +1,7 @@
 use std::env;
 
 use reqwest::blocking::Client;
-use tracing::info;
+use tracing::{info, instrument};
 
 use crate::utils::statics::MAL_CLIENT_ID;
 
@@ -18,6 +18,7 @@ fn build_mal_url(mal_id: u32) -> String {
     mal_url
 }
 
+#[instrument(name = "http.mal.send_request", skip_all, fields(mal_id = mal_id))]
 pub fn send_request(mal_id: u32) -> String {
     let mal_client_id =
         env::var(MAL_CLIENT_ID).expect("Expected a MAL Client ID in the environment");

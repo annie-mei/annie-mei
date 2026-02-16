@@ -57,6 +57,7 @@ diesel migration run     # Apply database migrations
 
 - Use conventional commit format: `type: description`
 - Types: `feat`, `fix`, `docs`, `chore`, `refactor`, `test`
+- Make small, sensible commits as you go; avoid batching unrelated changes into one commit
 
 ### Git Safety
 
