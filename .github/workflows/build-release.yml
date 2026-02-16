@@ -41,14 +41,6 @@ jobs:
           shared-key: "cargo"
       - name: Build
         run: cargo build --release
-      - name: Upload debug symbols to Sentry
-        run: |
-          curl -sL https://sentry.io/get-cli/ | bash
-          sentry-cli debug-files upload --include-sources target/release/
-        env:
-          SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
-          SENTRY_ORG: ${{ secrets.SENTRY_ORG }}
-          SENTRY_PROJECT: ${{ secrets.SENTRY_PROJECT }}
       - name: Prepare artifact
         run: cp target/release/annie-mei ./annie-mei
       - name: Upload artifact
