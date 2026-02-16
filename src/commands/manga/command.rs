@@ -63,7 +63,12 @@ pub async fn run(ctx: &Context, interaction: &mut CommandInteraction) {
                 info!("No users found in guild");
                 None
             } else {
-                let guild_members_data = get_guild_data_for_media(also_manga, guild_members).await;
+                let guild_members_data = task::spawn_blocking(move || {
+                    get_guild_data_for_media(also_manga, guild_members)
+                })
+                .await
+                .unwrap()
+                .await;
                 info!("Guild members data: {:#?}", guild_members_data);
                 if guild_members_data.is_empty() {
                     None
