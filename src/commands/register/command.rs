@@ -49,7 +49,7 @@ pub async fn run(ctx: &Context, interaction: &mut CommandInteraction) {
     let _register = interaction.edit_response(&ctx.http, builder).await;
 }
 
-#[instrument(name = "command.register.register_new_user", skip(user, anilist_username), fields(discord_user_id = %hash_user_id(user.id.get()), username_len = anilist_username.len()))]
+#[instrument(name = "command.register.register_new_user", skip(user), fields(discord_user_id = %hash_user_id(user.id.get()), username_len = anilist_username.len()))]
 async fn register_new_user(anilist_username: String, user: &serenity::model::user::User) -> String {
     let username = anilist_username.to_string();
     let anilist_id =
