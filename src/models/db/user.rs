@@ -54,7 +54,7 @@ impl User {
             .expect("Error saving user")
     }
 
-    #[instrument(name = "http.anilist.lookup_user", fields(username_len = username.len()))]
+    #[instrument(name = "http.anilist.lookup_user", skip(username), fields(username_len = username.len()))]
     pub fn get_anilist_id_from_username(username: &str) -> Option<i64> {
         let body = json!({
             "query": FETCH_ANILIST_USER,
