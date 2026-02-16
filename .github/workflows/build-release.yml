@@ -42,6 +42,7 @@ jobs:
       - name: Build
         run: cargo build --release
       - name: Upload debug symbols to Sentry
+        id: sentry-upload
         continue-on-error: true
         run: |
           curl -sL https://sentry.io/get-cli/ | bash
@@ -50,6 +51,9 @@ jobs:
           SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
           SENTRY_ORG: ${{ secrets.SENTRY_ORG }}
           SENTRY_PROJECT: ${{ secrets.SENTRY_PROJECT }}
+      - name: Warn on Sentry upload failure
+        if: steps.sentry-upload.outcome == 'failure'
+        run: echo "::warning::Sentry debug symbol upload failed — stack traces may not be symbolicated"
       - name: Prepare artifact
         run: cp target/release/annie-mei ./annie-mei
       - name: Upload artifact
