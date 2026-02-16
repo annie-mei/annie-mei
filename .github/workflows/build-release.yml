@@ -54,6 +54,8 @@ jobs:
       - name: Warn on Sentry upload failure
         if: steps.sentry-upload.outcome == 'failure'
         run: echo "::warning::Sentry debug symbol upload failed — stack traces may not be symbolicated"
+      - name: Strip binary for deployment
+        run: strip target/release/annie-mei
       - name: Prepare artifact
         run: cp target/release/annie-mei ./annie-mei
       - name: Upload artifact
