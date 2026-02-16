@@ -8,7 +8,7 @@ use std::sync::Arc;
 
 use clap::{Parser, Subcommand};
 use sentry::integrations::tracing as sentry_tracing;
-use tracing::{Instrument, info, info_span, instrument};
+use tracing::{Instrument, info, info_span, instrument, warn};
 use tracing_subscriber::{EnvFilter, prelude::*, util::SubscriberInitExt};
 
 use serenity::{
@@ -125,10 +125,15 @@ async fn main() {
     // Default: run the bot
     let environment = env::var(ENV).expect("Expected an environment in the environment");
     let sentry_dsn = env::var(SENTRY_DSN).expect("Expected a sentry dsn in the environment");
-    let sentry_traces_sample_rate = env::var(SENTRY_TRACES_SAMPLE_RATE)
-        .ok()
-        .and_then(|raw| raw.parse::<f32>().ok())
-        .map_or(0.0, |rate| rate.clamp(0.0, 1.0));
+    let sentry_traces_sample_rate_raw = env::var(SENTRY_TRACES_SAMPLE_RATE).ok();
+    let (sentry_traces_sample_rate, sentry_traces_sample_rate_invalid) =
+        match sentry_traces_sample_rate_raw {
+            Some(raw) => match raw.parse::<f32>() {
+                Ok(rate) => (rate.clamp(0.0, 1.0), None),
+                Err(_) => (0.0, Some(raw)),
+            },
+            None => (0.0, None),
+        };
 
     let _guard = sentry::init((
         sentry_dsn,
@@ -169,6 +174,14 @@ async fn main() {
         .finish();
 
     subscriber.with(sentry_tracing::layer()).init();
+
+    if let Some(invalid_value) = sentry_traces_sample_rate_invalid {
+        warn!(
+            invalid_value = %invalid_value,
+            fallback_sample_rate = sentry_traces_sample_rate,
+            "Invalid SENTRY_TRACES_SAMPLE_RATE; defaulting to 0.0"
+        );
+    }
 
     if sentry_traces_sample_rate > 0.0 {
         info!(
