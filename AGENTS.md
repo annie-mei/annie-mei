@@ -85,7 +85,7 @@ Examples:
 - Bug fix or refactor → bump patch
 - Breaking change to existing behavior → bump major
 
-- Also commit the Cargo.lock file when bumping the version
+- Also commit the Cargo.lock file when bumping the version — run `cargo check` to update the lockfile
 
 ### Pull Requests
 
