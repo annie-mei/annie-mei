@@ -51,11 +51,17 @@ pub async fn get_guild_data_for_media<T: Transformers>(
     media: T,
     guild_members: Vec<UserId>,
 ) -> HashMap<i64, MediaListData> {
-    let mut conn = establish_connection();
-    let anilist_users = User::get_users_by_discord_id(guild_members, &mut conn);
-    let anilist_users = anilist_users.unwrap();
+    let media_id = media.get_id();
+    let media_type = media.get_type();
 
-    get_guild_anilist_data(anilist_users, media.get_id(), media.get_type()).await
+    let anilist_users = task::spawn_blocking(move || {
+        let mut conn = establish_connection();
+        User::get_users_by_discord_id(guild_members, &mut conn).unwrap()
+    })
+    .await
+    .unwrap();
+
+    get_guild_anilist_data(anilist_users, media_id, media_type).await
 }
 
 #[instrument(name = "guild.fetch_anilist_data", skip(guild_members, media_type), fields(member_count = guild_members.len(), media_id = media_id, media_type = %media_type))]
