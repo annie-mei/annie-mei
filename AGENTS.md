@@ -80,9 +80,12 @@ Bump the version in `Cargo.toml` with every PR using semantic versioning:
 - **PATCH** (0.0.X): Bug fixes, backwards-compatible patches
 
 Examples:
+
 - New command or feature → bump minor
 - Bug fix or refactor → bump patch
 - Breaking change to existing behavior → bump major
+
+- Also commit the Cargo.lock file when bumping the version
 
 ### Pull Requests
 
