@@ -11,6 +11,7 @@ split-debuginfo = "unpacked"
 [profile.release]
 lto = true
 codegen-units = 1
+debug = 2
 split-debuginfo = "packed"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
