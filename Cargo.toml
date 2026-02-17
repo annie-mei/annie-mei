@@ -22,7 +22,7 @@ chrono = "0.4.43"
 clap = { version = "4", features = ["derive"] }
 diesel = { version = "2.3.6", features = ["postgres"] }
 diesel_migrations = "2.3.1"
-env_logger = "0.11.8"
+env_logger = "0.11.9"
 futures = "0.3.31"
 html2md = "0.2.15"
 linkify = "0.10"
