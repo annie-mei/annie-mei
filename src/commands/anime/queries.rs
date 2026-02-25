@@ -15,6 +15,9 @@ query ($id: Int) {
     format
     status
     episodes
+    nextAiringEpisode {
+      episode
+    }
     duration
     genres
     source
@@ -77,6 +80,9 @@ query ($page: Int, $perPage: Int, $search: String) {
       format
       status
       episodes
+      nextAiringEpisode {
+        episode
+      }
       duration
       genres
       source

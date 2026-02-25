@@ -89,7 +89,13 @@ impl Manga {
 
     pub fn transform_chapters(&self) -> String {
         match &self.chapters {
-            Some(chapters) => chapters.to_string(),
+            Some(chapters) => {
+                if self.status.as_deref() == Some("RELEASING") {
+                    format!("{chapters} written")
+                } else {
+                    chapters.to_string()
+                }
+            }
             None => EMPTY_STR.to_string(),
         }
     }
@@ -292,5 +298,60 @@ impl Transformers for Manga {
 
     fn get_studios_staff_text(&self) -> &str {
         "Staff"
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::Manga;
+    use serde_json::json;
+
+    fn sample_manga(status: &str, chapters: Option<u32>) -> Manga {
+        serde_json::from_value(json!({
+            "type": "MANGA",
+            "id": 1,
+            "idMal": null,
+            "title": {
+                "romaji": "Sample",
+                "english": "Sample",
+                "native": "サンプル"
+            },
+            "synonyms": null,
+            "startDate": null,
+            "endDate": null,
+            "format": null,
+            "status": status,
+            "chapters": chapters,
+            "volumes": null,
+            "genres": [],
+            "source": null,
+            "coverImage": {
+                "extraLarge": null,
+                "large": null,
+                "medium": "https://example.com/image.jpg",
+                "color": null
+            },
+            "averageScore": null,
+            "staff": null,
+            "siteUrl": "https://anilist.co/manga/1",
+            "externalLinks": null,
+            "description": null,
+            "tags": []
+        }))
+        .expect("sample manga JSON should deserialize")
+    }
+
+    #[test]
+    fn transform_chapters_uses_written_suffix_for_releasing_manga() {
+        let manga = sample_manga("RELEASING", Some(110));
+
+        assert_eq!(manga.transform_chapters(), "110 written");
+    }
+
+    #[test]
+    fn transform_chapters_uses_plain_count_for_non_releasing_manga() {
+        let manga = sample_manga("FINISHED", Some(110));
+
+        assert_eq!(manga.transform_chapters(), "110");
     }
 }
