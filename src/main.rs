@@ -141,6 +141,7 @@ async fn main() {
             release: sentry::release_name!(),
             environment: Some(environment.into()),
             traces_sample_rate: sentry_traces_sample_rate,
+            enable_logs: true,
             before_send: Some(Arc::new(|mut event| {
                 // Redact URLs with credentials from exception messages
                 for exception in event.exception.values.iter_mut() {
@@ -162,6 +163,10 @@ async fn main() {
                 }
 
                 Some(event)
+            })),
+            before_send_log: Some(Arc::new(|mut log| {
+                log.body = redact_url_credentials(&log.body);
+                Some(log)
             })),
             ..Default::default()
         },
