@@ -5,7 +5,7 @@ use crate::{
     },
     utils::{
         formatter::{code, linker, titlecase},
-        statics::EMPTY_STR,
+        statics::{ANILIST_STATUS_RELEASING, EMPTY_STR},
     },
 };
 
@@ -26,6 +26,7 @@ pub struct Anime {
     format: Option<String>,
     status: Option<String>,
     episodes: Option<u32>,
+    next_airing_episode: Option<NextAiringEpisode>,
     duration: Option<u32>,
     genres: Vec<String>,
     source: Option<String>,
@@ -64,6 +65,12 @@ pub struct Trailer {
     pub site: String,
 }
 
+#[derive(Deserialize, Debug, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct NextAiringEpisode {
+    pub episode: Option<u32>,
+}
+
 impl Anime {
     pub fn transform_season(&self) -> String {
         let season = match &self.season {
@@ -85,6 +92,19 @@ impl Anime {
     }
 
     pub fn transform_episodes(&self) -> String {
+        if self.status.as_deref() == Some(ANILIST_STATUS_RELEASING)
+            && let Some(next_airing_episode) = &self.next_airing_episode
+            && let Some(next_episode) = next_airing_episode.episode
+        {
+            let aired_episodes = next_episode.saturating_sub(1);
+
+            if let Some(total_episodes) = self.episodes {
+                return format!("{aired_episodes}/{total_episodes}");
+            }
+
+            return aired_episodes.to_string();
+        }
+
         match &self.episodes {
             Some(episodes) => episodes.to_string(),
             None => EMPTY_STR.to_string(),
@@ -282,5 +302,70 @@ impl Transformers for Anime {
 
     fn get_studios_staff_text(&self) -> &str {
         "Studios"
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::Anime;
+    use crate::utils::statics::{ANILIST_STATUS_FINISHED, ANILIST_STATUS_RELEASING};
+    use serde_json::json;
+
+    fn sample_anime(status: &str, episodes: Option<u32>, next_episode: Option<u32>) -> Anime {
+        serde_json::from_value(json!({
+            "type": "ANIME",
+            "id": 1,
+            "idMal": null,
+            "title": {
+                "romaji": "Sample",
+                "english": "Sample",
+                "native": "サンプル"
+            },
+            "synonyms": null,
+            "season": null,
+            "seasonYear": null,
+            "format": null,
+            "status": status,
+            "episodes": episodes,
+            "nextAiringEpisode": next_episode.map(|episode| json!({ "episode": episode })),
+            "duration": null,
+            "genres": [],
+            "source": null,
+            "coverImage": {
+                "extraLarge": null,
+                "large": null,
+                "medium": "https://example.com/image.jpg",
+                "color": null
+            },
+            "averageScore": null,
+            "studios": null,
+            "siteUrl": "https://anilist.co/anime/1",
+            "externalLinks": null,
+            "trailer": null,
+            "description": null,
+            "tags": []
+        }))
+        .expect("sample anime JSON should deserialize")
+    }
+
+    #[test]
+    fn transform_episodes_uses_aired_count_for_releasing_anime() {
+        let anime = sample_anime(ANILIST_STATUS_RELEASING, Some(12), Some(8));
+
+        assert_eq!(anime.transform_episodes(), "7/12");
+    }
+
+    #[test]
+    fn transform_episodes_uses_total_for_non_releasing_anime() {
+        let anime = sample_anime(ANILIST_STATUS_FINISHED, Some(12), Some(8));
+
+        assert_eq!(anime.transform_episodes(), "12");
+    }
+
+    #[test]
+    fn transform_episodes_uses_aired_count_when_total_is_unknown() {
+        let anime = sample_anime(ANILIST_STATUS_RELEASING, None, Some(8));
+
+        assert_eq!(anime.transform_episodes(), "7");
     }
 }
