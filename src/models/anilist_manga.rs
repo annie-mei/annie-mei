@@ -3,7 +3,10 @@ use crate::{
         anilist_common::{CoverImage, ExternalLinks, Tag, Title},
         transformers::Transformers,
     },
-    utils::{formatter::code, statics::EMPTY_STR},
+    utils::{
+        formatter::code,
+        statics::{ANILIST_STATUS_RELEASING, EMPTY_STR},
+    },
 };
 
 use chrono::NaiveDate;
@@ -90,7 +93,7 @@ impl Manga {
     pub fn transform_chapters(&self) -> String {
         match &self.chapters {
             Some(chapters) => {
-                if self.status.as_deref() == Some("RELEASING") {
+                if self.status.as_deref() == Some(ANILIST_STATUS_RELEASING) {
                     format!("{chapters} written")
                 } else {
                     chapters.to_string()
@@ -304,6 +307,7 @@ impl Transformers for Manga {
 #[cfg(test)]
 mod tests {
     use super::Manga;
+    use crate::utils::statics::{ANILIST_STATUS_FINISHED, ANILIST_STATUS_RELEASING};
     use serde_json::json;
 
     fn sample_manga(status: &str, chapters: Option<u32>) -> Manga {
@@ -343,14 +347,14 @@ mod tests {
 
     #[test]
     fn transform_chapters_uses_written_suffix_for_releasing_manga() {
-        let manga = sample_manga("RELEASING", Some(110));
+        let manga = sample_manga(ANILIST_STATUS_RELEASING, Some(110));
 
         assert_eq!(manga.transform_chapters(), "110 written");
     }
 
     #[test]
     fn transform_chapters_uses_plain_count_for_non_releasing_manga() {
-        let manga = sample_manga("FINISHED", Some(110));
+        let manga = sample_manga(ANILIST_STATUS_FINISHED, Some(110));
 
         assert_eq!(manga.transform_chapters(), "110");
     }
