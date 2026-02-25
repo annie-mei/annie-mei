@@ -7,10 +7,6 @@ Example: [ANNIE-84]/Prepare for AI Dev
 
 <!-- What does this PR do? Why is this change needed? -->
 
-## Related Issue
-
-<!-- Link to Linear issue, e.g., Closes ANNIE-XXX -->
-
 ## Type of Change
 
 - [ ] Bug fix
@@ -18,6 +14,12 @@ Example: [ANNIE-84]/Prepare for AI Dev
 - [ ] Refactor
 - [ ] Documentation
 - [ ] Chore
+
+## Changes
+
+<!-- Chronological list of changes in the format of git sha: description
+Example: a1233as: adds a new command /newcmd
+-->
 
 ## Checklist
 
