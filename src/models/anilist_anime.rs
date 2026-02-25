@@ -96,7 +96,13 @@ impl Anime {
             && let Some(next_airing_episode) = &self.next_airing_episode
             && let Some(next_episode) = next_airing_episode.episode
         {
-            return next_episode.saturating_sub(1).to_string();
+            let aired_episodes = next_episode.saturating_sub(1);
+
+            if let Some(total_episodes) = self.episodes {
+                return format!("{aired_episodes}/{total_episodes}");
+            }
+
+            return aired_episodes.to_string();
         }
 
         match &self.episodes {
@@ -345,7 +351,7 @@ mod tests {
     fn transform_episodes_uses_aired_count_for_releasing_anime() {
         let anime = sample_anime("RELEASING", Some(12), Some(8));
 
-        assert_eq!(anime.transform_episodes(), "7");
+        assert_eq!(anime.transform_episodes(), "7/12");
     }
 
     #[test]
@@ -353,5 +359,12 @@ mod tests {
         let anime = sample_anime("FINISHED", Some(12), Some(8));
 
         assert_eq!(anime.transform_episodes(), "12");
+    }
+
+    #[test]
+    fn transform_episodes_uses_aired_count_when_total_is_unknown() {
+        let anime = sample_anime("RELEASING", None, Some(8));
+
+        assert_eq!(anime.transform_episodes(), "7");
     }
 }
