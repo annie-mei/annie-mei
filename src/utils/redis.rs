@@ -1,4 +1,4 @@
-use redis::{Commands, Connection, RedisResult};
+use redis::{Commands, Connection, ErrorKind, RedisResult};
 use std::env;
 use tracing::{info, instrument};
 
@@ -6,7 +6,13 @@ use crate::utils::statics::REDIS_URL;
 
 #[instrument(name = "redis.get_connection", skip_all)]
 fn get_redis_client() -> RedisResult<Connection> {
-    let redis_url = env::var(REDIS_URL).expect("Expected REDIS_URL in the environment");
+    let redis_url = env::var(REDIS_URL).map_err(|e| {
+        (
+            ErrorKind::InvalidClientConfig,
+            "Missing REDIS_URL environment variable",
+            e.to_string(),
+        )
+    })?;
 
     let client = redis::Client::open(redis_url)?;
     let connection = client.get_connection()?;

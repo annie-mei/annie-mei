@@ -235,5 +235,7 @@ async fn main() {
     info!("Shutting down");
     client.shard_manager.shutdown_all().await;
     let _ = shutdown_tx.send(());
-    let _ = http_handle.await;
+    if let Err(e) = http_handle.await {
+        tracing::error!(error = %e, "HTTP server task join failed");
+    }
 }
