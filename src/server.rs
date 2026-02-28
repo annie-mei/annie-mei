@@ -12,25 +12,48 @@ const VERSION: &str = env!("CARGO_PKG_VERSION");
 
 #[instrument(name = "http.healthz", skip_all)]
 async fn healthz() -> (StatusCode, Json<Value>) {
-    let result = tokio::task::spawn_blocking(crate::utils::redis::ping).await;
+    let (redis_result, db_result) = tokio::join!(
+        tokio::task::spawn_blocking(crate::utils::redis::ping),
+        tokio::task::spawn_blocking(crate::utils::database::ping),
+    );
 
-    let (status, redis_ok) = match result {
-        Ok(Ok(())) => (StatusCode::OK, true),
+    let redis_ok = match &redis_result {
+        Ok(Ok(())) => true,
         Ok(Err(e)) => {
             error!(error = %e, "Redis health check failed");
-            (StatusCode::SERVICE_UNAVAILABLE, false)
+            false
         }
         Err(e) => {
-            error!(error = %e, "Health check task panicked");
-            (StatusCode::INTERNAL_SERVER_ERROR, false)
+            error!(error = %e, "Redis health check task panicked");
+            false
         }
     };
 
+    let db_ok = match &db_result {
+        Ok(Ok(())) => true,
+        Ok(Err(e)) => {
+            error!(error = %e, "Database health check failed");
+            false
+        }
+        Err(e) => {
+            error!(error = %e, "Database health check task panicked");
+            false
+        }
+    };
+
+    let all_healthy = redis_ok && db_ok;
+    let status = if all_healthy {
+        StatusCode::OK
+    } else {
+        StatusCode::SERVICE_UNAVAILABLE
+    };
+
     let body = json!({
-        "status": if status == StatusCode::OK { "healthy" } else { "unhealthy" },
+        "status": if all_healthy { "healthy" } else { "unhealthy" },
         "version": VERSION,
         "services": {
             "redis": if redis_ok { "up" } else { "down" },
+            "database": if db_ok { "up" } else { "down" },
         }
     });
 
