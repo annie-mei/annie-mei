@@ -15,7 +15,7 @@ jobs:
   rust-clippy-analyze:
     if: ${{ github.actor != 'dependabot[bot]' }}
     name: Clippy Analysis
-    runs-on: ubuntu-latest
+    runs-on: blacksmith-4vcpu-ubuntu-2404
     env:
       CARGO_TERM_COLOR: always
       RUSTC_WRAPPER: ""
