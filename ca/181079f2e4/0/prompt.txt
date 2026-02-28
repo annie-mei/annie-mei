@@ -1,0 +1,5 @@
+Can I use uptime bot to hit a redis end point to keep my free tier project up?
+
+---
+
+I have one on upstash and also Redis Cloud

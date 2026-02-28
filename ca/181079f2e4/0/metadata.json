@@ -1,0 +1,32 @@
+{
+  "cli_version": "0.4.8",
+  "checkpoint_id": "ca181079f2e4",
+  "session_id": "ses_359ffa105ffevoJjlp0T5aixO9",
+  "strategy": "manual-commit",
+  "created_at": "2026-02-28T21:54:45.295621Z",
+  "branch": "annie-114-run-a-small-http-server-alongside-serenity-bot-runtime",
+  "checkpoints_count": 0,
+  "files_touched": [
+    "src/server.rs"
+  ],
+  "agent": "OpenCode",
+  "turn_id": "38536efa18ca",
+  "checkpoint_transcript_start": 4,
+  "transcript_lines_at_start": 4,
+  "token_usage": {
+    "input_tokens": 0,
+    "cache_creation_tokens": 0,
+    "cache_read_tokens": 0,
+    "output_tokens": 0,
+    "api_call_count": 0
+  },
+  "initial_attribution": {
+    "calculated_at": "2026-02-28T21:54:45.221289Z",
+    "agent_lines": 20,
+    "human_added": 0,
+    "human_modified": 0,
+    "human_removed": 0,
+    "total_committed": 20,
+    "agent_percentage": 100
+  }
+}
