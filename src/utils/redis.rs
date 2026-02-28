@@ -14,6 +14,14 @@ fn get_redis_client() -> RedisResult<Connection> {
     Ok(connection)
 }
 
+#[instrument(name = "redis.ping", skip_all)]
+pub fn ping() -> RedisResult<()> {
+    let mut connection = get_redis_client()?;
+    redis::cmd("PING").query::<String>(&mut connection)?;
+    info!("Redis ping successful");
+    Ok(())
+}
+
 #[instrument(name = "redis.check_cache", fields(key = %key, key_len = key.len()))]
 pub fn check_cache(key: &str) -> RedisResult<String> {
     let mut redis_client_connection = get_redis_client().unwrap();
