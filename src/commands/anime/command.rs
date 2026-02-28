@@ -22,7 +22,7 @@ use serenity::{
 };
 
 use tokio::task;
-use tracing::{info, instrument};
+use tracing::{error, info, instrument};
 
 pub fn register() -> CreateCommand {
     CreateCommand::new("anime")
@@ -67,24 +67,33 @@ pub async fn run(ctx: &Context, interaction: &mut CommandInteraction) {
     let _ = interaction.defer(&ctx.http).await;
 
     let user = &interaction.user;
-    let arg = interaction.data.options[0].value.clone();
-    let arg_str = format!("{:?}", arg);
 
+    // Validate the required "search" option up-front.
+    let search_term = match interaction.data.options.first().map(|opt| &opt.value) {
+        Some(serenity::all::CommandDataOptionValue::String(s)) => s.clone(),
+        _ => {
+            let builder = EditInteractionResponse::new().content(
+                "Missing or invalid `search` option — please provide an anime name or ID.",
+            );
+            let _ = interaction.edit_response(&ctx.http, builder).await;
+            return;
+        }
+    };
+
+    let arg_str = format!("{:?}", search_term);
     configure_sentry_scope("Anime", user.id.get(), Some(json!(arg_str)));
 
-    info!("Got command 'anime' with args: {arg:#?}");
-
-    // Extract the raw search string from the Serenity option value.
-    let search_term = match &interaction.data.options[0].value {
-        serenity::all::CommandDataOptionValue::String(s) => s.clone(),
-        other => format!("{other:?}"),
-    };
+    info!("Got command 'anime' with search_term: {search_term}");
 
     // Fetch anime data on a blocking thread (AniList uses blocking reqwest).
     let anime_result: Option<Anime> =
-        task::spawn_blocking(move || AniListSource.fetch_anime(&search_term))
-            .await
-            .unwrap();
+        match task::spawn_blocking(move || AniListSource.fetch_anime(&search_term)).await {
+            Ok(result) => result,
+            Err(e) => {
+                error!(error = %e, "spawn_blocking panicked while fetching anime");
+                None
+            }
+        };
 
     // Gather guild-member data when the anime was found.
     let guild_members_data = match &anime_result {
@@ -96,13 +105,8 @@ pub async fn run(ctx: &Context, interaction: &mut CommandInteraction) {
                 None
             } else {
                 let also_anime = anime_response.clone();
-                let data = task::spawn_blocking(move || {
-                    get_guild_data_for_media(also_anime, guild_members)
-                })
-                .await
-                .unwrap()
-                .await;
-                info!("Guild members data: {:#?}", data);
+                let data = get_guild_data_for_media(also_anime, guild_members).await;
+                info!("Guild members data: {} entries", data.len());
                 if data.is_empty() { None } else { Some(data) }
             }
         }
@@ -121,7 +125,10 @@ pub async fn run(ctx: &Context, interaction: &mut CommandInteraction) {
             let builder = EditInteractionResponse::new().embed(*embed);
             interaction.edit_response(&ctx.http, builder).await
         }
-        CommandResponse::Message(_) => unreachable!("/anime always defers"),
+        CommandResponse::Message(text) => {
+            let builder = EditInteractionResponse::new().content(text);
+            interaction.edit_response(&ctx.http, builder).await
+        }
     };
 }
 

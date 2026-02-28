@@ -3,19 +3,18 @@
 //! These traits abstract external services (AniList, DB, Redis, …) so that
 //! command core logic can be unit-tested with mock implementations.
 //!
-//! ## Example: mocking the media data source
+//! ## Example: testing the core handler directly
 //!
 //! ```ignore
-//! struct FakeSource(Option<Anime>);
+//! use crate::commands::{anime::command::handle_anime, response::CommandResponse};
 //!
-//! impl MediaDataSource for FakeSource {
-//!     fn fetch_anime(&self, _search_term: &str) -> Option<Anime> {
-//!         self.0.clone()
-//!     }
-//! }
-//!
-//! let response = handle_anime(&FakeSource(None), "nonexistent", None);
+//! // Not-found path — no anime, no guild data.
+//! let response = handle_anime(None, None);
 //! assert!(response.is_content());
+//!
+//! // Success path — pass a pre-built Anime and optional guild data.
+//! let response = handle_anime(Some(sample_anime), Some(guild_data));
+//! assert!(response.is_embed());
 //! ```
 
 use crate::models::anilist_anime::Anime;
