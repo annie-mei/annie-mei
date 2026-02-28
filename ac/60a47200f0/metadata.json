@@ -2,7 +2,7 @@
   "cli_version": "0.4.8",
   "checkpoint_id": "ac60a47200f0",
   "strategy": "manual-commit",
-  "branch": "remove-erroneously-tracked-file",
+  "branch": "main",
   "checkpoints_count": 0,
   "files_touched": [
     ".entire/logs/entire.log"
@@ -17,10 +17,10 @@
     }
   ],
   "token_usage": {
-    "input_tokens": 21718,
+    "input_tokens": 0,
     "cache_creation_tokens": 0,
-    "cache_read_tokens": 21248,
-    "output_tokens": 1094,
-    "api_call_count": 2
+    "cache_read_tokens": 0,
+    "output_tokens": 0,
+    "api_call_count": 0
   }
 }
