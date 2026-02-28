@@ -1,27 +1,40 @@
 use std::env;
 use std::net::SocketAddr;
 
-use axum::{Router, http::StatusCode, routing::get};
+use axum::{Json, Router, http::StatusCode, routing::get};
+use serde_json::{Value, json};
 use tokio::net::TcpListener;
 use tracing::{error, info, instrument};
 
 use crate::utils::statics::{DEFAULT_SERVER_PORT, SERVER_PORT};
 
+const VERSION: &str = env!("CARGO_PKG_VERSION");
+
 #[instrument(name = "http.healthz", skip_all)]
-async fn healthz() -> StatusCode {
+async fn healthz() -> (StatusCode, Json<Value>) {
     let result = tokio::task::spawn_blocking(crate::utils::redis::ping).await;
 
-    match result {
-        Ok(Ok(())) => StatusCode::OK,
+    let (status, redis_ok) = match result {
+        Ok(Ok(())) => (StatusCode::OK, true),
         Ok(Err(e)) => {
             error!(error = %e, "Redis health check failed");
-            StatusCode::SERVICE_UNAVAILABLE
+            (StatusCode::SERVICE_UNAVAILABLE, false)
         }
         Err(e) => {
             error!(error = %e, "Health check task panicked");
-            StatusCode::INTERNAL_SERVER_ERROR
+            (StatusCode::INTERNAL_SERVER_ERROR, false)
         }
-    }
+    };
+
+    let body = json!({
+        "status": if status == StatusCode::OK { "healthy" } else { "unhealthy" },
+        "version": VERSION,
+        "services": {
+            "redis": if redis_ok { "up" } else { "down" },
+        }
+    });
+
+    (status, Json(body))
 }
 
 #[instrument(name = "http.server", skip_all)]
