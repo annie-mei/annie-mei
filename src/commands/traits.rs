@@ -17,7 +17,7 @@
 //! assert!(response.is_embed());
 //! ```
 
-use crate::models::anilist_anime::Anime;
+use crate::models::{anilist_anime::Anime, anilist_manga::Manga};
 
 /// Abstraction over media-data retrieval (AniList today, pluggable tomorrow).
 ///
@@ -29,6 +29,11 @@ pub trait MediaDataSource: Send + Sync {
     ///
     /// Returns `None` when no matching anime is found.
     fn fetch_anime(&self, search_term: &str) -> Option<Anime>;
+
+    /// Fetch manga data for the given search term (name **or** numeric ID).
+    ///
+    /// Returns `None` when no matching manga is found.
+    fn fetch_manga(&self, search_term: &str) -> Option<Manga>;
 }
 
 /// Production [`MediaDataSource`] backed by the AniList GraphQL API.
@@ -45,5 +50,14 @@ impl MediaDataSource for AniListSource {
 
         let arg = CommandDataOptionValue::String(search_term.to_string());
         fetcher::<Anime>(MediaType::Anime, arg)
+    }
+
+    fn fetch_manga(&self, search_term: &str) -> Option<Manga> {
+        use crate::models::media_type::MediaType;
+        use crate::utils::response_fetcher::fetcher;
+        use serenity::all::CommandDataOptionValue;
+
+        let arg = CommandDataOptionValue::String(search_term.to_string());
+        fetcher::<Manga>(MediaType::Manga, arg)
     }
 }
