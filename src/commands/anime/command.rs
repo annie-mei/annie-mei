@@ -69,16 +69,15 @@ pub async fn run(ctx: &Context, interaction: &mut CommandInteraction) {
     let user = &interaction.user;
 
     // Validate the required "search" option up-front.
-    let search_term = match interaction.data.options.first().map(|opt| &opt.value) {
-        Some(serenity::all::CommandDataOptionValue::String(s)) => s.clone(),
-        _ => {
-            let builder = EditInteractionResponse::new().content(
-                "Missing or invalid `search` option — please provide an anime name or ID.",
-            );
-            let _ = interaction.edit_response(&ctx.http, builder).await;
-            return;
-        }
+    let Some(serenity::all::CommandDataOptionValue::String(search_term)) =
+        interaction.data.options.first().map(|opt| &opt.value)
+    else {
+        let builder = EditInteractionResponse::new()
+            .content("Missing or invalid `search` option — please provide an anime name or ID.");
+        let _ = interaction.edit_response(&ctx.http, builder).await;
+        return;
     };
+    let search_term = search_term.clone();
 
     let arg_str = format!("{:?}", search_term);
     configure_sentry_scope("Anime", user.id.get(), Some(json!(arg_str)));
