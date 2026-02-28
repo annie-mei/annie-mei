@@ -1,6 +1,6 @@
 [package]
 name = "annie-mei"
-version = "2.4.0"
+version = "2.5.0"
 edition = "2024"
 license = "GPL-3.0-or-later"
 rust-version = "1.93"
@@ -17,6 +17,7 @@ split-debuginfo = "packed"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+axum = "0.8"
 blake3 = "1.8"
 chrono = "0.4.43"
 clap = { version = "4", features = ["derive"] }

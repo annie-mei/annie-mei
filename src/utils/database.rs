@@ -2,6 +2,7 @@ use crate::utils::statics::DATABASE_URL;
 
 use diesel::pg::PgConnection;
 use diesel::prelude::*;
+use diesel::sql_query;
 use diesel_migrations::{EmbeddedMigrations, MigrationHarness, embed_migrations};
 use std::env;
 use tracing::{error, info, instrument};
@@ -34,6 +35,14 @@ fn redact_database_url(database_url: &str) -> String {
         }
         _ => database_url.to_string(),
     }
+}
+
+#[instrument(name = "db.ping", skip_all)]
+pub fn ping() -> Result<(), diesel::result::Error> {
+    let mut conn = establish_connection();
+    sql_query("SELECT 1").execute(&mut conn)?;
+    info!("Database ping successful");
+    Ok(())
 }
 
 pub const MIGRATIONS: EmbeddedMigrations = embed_migrations!();

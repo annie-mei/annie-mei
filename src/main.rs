@@ -1,6 +1,7 @@
 mod commands;
 mod models;
 mod schema;
+mod server;
 mod utils;
 
 use std::env;
@@ -211,8 +212,30 @@ async fn main() {
         .await
         .expect("Err creating client");
 
-    info!("Starting Discord client");
-    if let Err(why) = client.start().await {
-        println!("Client error: {why:?}");
+    let (shutdown_tx, shutdown_rx) = tokio::sync::watch::channel(());
+
+    let http_handle = tokio::spawn(async move {
+        if let Err(e) = server::run(shutdown_rx).await {
+            tracing::error!(error = %e, "HTTP server error");
+        }
+    });
+
+    info!("Starting Discord client and HTTP server");
+    tokio::select! {
+        result = client.start() => {
+            if let Err(why) = result {
+                tracing::error!(error = %why, "Discord client error");
+            }
+        }
+        _ = tokio::signal::ctrl_c() => {
+            info!("Received shutdown signal");
+        }
+    }
+
+    info!("Shutting down");
+    client.shard_manager.shutdown_all().await;
+    let _ = shutdown_tx.send(());
+    if let Err(e) = http_handle.await {
+        tracing::error!(error = %e, "HTTP server task join failed");
     }
 }
