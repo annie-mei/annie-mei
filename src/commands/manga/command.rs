@@ -1,9 +1,14 @@
+use std::collections::HashMap;
+
 use crate::{
-    models::{anilist_manga::Manga, media_type::MediaType as Type, transformers::Transformers},
+    commands::{
+        response::CommandResponse,
+        traits::{AniListSource, MediaDataSource},
+    },
+    models::{anilist_manga::Manga, transformers::Transformers, user_media_list::MediaListData},
     utils::{
         guild::{get_current_guild_members, get_guild_data_for_media},
         privacy::configure_sentry_scope,
-        response_fetcher::fetcher,
         statics::NOT_FOUND_MANGA,
     },
 };
@@ -17,7 +22,7 @@ use serenity::{
 };
 
 use tokio::task;
-use tracing::{info, instrument};
+use tracing::{error, info, instrument};
 
 pub fn register() -> CreateCommand {
     CreateCommand::new("manga")
@@ -32,55 +37,168 @@ pub fn register() -> CreateCommand {
         )
 }
 
+// ── Core logic (transport-agnostic) ─────────────────────────────────────
+
+/// Decide the `/manga` response from already-fetched data.
+///
+/// This is the testable entry-point — it never touches `Context` or
+/// `CommandInteraction`.  The adapter is responsible for fetching the manga
+/// (via [`MediaDataSource`]) and guild-member data before calling this.
+///
+/// `guild_members_data` is optional guild-member score data that the adapter
+/// fetches separately (it requires Discord cache access).
+pub fn handle_manga(
+    manga: Option<Manga>,
+    guild_members_data: Option<HashMap<i64, MediaListData>>,
+) -> CommandResponse {
+    match manga {
+        None => CommandResponse::Content(NOT_FOUND_MANGA.to_string()),
+        Some(manga_response) => {
+            let embed = manga_response.transform_response_embed(guild_members_data);
+            CommandResponse::Embed(Box::new(embed))
+        }
+    }
+}
+
+// ── Serenity adapter (thin wrapper) ─────────────────────────────────────
+
 #[instrument(name = "command.manga.run", skip(ctx, interaction))]
 pub async fn run(ctx: &Context, interaction: &mut CommandInteraction) {
     let _ = interaction.defer(&ctx.http).await;
 
     let user = &interaction.user;
-    let arg = interaction.data.options[0].value.clone();
-    let arg_str = format!("{:?}", arg);
 
+    // Validate the required "search" option up-front.
+    let Some(serenity::all::CommandDataOptionValue::String(search_term)) =
+        interaction.data.options.first().map(|opt| &opt.value)
+    else {
+        let builder = EditInteractionResponse::new()
+            .content("Missing or invalid `search` option — please provide a manga name or ID.");
+        let _ = interaction.edit_response(&ctx.http, builder).await;
+        return;
+    };
+    let search_term = search_term.clone();
+
+    let arg_str = format!("{:?}", search_term);
     configure_sentry_scope("Manga", user.id.get(), Some(json!(arg_str)));
 
-    info!("Got command 'manga' with args: {arg:#?}");
+    info!("Got command 'manga' with search_term: {search_term}");
 
-    let response: Option<Manga> = task::spawn_blocking(move || fetcher(Type::Manga, arg))
-        .await
-        .unwrap();
+    // Fetch manga data on a blocking thread (AniList uses blocking reqwest).
+    let manga_result: Option<Manga> =
+        match task::spawn_blocking(move || AniListSource.fetch_manga(&search_term)).await {
+            Ok(result) => result,
+            Err(e) => {
+                error!(error = %e, "spawn_blocking panicked while fetching manga");
+                None
+            }
+        };
 
-    let _manga_response = match response {
-        None => {
-            let builder = EditInteractionResponse::new().content(NOT_FOUND_MANGA);
-            interaction.edit_response(&ctx.http, builder).await
-        }
+    // Gather guild-member data when the manga was found.
+    let guild_members_data = match &manga_result {
+        None => None,
         Some(manga_response) => {
-            // TODO: Refactor this to fetcher.rs
-
             let guild_members = get_current_guild_members(ctx, interaction);
-            let also_manga = manga_response.clone();
-
-            let guild_members_data = if guild_members.is_empty() {
+            if guild_members.is_empty() {
                 info!("No users found in guild");
                 None
             } else {
-                let guild_members_data = task::spawn_blocking(move || {
-                    get_guild_data_for_media(also_manga, guild_members)
-                })
-                .await
-                .unwrap()
-                .await;
-                info!("Guild members data: {:#?}", guild_members_data);
-                if guild_members_data.is_empty() {
-                    None
-                } else {
-                    Some(guild_members_data)
-                }
-            };
+                let also_manga = manga_response.clone();
+                let data = get_guild_data_for_media(also_manga, guild_members).await;
+                info!("Guild members data: {} entries", data.len());
+                if data.is_empty() { None } else { Some(data) }
+            }
+        }
+    };
 
-            let manga_response_embed = manga_response.transform_response_embed(guild_members_data);
+    // Delegate to the transport-agnostic core logic.
+    let response = handle_manga(manga_result, guild_members_data);
 
-            let builder = EditInteractionResponse::new().embed(manga_response_embed);
+    // Map the CommandResponse to the appropriate Discord API call.
+    let _result = match response {
+        CommandResponse::Content(text) => {
+            let builder = EditInteractionResponse::new().content(text);
+            interaction.edit_response(&ctx.http, builder).await
+        }
+        CommandResponse::Embed(embed) => {
+            let builder = EditInteractionResponse::new().embed(*embed);
+            interaction.edit_response(&ctx.http, builder).await
+        }
+        CommandResponse::Message(text) => {
+            let builder = EditInteractionResponse::new().content(text);
             interaction.edit_response(&ctx.http, builder).await
         }
     };
+}
+
+// ── Tests ───────────────────────────────────────────────────────────────
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Helper: build a minimal `Manga` from JSON for testing.
+    fn sample_manga() -> Manga {
+        serde_json::from_value(serde_json::json!({
+            "type": "MANGA",
+            "id": 30013,
+            "idMal": 13,
+            "title": {
+                "romaji": "One Piece",
+                "english": "One Piece",
+                "native": "ワンピース"
+            },
+            "synonyms": [],
+            "startDate": { "year": 1997, "month": 7, "day": 22 },
+            "endDate": null,
+            "format": "MANGA",
+            "status": "RELEASING",
+            "chapters": null,
+            "volumes": null,
+            "genres": ["Action", "Adventure", "Comedy", "Drama", "Fantasy"],
+            "source": "ORIGINAL",
+            "coverImage": {
+                "extraLarge": "https://example.com/cover.jpg",
+                "large": null,
+                "medium": null,
+                "color": "#e4a015"
+            },
+            "averageScore": 92,
+            "staff": {
+                "edges": [{ "role": "Story & Art" }],
+                "nodes": [{ "name": { "full": "Eiichiro Oda" } }]
+            },
+            "siteUrl": "https://anilist.co/manga/30013",
+            "externalLinks": [],
+            "description": "<p>Gol D. Roger was known as the Pirate King.</p>",
+            "tags": [{ "name": "Shounen" }]
+        }))
+        .expect("sample manga JSON should deserialize")
+    }
+
+    #[test]
+    fn manga_not_found_returns_content_with_message() {
+        let response = handle_manga(None, None);
+
+        assert!(response.is_content(), "expected Content variant");
+        assert_eq!(response.unwrap_content(), NOT_FOUND_MANGA);
+    }
+
+    #[test]
+    fn manga_success_returns_embed() {
+        let response = handle_manga(Some(sample_manga()), None);
+
+        assert!(
+            response.is_embed(),
+            "expected Embed variant for a successful lookup"
+        );
+        let _embed = response.unwrap_embed();
+    }
+
+    #[test]
+    fn manga_success_with_no_guild_data_still_returns_embed() {
+        let response = handle_manga(Some(sample_manga()), None);
+
+        assert!(response.is_embed());
+    }
 }
