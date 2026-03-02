@@ -22,7 +22,7 @@ pub async fn run(ctx: &Context, interaction: &CommandInteraction) {
 
     let mut embed = CreateEmbed::new()
         .colour(0x00ff00)
-        .title(format!("{} • Annie Mei Help", user.mention()))
+        .title(format!("{} • Annie Mei Help", user.name))
         .description(
             "I can help you look up anime and manga details, theme songs, and show what guild members are watching or reading.",
         )
