@@ -14,7 +14,7 @@ use serenity::{
 use serde::Deserialize;
 use serde_json::json;
 use tokio::task;
-use tracing::{info, instrument};
+use tracing::{error, info, instrument};
 
 #[derive(Deserialize, Debug)]
 struct BatchUserMediaListResponse {
@@ -113,12 +113,22 @@ async fn get_guild_anilist_data(
     });
 
     info!("Body: {:#?}", body);
-    let user_media_list_response = task::spawn_blocking(move || send_request(body))
-        .await
-        .unwrap();
+    let user_media_list_response = match task::spawn_blocking(move || send_request(body)).await {
+        Ok(response) => response,
+        Err(err) => {
+            error!("Failed to fetch guild AniList media data: {err}");
+            return HashMap::new();
+        }
+    };
 
     let user_media_list_response: BatchUserMediaListResponse =
-        serde_json::from_str(&user_media_list_response).unwrap();
+        match serde_json::from_str::<BatchUserMediaListResponse>(&user_media_list_response) {
+            Ok(response) => response,
+            Err(err) => {
+                error!("Failed to parse guild AniList media data response: {err}");
+                return HashMap::new();
+            }
+        };
 
     let mut guild_members_data: HashMap<i64, MediaListData> = HashMap::new();
     if let Some(media_lookup_data) = user_media_list_response.data {
