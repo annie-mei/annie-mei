@@ -8,18 +8,19 @@ use serenity::{
     builder::CreateCommand,
     prelude::*,
 };
-use tracing::warn;
+use tracing::{error, instrument, warn};
 
 pub fn register() -> CreateCommand {
     CreateCommand::new("help").description("Shows how to use the bot")
 }
 
+#[instrument(name = "command.help.run", skip(ctx, interaction))]
 pub async fn run(ctx: &Context, interaction: &CommandInteraction) {
     let user = &interaction.user;
 
     configure_sentry_scope("Help", user.id.get(), None);
 
-    let embed = CreateEmbed::new()
+    let mut embed = CreateEmbed::new()
         .colour(0x00ff00)
         .title(format!("{} • Annie Mei Help", user.mention()))
         .description(
@@ -41,19 +42,28 @@ pub async fn run(ctx: &Context, interaction: &CommandInteraction) {
             false,
         )
         .footer(CreateEmbedFooter::new("Annie Mei"))
-        .timestamp(chrono::Utc::now())
-        .thumbnail("attachment://mei.jpg");
+        .timestamp(chrono::Utc::now());
 
-    let mut response_message = CreateInteractionResponseMessage::new().embed(embed);
+    let mut response_message = CreateInteractionResponseMessage::new();
 
     match CreateAttachment::path("./mei.jpg").await {
         Ok(attachment) => {
+            embed = embed.thumbnail("attachment://mei.jpg");
             response_message = response_message.add_file(attachment);
         }
         Err(error) => warn!(error = %error, "Failed to attach help image"),
     }
 
+    response_message = response_message.embed(embed);
+
     let response = CreateInteractionResponse::Message(response_message);
 
-    let _ = interaction.create_response(&ctx.http, response).await;
+    if let Err(error) = interaction.create_response(&ctx.http, response).await {
+        error!(
+            error = %error,
+            interaction_id = ?interaction.id,
+            command = "help",
+            "Failed to create interaction response"
+        );
+    }
 }
