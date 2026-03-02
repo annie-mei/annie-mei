@@ -2,17 +2,6 @@ use serde::Deserialize;
 use std::fmt;
 
 #[derive(Deserialize, Debug)]
-pub struct UserMediaList {
-    pub data: Option<MediaList>,
-}
-
-#[derive(Deserialize, Debug)]
-pub struct MediaList {
-    #[serde(rename = "MediaList")]
-    pub media_list: Option<MediaListData>,
-}
-
-#[derive(Deserialize, Debug)]
 #[serde(rename_all = "camelCase")]
 pub struct MediaListData {
     pub status: Option<MediaListStatus>,

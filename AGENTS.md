@@ -51,6 +51,8 @@ diesel migration run     # Apply database migrations
 - Run `cargo clippy` and fix warnings
 - Use `tracing` macros for logging (`info!`, `debug!`, `error!`)
 - Add `#[instrument]` attribute to functions for tracing spans
+- Add `#[instrument]` to private/helper functions too (for example query builders and alias helpers), keeping signatures unchanged and using `skip(...)`/`fields(...)` when useful
+- When implementing review findings, first verify the current code state and only apply changes that are actually missing
 - Prefer `?` operator over `.unwrap()` for error handling
 
 ### Git Commits
