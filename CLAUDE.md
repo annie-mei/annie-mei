@@ -113,6 +113,8 @@ let result = task::spawn_blocking(move || {
 - Edition 2024, rustfmt edition 2024
 - Use `tracing` macros (`info!`, `debug!`, `error!`) for logging
 - Add `#[instrument]` to functions for automatic tracing spans
+- Add `#[instrument]` to private/helper functions too (for example query builders and alias helpers), keeping signatures unchanged and using `skip(...)`/`fields(...)` when useful
+- When implementing review findings, first verify the current code state and only apply changes that are actually missing
 - Prefer `?` operator over `unwrap()` where possible
 - Constants go in `src/utils/statics.rs`
 
