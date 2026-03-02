@@ -23,10 +23,12 @@ struct BatchUserMediaListResponse {
 
 const MEDIA_LIST_QUERY_FIELDS: &str = "status\nscore(format: POINT_100)\nprogress\nprogressVolumes";
 
+#[instrument(name = "guild.media_alias")]
 fn media_alias(index: usize) -> String {
     format!("media_{index}")
 }
 
+#[instrument(name = "guild.build_batch_media_list_query", skip(guild_members), fields(member_count = guild_members.len()))]
 fn build_batch_media_list_query(guild_members: &[User]) -> String {
     let media_lookups = guild_members
         .iter()
