@@ -59,7 +59,7 @@ jobs:
       - name: Prepare artifact
         run: cp target/release/annie-mei ./annie-mei
       - name: Upload artifact
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         with:
           name: annie-mei-arm64
           path: |
