@@ -1,0 +1,34 @@
+on:
+  workflow_dispatch:
+  pull_request:
+  push:
+    branches:
+      - "main"
+      - "dependabot/**"
+    paths-ignore:
+      - "**/README.md"
+
+name: Cargo Test
+
+jobs:
+  cargo-test:
+    name: Run Tests
+    runs-on: blacksmith-4vcpu-ubuntu-2404
+    env:
+      CARGO_TERM_COLOR: always
+      RUSTC_WRAPPER: ""
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+      - name: Install Rust
+        run: rustup update stable && rustup default stable
+      - name: Install dependencies
+        run: sudo apt-get update && sudo apt-get install -y libpq-dev
+      - name: Cache
+        uses: Swatinem/rust-cache@v2.8.2
+        with:
+          cache-on-failure: "true"
+          prefix-key: "annie-mei"
+          shared-key: "cargo"
+      - name: Run tests
+        run: cargo test --all-features
