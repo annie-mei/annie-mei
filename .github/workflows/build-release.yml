@@ -79,27 +79,42 @@ jobs:
     needs: build
     runs-on: blacksmith-4vcpu-ubuntu-2404
     if: startsWith(github.ref, 'refs/tags/') || github.event_name == 'workflow_dispatch'
+    env:
+      TUNNEL_SERVICE_TOKEN_ID: ${{ secrets.CF_ACCESS_CLIENT_ID }}
+      TUNNEL_SERVICE_TOKEN_SECRET: ${{ secrets.CF_ACCESS_CLIENT_SECRET }}
     steps:
       - name: Download artifact
         uses: actions/download-artifact@v8
         with:
           name: annie-mei-arm64
+      - name: Install cloudflared
+        run: |
+          curl -fsSL -o cloudflared.deb https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64.deb
+          sudo dpkg -i cloudflared.deb
+          cloudflared --version
+      - name: Configure SSH via Cloudflare Access
+        run: |
+          mkdir -p ~/.ssh
+          chmod 700 ~/.ssh
+          printf '%s\n' "${{ secrets.ORACLE_SSH_KEY }}" > ~/.ssh/oracle_key
+          chmod 600 ~/.ssh/oracle_key
+          {
+            printf '%s\n' 'Host oci-via-cloudflare'
+            printf '%s\n' '  HostName ${{ secrets.CF_TUNNEL_SSH_HOSTNAME }}'
+            printf '%s\n' '  User ${{ secrets.ORACLE_USER }}'
+            printf '%s\n' '  IdentityFile ~/.ssh/oracle_key'
+            printf '%s\n' '  StrictHostKeyChecking no'
+            printf '%s\n' '  UserKnownHostsFile /dev/null'
+            printf '%s\n' '  ProxyCommand cloudflared access ssh --hostname %h --id $TUNNEL_SERVICE_TOKEN_ID --secret $TUNNEL_SERVICE_TOKEN_SECRET'
+          } > ~/.ssh/config
+          chmod 600 ~/.ssh/config
+      - name: Prepare remote directory
+        run: ssh oci-via-cloudflare "mkdir -p /opt/annie-mei/annie-mei.new"
       - name: Copy binary to server
-        uses: appleboy/scp-action@v1
-        with:
-          host: ${{ secrets.ORACLE_HOST }}
-          username: ${{ secrets.ORACLE_USER }}
-          key: ${{ secrets.ORACLE_SSH_KEY }}
-          source: "annie-mei,mei.jpg"
-          target: /opt/annie-mei/annie-mei.new
-          strip_components: 0
+        run: scp annie-mei mei.jpg oci-via-cloudflare:/opt/annie-mei/annie-mei.new/
       - name: Restart service
-        uses: appleboy/ssh-action@v1
-        with:
-          host: ${{ secrets.ORACLE_HOST }}
-          username: ${{ secrets.ORACLE_USER }}
-          key: ${{ secrets.ORACLE_SSH_KEY }}
-          script: |
+        run: |
+          ssh oci-via-cloudflare <<'EOF'
             cd /opt/annie-mei || exit 1
             chmod +x annie-mei.new/annie-mei
             # Validate new binary before stopping service
@@ -137,3 +152,8 @@ jobs:
               exit 1
             }
             rm -f annie-mei.backup
+          EOF
+      - name: Verify /healthz over Cloudflare
+        run: |
+          curl --fail --silent --show-error --retry 6 --retry-delay 5 "https://${{ secrets.CF_HEALTHZ_HOSTNAME }}/healthz" > healthz.json
+          python3 -c 'import json; from pathlib import Path; payload = json.loads(Path("healthz.json").read_text()); assert payload.get("status") == "healthy", f"Unexpected health payload: {payload}"; print("Cloudflare health check passed")'
