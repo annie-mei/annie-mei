@@ -6,19 +6,6 @@ This document provides context for AI coding agents working on the Annie Mei Dis
 
 Annie Mei is a Rust Discord bot using Serenity 0.12 that fetches anime/manga data from AniList and theme songs from MyAnimeList/Spotify. Users interact via Discord slash commands. The app also exposes a small Axum health server and reports errors/logs to Sentry.
 
-## Technology Stack
-
-| Component | Technology                   |
-| --------- | ---------------------------- |
-| Language  | Rust 2024 Edition            |
-| Discord   | Serenity 0.12                |
-| Database  | PostgreSQL + Diesel ORM      |
-| Cache     | Redis                        |
-| HTTP      | Reqwest (blocking) + Axum    |
-| Async     | Tokio                        |
-| Logging   | tracing + tracing-subscriber |
-| Errors    | Sentry                       |
-
 ## Project Layout
 
 ```
@@ -30,18 +17,6 @@ src/
 ├── schema.rs        # Diesel schema (AUTO-GENERATED - never edit)
 └── main.rs          # Bot entry point, event routing, startup/shutdown
 migrations/          # Diesel SQL migrations
-```
-
-## Essential Commands
-
-```bash
-cargo build              # Compile debug build
-cargo build --release    # Compile optimized build
-cargo test               # Run test suite
-cargo clippy             # Run linter
-cargo fmt                # Format code
-cargo check              # Fast type checking
-diesel migration run     # Apply database migrations
 ```
 
 ## Conventions to Follow
@@ -74,7 +49,6 @@ diesel migration run     # Apply database migrations
   1. Explain what went wrong
   2. Present the available options
   3. Ask the user how they want to resolve it
-- If a push didn't go through, prefer `git reset --hard origin/<branch>` over amending and force pushing
 
 ### Versioning
 
@@ -95,34 +69,8 @@ Examples:
 ### Pull Requests
 
 - Title format: `[ANNIE-XXX]/Description`
-- Example: `[ANNIE-84]/Prepare for AI Dev`
 - Always link to Linear issue in PR body
 - Always assign the PR to `@InfernapeXavier`
-
-### Creating Releases
-
-This project uses trunk-based development with a single `main` branch. Releases are created by tagging commits.
-
-1. Ensure the version is bumped in `Cargo.toml` (should already be done per PR)
-2. Create and push a tag:
-   ```bash
-   git tag vX.X.X
-   git push origin vX.X.X
-   ```
-3. Create the GitHub release with generated notes:
-   ```bash
-   gh release create vX.X.X --generate-notes
-   ```
-4. The `build-release.yml` workflow will attach binaries and deploy automatically
-5. Edit release notes to include these sections:
-   - **Breaking Changes** - API changes, major upgrades
-   - **Improvements** - New features, enhancements
-   - **Dependencies** - Package updates with version changes
-
-### Branches
-
-- Use Linear's suggested branch name: `annie-XXX-description`
-- `main` - Single trunk branch (all PRs target this)
 
 ### Adding Commands
 
@@ -146,33 +94,6 @@ Notes:
 3. Run: `diesel migration run`
 4. `src/schema.rs` updates automatically
 
-### Async/Blocking Patterns
-
-- Discord interactions are async
-- External API calls use blocking reqwest
-- Database access and Redis access are also synchronous today
-- Wrap blocking HTTP/DB/Redis work in `tokio::task::spawn_blocking`
-- Always `defer()` interactions before long operations
-
-### Observability and Privacy
-
-- Use `tracing` spans with explicit names for command entrypoints and helpers
-- Preserve Sentry integration and hashed Discord user IDs when touching observability-related code
-- Never log raw secrets or credential-bearing URLs; use existing privacy helpers in `src/utils/privacy.rs`
-- `main.rs` supports a CLI helper command: `cargo run -- hash <discord_user_id>` for Sentry correlation
-
-## File Patterns
-
-| Pattern            | Location                         |
-| ------------------ | -------------------------------- |
-| Slash commands     | `src/commands/<name>/command.rs` or `src/commands/<name>.rs` |
-| API response types | `src/models/anilist_*.rs`        |
-| Database models    | `src/models/db/*.rs`             |
-| API clients        | `src/utils/requests/*.rs`        |
-| Constants          | `src/utils/statics.rs`           |
-| GraphQL queries    | `src/commands/<name>/queries.rs` |
-| Health server      | `src/server.rs`                  |
-
 ## Testing
 
 - Unit tests go in the same file as the code being tested
@@ -188,6 +109,16 @@ Notes:
 4. **Global command registration is slow to propagate** - `main.rs` re-registers global slash commands on startup
 5. **Check environment variables** - Bot requires multiple env vars to run
 6. **Don't assume all commands follow the same file shape** - some are folder-based, others are single files
+
+## Key Paths
+
+- `src/main.rs` - bot startup, command registration/dispatch, shutdown, Sentry setup
+- `src/server.rs` - `/healthz` server
+- `src/commands/<name>/command.rs` or `src/commands/<name>.rs` - slash commands
+- `src/commands/response.rs` and `src/commands/traits.rs` - testable command patterns
+- `src/models/transformers.rs` - shared embed construction
+- `src/utils/requests/*.rs` - upstream API clients
+- `src/utils/privacy.rs` - hashed IDs and URL redaction
 
 ## Environment Requirements
 
