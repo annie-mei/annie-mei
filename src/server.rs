@@ -69,7 +69,7 @@ pub async fn run(shutdown: tokio::sync::watch::Receiver<()>) -> std::io::Result<
 
     let app = Router::new().route("/healthz", get(healthz));
 
-    let addr = SocketAddr::from(([0, 0, 0, 0], port));
+    let addr = SocketAddr::from(([127, 0, 0, 1], port));
     let listener = TcpListener::bind(addr).await?;
 
     info!(%addr, "HTTP server listening");
