@@ -104,7 +104,7 @@ pub async fn run(ctx: &Context, interaction: &mut CommandInteraction) {
                 None
             } else {
                 let also_manga = manga_response.clone();
-                let data = get_guild_data_for_media(also_manga, guild_members).await;
+                let data = get_guild_data_for_media(ctx, also_manga, guild_members).await;
                 info!("Guild members data: {} entries", data.len());
                 if data.is_empty() { None } else { Some(data) }
             }

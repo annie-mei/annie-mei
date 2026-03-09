@@ -43,14 +43,26 @@ pub async fn run(ctx: &Context, interaction: &mut CommandInteraction) {
         _ => panic!("Invalid argument type"),
     };
 
-    let response_message = register_new_user(anilist_username.to_owned(), user).await;
+    let Some(database_pool) = database::get_pool_from_context(ctx).await else {
+        let builder = EditInteractionResponse::new()
+            .content("Database is not initialized. Please try again later.");
+        let _register = interaction.edit_response(&ctx.http, builder).await;
+        return;
+    };
+
+    let response_message =
+        register_new_user(anilist_username.to_owned(), user, database_pool).await;
 
     let builder = EditInteractionResponse::new().content(response_message);
     let _register = interaction.edit_response(&ctx.http, builder).await;
 }
 
-#[instrument(name = "command.register.register_new_user", skip(user), fields(discord_user_id = %hash_user_id(user.id.get()), username_len = anilist_username.len()))]
-async fn register_new_user(anilist_username: String, user: &serenity::model::user::User) -> String {
+#[instrument(name = "command.register.register_new_user", skip(user, database_pool), fields(discord_user_id = %hash_user_id(user.id.get()), username_len = anilist_username.len()))]
+async fn register_new_user(
+    anilist_username: String,
+    user: &serenity::model::user::User,
+    database_pool: database::DbPool,
+) -> String {
     let username = anilist_username.to_string();
     let anilist_id =
         task::spawn_blocking(move || User::get_anilist_id_from_username(username.as_ref()))
@@ -64,7 +76,7 @@ async fn register_new_user(anilist_username: String, user: &serenity::model::use
         );
     };
 
-    let connection = &mut database::establish_connection();
+    let connection = &mut database::get_connection(&database_pool);
 
     {
         let anilist_id = anilist_id.unwrap();

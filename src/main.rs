@@ -23,7 +23,7 @@ use serenity::{
 };
 
 use utils::{
-    database::run_migration,
+    database::{DatabasePoolKey, create_pool, get_connection, run_migration},
     privacy::{hash_user_id, redact_url_credentials},
     statics::{DISCORD_TOKEN, ENV, SENTRY_DSN, SENTRY_TRACES_SAMPLE_RATE},
 };
@@ -196,8 +196,9 @@ async fn main() {
         );
     }
 
-    info!("Initializing database connection");
-    let connection = &mut utils::database::establish_connection();
+    info!("Initializing database connection pool");
+    let database_pool = create_pool();
+    let connection = &mut get_connection(&database_pool);
     run_migration(connection);
 
     let token = env::var(DISCORD_TOKEN).expect("Expected a token in the environment");
@@ -212,10 +213,16 @@ async fn main() {
         .await
         .expect("Err creating client");
 
+    {
+        let mut data = client.data.write().await;
+        data.insert::<DatabasePoolKey>(database_pool.clone());
+    }
+
     let (shutdown_tx, shutdown_rx) = tokio::sync::watch::channel(());
+    let http_database_pool = database_pool.clone();
 
     let http_handle = tokio::spawn(async move {
-        if let Err(e) = server::run(shutdown_rx).await {
+        if let Err(e) = server::run(shutdown_rx, http_database_pool).await {
             tracing::error!(error = %e, "HTTP server error");
         }
     });

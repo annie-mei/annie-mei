@@ -2,7 +2,10 @@ use std::collections::HashMap;
 
 use crate::{
     models::{db::user::User, transformers::Transformers, user_media_list::MediaListData},
-    utils::{database::establish_connection, requests::anilist::send_request},
+    utils::{
+        database::{get_connection, get_pool_from_context},
+        requests::anilist::send_request,
+    },
 };
 
 use serenity::{
@@ -74,14 +77,30 @@ pub fn get_current_guild_members(ctx: &Context, interaction: &CommandInteraction
         .unwrap_or_default()
 }
 
-#[instrument(name = "guild.fetch_media_data", skip(media, guild_members), fields(member_count = guild_members.len()))]
+#[instrument(name = "guild.fetch_media_data", skip(ctx, media, guild_members), fields(member_count = guild_members.len()))]
 pub async fn get_guild_data_for_media<T: Transformers>(
+    ctx: &Context,
     media: T,
     guild_members: Vec<UserId>,
 ) -> HashMap<i64, MediaListData> {
-    let mut conn = establish_connection();
-    let anilist_users = User::get_users_by_discord_id(guild_members, &mut conn);
-    let anilist_users = anilist_users.unwrap();
+    let Some(database_pool) = get_pool_from_context(ctx).await else {
+        error!("Database pool is not available in Serenity context");
+        return HashMap::new();
+    };
+
+    let anilist_users = match task::spawn_blocking(move || {
+        let mut conn = get_connection(&database_pool);
+        User::get_users_by_discord_id(guild_members, &mut conn)
+    })
+    .await
+    {
+        Ok(Some(users)) => users,
+        Ok(None) => return HashMap::new(),
+        Err(err) => {
+            error!(error = %err, "Failed to fetch registered guild members from database");
+            return HashMap::new();
+        }
+    };
 
     get_guild_anilist_data(anilist_users, media.get_id(), media.get_type()).await
 }
