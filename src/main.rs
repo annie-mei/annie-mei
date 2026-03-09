@@ -197,6 +197,7 @@ async fn main() {
     }
 
     info!("Initializing database connection");
+    utils::database::init_pool();
     let connection = &mut utils::database::establish_connection();
     run_migration(connection);
 

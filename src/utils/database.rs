@@ -2,23 +2,40 @@ use crate::utils::statics::DATABASE_URL;
 
 use diesel::pg::PgConnection;
 use diesel::prelude::*;
+use diesel::r2d2::{ConnectionManager, Pool, PooledConnection};
 use diesel::sql_query;
 use diesel_migrations::{EmbeddedMigrations, MigrationHarness, embed_migrations};
 use std::env;
+use std::sync::OnceLock;
 use tracing::{error, info, instrument};
 
-#[instrument(name = "db.establish_connection", skip_all)]
-pub fn establish_connection() -> PgConnection {
+pub type DbPool = Pool<ConnectionManager<PgConnection>>;
+pub type DbPooledConnection = PooledConnection<ConnectionManager<PgConnection>>;
+
+pub static POOL: OnceLock<DbPool> = OnceLock::new();
+
+#[instrument(name = "db.init_pool", skip_all)]
+pub fn init_pool() {
     let database_url = env::var(DATABASE_URL).expect("DATABASE_URL must be set");
-    PgConnection::establish(&database_url).unwrap_or_else(|error| {
+    let manager = ConnectionManager::<PgConnection>::new(&database_url);
+    let pool = Pool::builder().build(manager).unwrap_or_else(|error| {
         let redacted_url = redact_database_url(&database_url);
         error!(
             error = %error,
             database_url = %redacted_url,
-            "Failed to connect to database"
+            "Failed to create database connection pool"
         );
-        panic!("Error connecting to {redacted_url}: {error}")
-    })
+        panic!("Error creating connection pool to {redacted_url}: {error}")
+    });
+    POOL.set(pool).expect("Database pool already initialized");
+}
+
+#[instrument(name = "db.establish_connection", skip_all)]
+pub fn establish_connection() -> DbPooledConnection {
+    POOL.get()
+        .expect("Database pool not initialized. Call init_pool() first.")
+        .get()
+        .expect("Failed to get connection from pool")
 }
 
 fn redact_database_url(database_url: &str) -> String {
