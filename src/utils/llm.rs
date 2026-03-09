@@ -176,7 +176,7 @@ pub trait LlmClient: Send + Sync {
 ///
 /// Use [`GeminiClient::from_env`] for defaults, or build manually to
 /// target a different provider / model.
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct GeminiClientConfig {
     /// API key sent as a Bearer token.
     pub api_key: String,
@@ -188,6 +188,18 @@ pub struct GeminiClientConfig {
     pub system_prompt: Option<String>,
     /// Optional temperature for sampling (0.0–2.0).
     pub temperature: Option<f32>,
+}
+
+impl fmt::Debug for GeminiClientConfig {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("GeminiClientConfig")
+            .field("api_key", &"[REDACTED]")
+            .field("base_url", &self.base_url)
+            .field("model", &self.model)
+            .field("system_prompt", &self.system_prompt)
+            .field("temperature", &self.temperature)
+            .finish()
+    }
 }
 
 /// An OpenAI-compatible chat completions client targeting Gemini.
@@ -256,6 +268,7 @@ impl GeminiClient {
     // ── Internal helpers ─────────────────────────────────────────────
 
     /// Assemble the message list for a simple user-message call.
+    #[instrument(name = "llm.build_messages", skip(self, user_message))]
     fn build_messages(&self, user_message: &str) -> Vec<ChatMessage> {
         let mut messages = Vec::with_capacity(2);
 
@@ -275,6 +288,7 @@ impl GeminiClient {
     }
 
     /// Extract the assistant's reply text from a completion response.
+    #[instrument(name = "llm.extract_reply", skip(response))]
     fn extract_reply(response: ChatCompletionResponse) -> Result<String, LlmError> {
         response
             .choices
