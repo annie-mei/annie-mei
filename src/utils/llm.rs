@@ -68,6 +68,8 @@ impl fmt::Display for LlmError {
     }
 }
 
+impl std::error::Error for LlmError {}
+
 // ── Request types ────────────────────────────────────────────────────
 
 /// A single message in the chat conversation.
