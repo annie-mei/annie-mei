@@ -73,8 +73,8 @@ Examples:
 - PR titles should use `[ANNIE-<ticket-number>]/<description>`
 - If ticketless work is explicitly approved, use `[ANNIE] <description>`
 - PR descriptions should include:
-  - `## Why` explaining why the change is needed
   - `## Summary` describing the change at a high level
+  - `## Type of Change` with relevant checklist items
   - `## Changes` with bullets in `full-commit-sha: description` format (no code formatting)
   - `### Notes` under Changes when implementation details matter
   - `### High-risk resources` under Changes when applicable
@@ -85,9 +85,15 @@ Examples:
 PR template:
 
 ```md
-## Why
-
 ## Summary
+
+## Type of Change
+
+- [ ] Bug fix
+- [ ] New feature
+- [ ] Refactor
+- [ ] Documentation
+- [ ] Chore
 
 ## Changes
 - <full-commit-sha>: <what changed>

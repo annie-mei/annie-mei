@@ -1,11 +1,11 @@
 <!--
-PR Title Format: [ANNIE-XXX]/Description
-Example: [ANNIE-84]/Prepare for AI Dev
+PR Title Format: [ANNIE-XXX]/description
+If ticketless work is explicitly approved, use: [ANNIE] description
 -->
 
-## Description
+## Summary
 
-<!-- What does this PR do? Why is this change needed? -->
+<!-- High-level description of the change -->
 
 ## Type of Change
 
@@ -17,17 +17,27 @@ Example: [ANNIE-84]/Prepare for AI Dev
 
 ## Changes
 
-<!-- Chronological list of changes in the format of git sha: description
-Example: a1233as: adds a new command /newcmd
+<!-- List changes in the format of full git sha: description
+Example: a1234567890abcdef1234567890abcdef123456: add guild score fallback
 -->
 
-## Checklist
+### Notes (optional)
 
-- [ ] `cargo fmt` has been run
-- [ ] `cargo clippy` passes without warnings
-- [ ] `cargo test` passes
-- [ ] Changes have been tested locally
+<!-- Add implementation details when useful for reviewers -->
 
-## Additional Notes
+### High-risk resources (optional)
 
-<!-- Any additional context, screenshots, or notes for reviewers -->
+<!-- Mention anything risky to roll out or monitor -->
+
+## Validation
+
+- [ ] `cargo test` / `cargo clippy` / manual verification steps as appropriate
+- [ ] Discord QA or runtime verification, if applicable
+
+## References (optional)
+
+<!-- Link dashboards, docs, issues, or runbooks when useful -->
+
+---
+
+This PR description was written by MODEL_NAME.
