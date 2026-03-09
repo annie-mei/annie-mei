@@ -1,0 +1,4 @@
+# CodeRabbit looks for a repository-level TruffleHog config before running
+# TruffleHog in filesystem mode. An empty config opts the repo into the
+# default detector set without custom sources or custom regex detectors.
+{}
