@@ -1,6 +1,5 @@
 <!--
 PR Title Format: [ANNIE-XXX]/description
-If ticketless work is explicitly approved, use: [ANNIE] description
 -->
 
 ## Summary
