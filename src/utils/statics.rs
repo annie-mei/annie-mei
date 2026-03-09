@@ -21,5 +21,5 @@ pub const DEFAULT_SERVER_PORT: u16 = 8080;
 
 // AI / LLM
 pub const GEMINI_API_KEY: &str = "GEMINI_API_KEY";
-pub const AI_MODEL: &str = "AI_MODEL";
-pub const AI_BASE_URL: &str = "AI_BASE_URL";
+pub const LLM_MODEL: &str = "LLM_MODEL";
+pub const LLM_BASE_URL: &str = "LLM_BASE_URL";

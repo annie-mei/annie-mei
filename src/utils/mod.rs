@@ -1,9 +1,9 @@
-pub mod ai;
 pub mod database;
 pub mod fetch_by_arguments;
 pub mod formatter;
 pub mod fuzzy;
 pub mod guild;
+pub mod llm;
 pub mod privacy;
 pub mod queries;
 pub mod redis;
