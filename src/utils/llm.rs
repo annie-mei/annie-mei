@@ -24,6 +24,7 @@
 
 use std::env;
 use std::fmt;
+use std::time::Duration;
 
 use reqwest::blocking::Client;
 use serde::{Deserialize, Serialize};
@@ -33,6 +34,7 @@ use crate::utils::statics::{GEMINI_API_KEY, LLM_BASE_URL, LLM_MODEL};
 
 const DEFAULT_BASE_URL: &str = "https://generativelanguage.googleapis.com/v1beta/openai";
 const DEFAULT_MODEL: &str = "gemini-2.0-flash";
+const DEFAULT_TIMEOUT_SECS: u64 = 30;
 
 // ── Error type ───────────────────────────────────────────────────────
 
@@ -45,12 +47,16 @@ pub enum LlmError {
     Serialization(String),
     /// The HTTP request failed.
     Request(String),
+    /// The API returned a non-success HTTP status.
+    ApiError { status: u16, body: String },
     /// Failed to read the response body.
     ResponseBody(String),
     /// Failed to deserialize the response JSON.
     Deserialization { message: String, body: String },
     /// The response contained no choices.
     EmptyResponse,
+    /// An invalid temperature value was provided.
+    InvalidTemperature(f32),
 }
 
 impl fmt::Display for LlmError {
@@ -59,11 +65,20 @@ impl fmt::Display for LlmError {
             LlmError::MissingEnvVar(var) => write!(f, "missing environment variable: {var}"),
             LlmError::Serialization(e) => write!(f, "request serialization failed: {e}"),
             LlmError::Request(e) => write!(f, "HTTP request failed: {e}"),
+            LlmError::ApiError { status, body } => {
+                write!(f, "API error (HTTP {status}): {body}")
+            }
             LlmError::ResponseBody(e) => write!(f, "failed to read response body: {e}"),
             LlmError::Deserialization { message, .. } => {
                 write!(f, "response deserialization failed: {message}")
             }
             LlmError::EmptyResponse => write!(f, "response contained no choices"),
+            LlmError::InvalidTemperature(t) => {
+                write!(
+                    f,
+                    "invalid temperature {t}: must be finite and in 0.0..=2.0"
+                )
+            }
         }
     }
 }
@@ -189,7 +204,10 @@ impl GeminiClient {
     pub fn new(config: GeminiClientConfig) -> Self {
         Self {
             config,
-            http: Client::new(),
+            http: Client::builder()
+                .timeout(Duration::from_secs(DEFAULT_TIMEOUT_SECS))
+                .build()
+                .unwrap_or_default(),
         }
     }
 
@@ -224,9 +242,15 @@ impl GeminiClient {
     }
 
     /// Set the sampling temperature (0.0–2.0).
-    pub fn with_temperature(mut self, temperature: f32) -> Self {
+    ///
+    /// Returns an error if the value is not finite or outside the
+    /// supported range.
+    pub fn with_temperature(mut self, temperature: f32) -> Result<Self, LlmError> {
+        if !temperature.is_finite() || !(0.0..=2.0).contains(&temperature) {
+            return Err(LlmError::InvalidTemperature(temperature));
+        }
         self.config.temperature = Some(temperature);
-        self
+        Ok(self)
     }
 
     // ── Internal helpers ─────────────────────────────────────────────
@@ -293,9 +317,17 @@ impl GeminiClient {
             .send()
             .map_err(|e| LlmError::Request(e.to_string()))?;
 
+        let status = response.status();
         let text = response
             .text()
             .map_err(|e| LlmError::ResponseBody(e.to_string()))?;
+
+        if !status.is_success() {
+            return Err(LlmError::ApiError {
+                status: status.as_u16(),
+                body: text,
+            });
+        }
 
         serde_json::from_str::<ChatCompletionResponse>(&text).map_err(|e| {
             LlmError::Deserialization {
@@ -393,8 +425,44 @@ mod tests {
 
     #[test]
     fn with_temperature_sets_value() {
-        let client = GeminiClient::new(sample_config()).with_temperature(0.7);
+        let client = GeminiClient::new(sample_config())
+            .with_temperature(0.7)
+            .unwrap();
         assert_eq!(client.config.temperature, Some(0.7));
+    }
+
+    #[test]
+    fn with_temperature_rejects_nan() {
+        let result = GeminiClient::new(sample_config()).with_temperature(f32::NAN);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn with_temperature_rejects_infinity() {
+        let result = GeminiClient::new(sample_config()).with_temperature(f32::INFINITY);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn with_temperature_rejects_out_of_range() {
+        let result = GeminiClient::new(sample_config()).with_temperature(2.5);
+        assert!(result.is_err());
+
+        let result = GeminiClient::new(sample_config()).with_temperature(-0.1);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn with_temperature_accepts_boundary_values() {
+        let client = GeminiClient::new(sample_config())
+            .with_temperature(0.0)
+            .unwrap();
+        assert_eq!(client.config.temperature, Some(0.0));
+
+        let client = GeminiClient::new(sample_config())
+            .with_temperature(2.0)
+            .unwrap();
+        assert_eq!(client.config.temperature, Some(2.0));
     }
 
     #[test]
@@ -546,5 +614,14 @@ mod tests {
 
         let err = LlmError::EmptyResponse;
         assert_eq!(err.to_string(), "response contained no choices");
+
+        let err = LlmError::ApiError {
+            status: 429,
+            body: "rate limited".to_string(),
+        };
+        assert_eq!(err.to_string(), "API error (HTTP 429): rate limited");
+
+        let err = LlmError::InvalidTemperature(3.0);
+        assert!(err.to_string().contains("invalid temperature 3"));
     }
 }
