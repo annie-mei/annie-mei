@@ -8,9 +8,9 @@ tone_instructions: >
 reviews:
   high_level_summary: true
   review_status: true
-  collapse_walkthrough: false
+  collapse_walkthrough: true
   poem: false
-  request_changes_workflow: false
+  request_changes_workflow: true
   auto_review:
     enabled: true
     drafts: false
