@@ -14,7 +14,7 @@ use serenity::{
     model::application::CommandOptionType,
 };
 use tokio::task;
-use tracing::{info, instrument};
+use tracing::{error, info, instrument};
 
 pub fn register() -> CreateCommand {
     CreateCommand::new("register")
@@ -76,26 +76,43 @@ async fn register_new_user(
         );
     };
 
-    let connection = &mut database::get_connection(&database_pool);
+    let discord_id = user.id.get() as i64;
+    let user_name = user.name.clone();
+    let anilist_id = anilist_id.unwrap();
+    let anilist_username_for_db = anilist_username.clone();
 
-    {
-        let anilist_id = anilist_id.unwrap();
+    let db_write_result = task::spawn_blocking(move || {
+        let mut connection = database::get_connection(&database_pool);
         User::create_or_update_user(
-            user.id.get() as i64,
+            discord_id,
             anilist_id,
-            anilist_username.to_owned(),
-            connection,
+            anilist_username_for_db,
+            &mut connection,
         );
+    })
+    .await;
 
-        info!(
-            discord_user_id = %hash_user_id(user.id.get()),
-            anilist_id,
-            anilist_username = %anilist_username,
-            "Created user with details"
+    if let Err(err) = db_write_result {
+        error!(
+            error = %err,
+            discord_user_id = %hash_user_id(discord_id as u64),
+            "Failed to save user registration"
         );
-        format!(
-            "Hello {}, I have linked the Anilist account {} to your user.",
-            user.name, anilist_username
-        )
+        return format!(
+            "Hello {}, I hit an internal error while linking your Anilist account. Please try again later.",
+            user_name
+        );
     }
+
+    info!(
+        discord_user_id = %hash_user_id(discord_id as u64),
+        anilist_id,
+        anilist_username = %anilist_username,
+        "Created user with details"
+    );
+
+    format!(
+        "Hello {}, I have linked the Anilist account {} to your user.",
+        user_name, anilist_username
+    )
 }
