@@ -52,7 +52,7 @@ migrations/          # Diesel SQL migrations
 
 ### Versioning
 
-Bump the version in `Cargo.toml` with every PR using semantic versioning:
+Bump the version in `Cargo.toml` using semantic versioning when preparing versioned changes:
 
 - **MAJOR** (X.0.0): Breaking changes, incompatible API changes
 - **MINOR** (0.X.0): New features, backwards-compatible functionality
@@ -65,12 +65,6 @@ Examples:
 - Breaking change to existing behavior → bump major
 
 - Also commit the Cargo.lock file when bumping the version — run `cargo check` to update the lockfile
-
-### Pull Requests
-
-- Title format: `[ANNIE-XXX]/Description`
-- Always link to Linear issue in PR body
-- Always assign the PR to `@InfernapeXavier`
 
 ### Adding Commands
 
