@@ -35,9 +35,11 @@ migrations/          # Diesel SQL migrations
 
 ### Git Commits
 
-- Use conventional commit format: `type: description`
+- Use Conventional Commits and prefer `type(scope): summary`
+- Example: `feat(anime): add guild score fallback`
 - Types: `feat`, `fix`, `docs`, `chore`, `refactor`, `test`
 - Make small, sensible commits as you go; avoid batching unrelated changes into one commit
+- Squash WIP commits before opening a PR
 
 ### Git Safety
 
@@ -65,6 +67,45 @@ Examples:
 - Breaking change to existing behavior → bump major
 
 - Also commit the Cargo.lock file when bumping the version — run `cargo check` to update the lockfile
+
+### Pull Requests
+
+- PR titles should use `[ANNIE-<ticket-number>]/<description>`
+- If ticketless work is explicitly approved, use `[ANNIE] <description>`
+- PR descriptions should include:
+  - `## Why` explaining why the change is needed
+  - `## Summary` describing the change at a high level
+  - `## Changes` with bullets in `full-commit-sha: description` format (no code formatting)
+  - `### Notes` under Changes when implementation details matter
+  - `### High-risk resources` under Changes when applicable
+  - `## Validation` with appropriate test and QA steps for the scope of the change
+  - `## References` for relevant dashboards, docs, issues, or runbooks when useful
+  - A closing footnote replacing `MODEL_NAME` with the actual model used to write the PR
+
+PR template:
+
+```md
+## Why
+
+## Summary
+
+## Changes
+- <full-commit-sha>: <what changed>
+
+### Notes (optional)
+
+### High-risk resources (optional)
+
+## Validation
+- [ ] <relevant cargo test / cargo clippy / manual verification steps>
+- [ ] <Discord QA or runtime verification, if applicable>
+
+## References (optional)
+
+---
+
+This PR description was written by MODEL_NAME.
+```
 
 ### Adding Commands
 
@@ -103,6 +144,18 @@ Notes:
 4. **Global command registration is slow to propagate** - `main.rs` re-registers global slash commands on startup
 5. **Check environment variables** - Bot requires multiple env vars to run
 6. **Don't assume all commands follow the same file shape** - some are folder-based, others are single files
+
+## Review Guidelines
+
+- Confirm command changes follow the existing registration and dispatch structure in `src/main.rs`
+- Prefer the core-handler plus thin-Serenity-adapter pattern for substantial command work
+- Verify blocking HTTP/DB/Redis work uses `tokio::task::spawn_blocking`
+- Ensure long-running Discord interactions defer before doing expensive work
+- Check that `tracing` and `#[instrument]` are added where they provide useful observability
+- Verify secrets, credential-bearing URLs, and raw Discord user IDs are not exposed in logs or code
+- Ensure `src/schema.rs` is not edited manually; schema changes should come from Diesel migrations
+- Confirm validation matches the scope: targeted tests, `cargo test`, `cargo clippy`, and manual Discord or `/healthz` verification when applicable
+- For versioned changes, verify the `Cargo.toml` bump is correct and `Cargo.lock` is updated
 
 ## Key Paths
 
