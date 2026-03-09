@@ -1,4 +1,5 @@
 language: "en-US"
+early_access: true
 
 tone_instructions: >
   Review as a pragmatic Rust teammate. Prioritize correctness, operational safety,
