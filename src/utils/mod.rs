@@ -1,3 +1,4 @@
+pub mod ai;
 pub mod database;
 pub mod fetch_by_arguments;
 pub mod formatter;
