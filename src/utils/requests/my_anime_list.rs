@@ -19,18 +19,17 @@ fn build_mal_url(mal_id: u32) -> String {
 }
 
 #[instrument(name = "http.mal.send_request", skip_all, fields(mal_id = mal_id))]
-pub fn send_request(mal_id: u32) -> String {
-    let mal_client_id =
-        env::var(MAL_CLIENT_ID).expect("Expected a MAL Client ID in the environment");
+pub fn send_request(mal_id: u32) -> Result<String, String> {
+    let mal_client_id = env::var(MAL_CLIENT_ID)
+        .map_err(|_| "MAL_CLIENT_ID is not configured in the environment".to_string())?;
     let client = Client::new();
     let response = client
         .get(build_mal_url(mal_id))
         .header("X-MAL-CLIENT-ID", mal_client_id)
         .send()
-        .unwrap()
-        .text();
+        .map_err(|error| format!("Failed to call MyAnimeList API: {error}"))?;
 
-    let result = &response.unwrap();
-
-    result.to_string()
+    response
+        .text()
+        .map_err(|error| format!("Failed to read MyAnimeList response body: {error}"))
 }
