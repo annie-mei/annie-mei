@@ -1,27 +1,39 @@
 use crate::{
-    models::{
-        anilist_anime::Anime, mal_response::MalResponse, media_type::MediaType as Type,
-        transformers::Transformers,
-    },
-    utils::{requests::my_anime_list, response_fetcher::fetcher as anime_fetcher},
+    commands::traits::{AniListSource, MediaDataSource},
+    models::{mal_response::MalResponse, transformers::Transformers},
+    utils::requests::my_anime_list,
 };
 
-use serenity::all::CommandDataOptionValue;
-use tracing::{info, instrument};
+use tracing::{info, instrument, warn};
 
-#[instrument(name = "command.songs.fetcher", skip(args))]
-pub fn fetcher(args: CommandDataOptionValue) -> Option<MalResponse> {
-    let anime_response: Option<Anime> = anime_fetcher(Type::Anime, args);
-    match anime_response {
-        None => None,
-        Some(anime) => {
-            let mal_id = anime.get_mal_id();
-            mal_id?;
-            let mal_fetcher_response: String = my_anime_list::send_request(mal_id.unwrap());
-            let mal_response: MalResponse = serde_json::from_str(&mal_fetcher_response).unwrap();
+#[derive(Debug)]
+pub enum SongFetchError {
+    AnimeNotFound,
+    MissingMyAnimeListId,
+    UpstreamUnavailable,
+    MalformedUpstreamResponse,
+}
 
-            info!("Mal Response: {:#?}", mal_response);
-            Some(mal_response)
-        }
-    }
+#[instrument(name = "command.songs.fetcher", skip(search_term), fields(search_len = search_term.len()))]
+pub fn fetcher(search_term: &str) -> Result<MalResponse, SongFetchError> {
+    let anime = AniListSource
+        .fetch_anime(search_term)
+        .ok_or(SongFetchError::AnimeNotFound)?;
+    let mal_id = anime
+        .get_mal_id()
+        .ok_or(SongFetchError::MissingMyAnimeListId)?;
+
+    let mal_fetcher_response = my_anime_list::send_request(mal_id).map_err(|error| {
+        warn!(error = %error, mal_id, "Failed to fetch MAL response");
+        SongFetchError::UpstreamUnavailable
+    })?;
+
+    let mal_response: MalResponse =
+        serde_json::from_str(&mal_fetcher_response).map_err(|error| {
+            warn!(error = %error, mal_id, "Failed to deserialize MAL response");
+            SongFetchError::MalformedUpstreamResponse
+        })?;
+
+    info!(mal_id, "Fetched MAL response");
+    Ok(mal_response)
 }
