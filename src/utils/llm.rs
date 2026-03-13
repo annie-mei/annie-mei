@@ -57,6 +57,8 @@ pub enum LlmError {
     EmptyResponse,
     /// An invalid temperature value was provided.
     InvalidTemperature(f32),
+    /// Failed to build the HTTP client.
+    ClientBuild(String),
 }
 
 impl fmt::Display for LlmError {
@@ -79,6 +81,7 @@ impl fmt::Display for LlmError {
                     "invalid temperature {t}: must be finite and in 0.0..=2.0"
                 )
             }
+            LlmError::ClientBuild(e) => write!(f, "failed to build HTTP client: {e}"),
         }
     }
 }
@@ -213,14 +216,16 @@ pub struct GeminiClient {
 
 impl GeminiClient {
     /// Build a new client from an explicit config.
-    pub fn new(config: GeminiClientConfig) -> Self {
-        Self {
-            config,
-            http: Client::builder()
-                .timeout(Duration::from_secs(DEFAULT_TIMEOUT_SECS))
-                .build()
-                .unwrap_or_default(),
-        }
+    ///
+    /// Returns an error if the HTTP client cannot be constructed
+    /// (e.g. TLS backend unavailable).
+    pub fn new(config: GeminiClientConfig) -> Result<Self, LlmError> {
+        let http = Client::builder()
+            .timeout(Duration::from_secs(DEFAULT_TIMEOUT_SECS))
+            .build()
+            .map_err(|e| LlmError::ClientBuild(e.to_string()))?;
+
+        Ok(Self { config, http })
     }
 
     /// Build a client from environment variables.
@@ -233,13 +238,13 @@ impl GeminiClient {
         let base_url = env::var(LLM_BASE_URL).unwrap_or_else(|_| DEFAULT_BASE_URL.to_string());
         let model = env::var(LLM_MODEL).unwrap_or_else(|_| DEFAULT_MODEL.to_string());
 
-        Ok(Self::new(GeminiClientConfig {
+        Self::new(GeminiClientConfig {
             api_key,
             base_url,
             model,
             system_prompt: None,
             temperature: None,
-        }))
+        })
     }
 
     /// Build a client from environment variables with a system prompt.
@@ -249,6 +254,7 @@ impl GeminiClient {
     /// global API key, base URL, and model configuration.
     pub fn from_env_with_system_prompt(system_prompt: impl Into<String>) -> Result<Self, LlmError> {
         let mut client = Self::from_env()?;
+
         client.config.system_prompt = Some(system_prompt.into());
         Ok(client)
     }
@@ -409,7 +415,7 @@ mod tests {
 
     #[test]
     fn build_messages_without_system_prompt() {
-        let client = GeminiClient::new(sample_config());
+        let client = GeminiClient::new(sample_config()).unwrap();
         let messages = client.build_messages("hello");
 
         assert_eq!(messages.len(), 1);
@@ -421,7 +427,7 @@ mod tests {
     fn build_messages_with_system_prompt() {
         let mut config = sample_config();
         config.system_prompt = Some("You are a helpful bot.".to_string());
-        let client = GeminiClient::new(config);
+        let client = GeminiClient::new(config).unwrap();
         let messages = client.build_messages("hello");
 
         assert_eq!(messages.len(), 2);
@@ -433,13 +439,14 @@ mod tests {
 
     #[test]
     fn model_returns_configured_model_name() {
-        let client = GeminiClient::new(sample_config());
+        let client = GeminiClient::new(sample_config()).unwrap();
         assert_eq!(client.model(), "test-model");
     }
 
     #[test]
     fn with_temperature_sets_value() {
         let client = GeminiClient::new(sample_config())
+            .unwrap()
             .with_temperature(0.7)
             .unwrap();
         assert_eq!(client.config.temperature, Some(0.7));
@@ -447,33 +454,43 @@ mod tests {
 
     #[test]
     fn with_temperature_rejects_nan() {
-        let result = GeminiClient::new(sample_config()).with_temperature(f32::NAN);
+        let result = GeminiClient::new(sample_config())
+            .unwrap()
+            .with_temperature(f32::NAN);
         assert!(result.is_err());
     }
 
     #[test]
     fn with_temperature_rejects_infinity() {
-        let result = GeminiClient::new(sample_config()).with_temperature(f32::INFINITY);
+        let result = GeminiClient::new(sample_config())
+            .unwrap()
+            .with_temperature(f32::INFINITY);
         assert!(result.is_err());
     }
 
     #[test]
     fn with_temperature_rejects_out_of_range() {
-        let result = GeminiClient::new(sample_config()).with_temperature(2.5);
+        let result = GeminiClient::new(sample_config())
+            .unwrap()
+            .with_temperature(2.5);
         assert!(result.is_err());
 
-        let result = GeminiClient::new(sample_config()).with_temperature(-0.1);
+        let result = GeminiClient::new(sample_config())
+            .unwrap()
+            .with_temperature(-0.1);
         assert!(result.is_err());
     }
 
     #[test]
     fn with_temperature_accepts_boundary_values() {
         let client = GeminiClient::new(sample_config())
+            .unwrap()
             .with_temperature(0.0)
             .unwrap();
         assert_eq!(client.config.temperature, Some(0.0));
 
         let client = GeminiClient::new(sample_config())
+            .unwrap()
             .with_temperature(2.0)
             .unwrap();
         assert_eq!(client.config.temperature, Some(2.0));
