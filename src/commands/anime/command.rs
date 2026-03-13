@@ -7,9 +7,10 @@ use crate::{
     },
     models::{anilist_anime::Anime, transformers::Transformers, user_media_list::MediaListData},
     utils::{
+        channel::is_nsfw_channel,
         guild::{get_current_guild_members, get_guild_data_for_media},
         privacy::configure_sentry_scope,
-        statics::NOT_FOUND_ANIME,
+        statics::{NOT_FOUND_ANIME, NSFW_NOT_ALLOWED},
     },
 };
 
@@ -94,6 +95,16 @@ pub async fn run(ctx: &Context, interaction: &mut CommandInteraction) {
             }
         };
 
+    // Block adult content in non-NSFW channels.
+    if let Some(ref anime) = anime_result
+        && anime.is_adult()
+        && !is_nsfw_channel(ctx, interaction.channel_id).await
+    {
+        let builder = EditInteractionResponse::new().content(NSFW_NOT_ALLOWED);
+        let _ = interaction.edit_response(&ctx.http, builder).await;
+        return;
+    }
+
     // Gather guild-member data when the anime was found.
     let guild_members_data = match &anime_result {
         None => None,
@@ -143,6 +154,7 @@ mod tests {
             "type": "ANIME",
             "id": 21,
             "idMal": 21,
+            "isAdult": false,
             "title": {
                 "romaji": "One Piece",
                 "english": "One Piece",

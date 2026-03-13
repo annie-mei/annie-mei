@@ -21,6 +21,7 @@ pub struct Manga {
     #[allow(dead_code)]
     id: u32,
     id_mal: Option<u32>,
+    is_adult: Option<bool>,
     title: Title,
     synonyms: Option<Vec<String>>,
     start_date: Option<AnilistDate>,
@@ -202,6 +203,10 @@ impl Transformers for Manga {
         self.media_type.as_ref().unwrap().to_string().to_lowercase()
     }
 
+    fn is_adult(&self) -> bool {
+        self.is_adult.unwrap_or(false)
+    }
+
     fn get_mal_id(&self) -> Option<u32> {
         self.id_mal
     }
@@ -315,6 +320,7 @@ mod tests {
             "type": "MANGA",
             "id": 1,
             "idMal": null,
+            "isAdult": false,
             "title": {
                 "romaji": "Sample",
                 "english": "Sample",

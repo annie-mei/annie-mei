@@ -19,6 +19,7 @@ pub struct Anime {
     #[allow(dead_code)]
     id: u32,
     id_mal: Option<u32>,
+    is_adult: Option<bool>,
     title: Title,
     synonyms: Option<Vec<String>>,
     season: Option<String>,
@@ -164,6 +165,10 @@ impl Transformers for Anime {
 
     fn get_type(&self) -> String {
         self.media_type.as_ref().unwrap().to_string().to_lowercase()
+    }
+
+    fn is_adult(&self) -> bool {
+        self.is_adult.unwrap_or(false)
     }
 
     fn get_mal_id(&self) -> Option<u32> {
@@ -316,6 +321,7 @@ mod tests {
             "type": "ANIME",
             "id": 1,
             "idMal": null,
+            "isAdult": false,
             "title": {
                 "romaji": "Sample",
                 "english": "Sample",
