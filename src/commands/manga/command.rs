@@ -2,6 +2,7 @@ use std::collections::HashMap;
 
 use crate::{
     commands::{
+        input_validation::{MAX_SEARCH_INPUT_LEN, validate_search_option},
         response::CommandResponse,
         traits::{AniListSource, MediaDataSource},
     },
@@ -69,29 +70,51 @@ pub async fn run(ctx: &Context, interaction: &mut CommandInteraction) {
 
     let user = &interaction.user;
 
-    // Validate the required "search" option up-front.
-    let Some(serenity::all::CommandDataOptionValue::String(search_term)) =
-        interaction.data.options.first().map(|opt| &opt.value)
-    else {
-        let builder = EditInteractionResponse::new()
-            .content("Missing or invalid `search` option — please provide a manga name or ID.");
-        let _ = interaction.edit_response(&ctx.http, builder).await;
-        return;
-    };
-    let search_term = search_term.clone();
+    let validated_search =
+        match validate_search_option(&interaction.data.options, "search", MAX_SEARCH_INPUT_LEN) {
+            Ok(validated_search) => validated_search,
+            Err(error) => {
+                let builder = EditInteractionResponse::new().content(error.user_message());
+                let _ = interaction.edit_response(&ctx.http, builder).await;
+                return;
+            }
+        };
+    let search_kind = validated_search.kind.as_str();
+    let search_term = validated_search.value;
+    let search_len = search_term.len();
 
-    let arg_str = format!("{:?}", search_term);
-    configure_sentry_scope("Manga", user.id.get(), Some(json!(arg_str)));
+    configure_sentry_scope(
+        "Manga",
+        user.id.get(),
+        Some(json!({
+            "search": {
+                "kind": search_kind,
+                "len": search_len,
+            }
+        })),
+    );
 
-    info!("Got command 'manga' with search_term: {search_term}");
+    info!(
+        search_kind,
+        search_len, "Got command 'manga' with validated search input"
+    );
 
     // Fetch manga data on a blocking thread (AniList uses blocking reqwest).
     let manga_result: Option<Manga> =
         match task::spawn_blocking(move || AniListSource.fetch_manga(&search_term)).await {
             Ok(result) => result,
             Err(e) => {
-                error!(error = %e, "spawn_blocking panicked while fetching manga");
-                None
+                error!(
+                    error = %e,
+                    search_kind,
+                    search_len,
+                    "spawn_blocking panicked while fetching manga"
+                );
+                let builder = EditInteractionResponse::new().content(
+                    "I couldn't fetch manga details right now. Please try again in a few minutes.",
+                );
+                let _ = interaction.edit_response(&ctx.http, builder).await;
+                return;
             }
         };
 
@@ -111,12 +134,17 @@ pub async fn run(ctx: &Context, interaction: &mut CommandInteraction) {
         Some(manga_response) => {
             let guild_members = get_current_guild_members(ctx, interaction);
             if guild_members.is_empty() {
-                info!("No users found in guild");
+                info!(search_kind, search_len, "No users found in guild");
                 None
             } else {
                 let also_manga = manga_response.clone();
                 let data = get_guild_data_for_media(ctx, also_manga, guild_members).await;
-                info!("Guild members data: {} entries", data.len());
+                info!(
+                    search_kind,
+                    search_len,
+                    guild_members_data_len = data.len(),
+                    "Guild members data fetched"
+                );
                 if data.is_empty() { None } else { Some(data) }
             }
         }

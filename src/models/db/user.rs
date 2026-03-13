@@ -1,11 +1,36 @@
 use diesel::prelude::*;
 use serde_json::json;
 use serenity::model::prelude::UserId;
-use tracing::{info, instrument};
+use tracing::{error, info, instrument};
 
 use crate::utils::{
     privacy::hash_user_id, queries::FETCH_ANILIST_USER, requests::anilist::send_request,
 };
+
+#[derive(Debug)]
+pub enum UserError {
+    AniListRequest(String),
+    AniListResponseParse(String),
+    Database(diesel::result::Error),
+}
+
+impl std::fmt::Display for UserError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            UserError::AniListRequest(error) => {
+                write!(f, "Failed to fetch AniList user data: {error}")
+            }
+            UserError::AniListResponseParse(error) => {
+                write!(f, "Failed to parse AniList user data response: {error}")
+            }
+            UserError::Database(error) => {
+                write!(f, "Failed to persist user data: {error}")
+            }
+        }
+    }
+}
+
+impl std::error::Error for UserError {}
 
 #[derive(Queryable)]
 #[allow(dead_code)]
@@ -36,7 +61,7 @@ impl User {
         anilist_id: i64,
         anilist_username: String,
         conn: &mut PgConnection,
-    ) -> User {
+    ) -> Result<User, UserError> {
         use crate::schema::users;
         diesel::insert_into(users::table)
             .values((
@@ -51,11 +76,11 @@ impl User {
                 users::anilist_username.eq(anilist_username),
             ))
             .get_result(conn)
-            .expect("Error saving user")
+            .map_err(UserError::Database)
     }
 
     #[instrument(name = "http.anilist.lookup_user", fields(username_len = username.len()))]
-    pub fn get_anilist_id_from_username(username: &str) -> Option<i64> {
+    pub fn get_anilist_id_from_username(username: &str) -> Result<Option<i64>, UserError> {
         let body = json!({
             "query": FETCH_ANILIST_USER,
             "variables": {
@@ -63,10 +88,34 @@ impl User {
             }
         });
         info!("Body: {:#?}", body);
-        let result: String = send_request(body);
+        let result: String = send_request(body).map_err(|error| {
+            error!(error = %error, "AniList user lookup request failed");
+            UserError::AniListRequest(error.to_string())
+        })?;
         info!("Result: {:#?}", result);
-        let result: serde_json::Value = serde_json::from_str(&result).unwrap();
+        let result: serde_json::Value = serde_json::from_str(&result).map_err(|error| {
+            error!(error = %error, "AniList user lookup response JSON parse failed");
+            UserError::AniListResponseParse(error.to_string())
+        })?;
 
-        result["data"]["User"]["id"].as_i64()
+        if result.get("errors").is_some() {
+            let message = format!("AniList errors: {}", result["errors"]);
+            error!(error = %message, "AniList GraphQL returned errors for user lookup");
+            return Err(UserError::AniListResponseParse(message));
+        }
+
+        if result["data"]["User"]["id"].is_null() {
+            let message = "missing data.User.id".to_string();
+            error!(error = %message, "AniList user lookup missing expected id field");
+            return Err(UserError::AniListResponseParse(message));
+        }
+
+        let id = result["data"]["User"]["id"].as_i64().ok_or_else(|| {
+            let message = "data.User.id is not an integer".to_string();
+            error!(error = %message, "AniList user lookup id type mismatch");
+            UserError::AniListResponseParse(message)
+        })?;
+
+        Ok(Some(id))
     }
 }
