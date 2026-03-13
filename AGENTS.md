@@ -187,3 +187,6 @@ Required environment variables:
 - `MAL_CLIENT_ID` - MyAnimeList API client ID
 - `USERID_HASH_SALT` - Salt used when hashing Discord user IDs for Sentry/log correlation
 - `SERVER_PORT` - Optional local HTTP server port (defaults to 8080)
+- `GEMINI_API_KEY` - API key for the Gemini / OpenAI-compatible LLM endpoint
+- `LLM_BASE_URL` - Optional base URL override for the LLM API (defaults to Gemini OpenAI compatibility endpoint)
+- `LLM_MODEL` - Optional model name override (defaults to `gemini-2.0-flash`)

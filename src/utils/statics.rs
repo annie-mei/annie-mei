@@ -18,3 +18,8 @@ pub const DATABASE_URL: &str = "DATABASE_URL";
 pub const USERID_HASH_SALT: &str = "USERID_HASH_SALT";
 pub const SERVER_PORT: &str = "SERVER_PORT";
 pub const DEFAULT_SERVER_PORT: u16 = 8080;
+
+// AI / LLM
+pub const GEMINI_API_KEY: &str = "GEMINI_API_KEY";
+pub const LLM_MODEL: &str = "LLM_MODEL";
+pub const LLM_BASE_URL: &str = "LLM_BASE_URL";
