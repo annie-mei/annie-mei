@@ -27,7 +27,9 @@ pub fn send_request(mal_id: u32) -> Result<String, String> {
         .get(build_mal_url(mal_id))
         .header("X-MAL-CLIENT-ID", mal_client_id)
         .send()
-        .map_err(|error| format!("Failed to call MyAnimeList API: {error}"))?;
+        .map_err(|error| format!("Failed to call MyAnimeList API: {error}"))?
+        .error_for_status()
+        .map_err(|error| format!("MyAnimeList API returned an error status: {error}"))?;
 
     response
         .text()

@@ -20,8 +20,12 @@ fn return_argument(arg: CommandDataOptionValue) -> Option<Argument> {
     };
 
     match val.parse::<u32>() {
-        Ok(id) => Some(Argument::Id(id)),
+        Ok(id) if id > 0 => Some(Argument::Id(id)),
         Err(_) => {
+            let val = strip_quotes(&val);
+            Some(Argument::Search(val))
+        }
+        Ok(_) => {
             let val = strip_quotes(&val);
             Some(Argument::Search(val))
         }
