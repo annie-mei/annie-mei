@@ -100,7 +100,7 @@ pub fn validate_required_string_option(
         return Err(InputValidationError::EmptyValue { option_name });
     }
 
-    if value.len() > max_len {
+    if value.chars().count() > max_len {
         return Err(InputValidationError::TooLong {
             option_name,
             max_len,
@@ -146,4 +146,109 @@ pub fn validate_search_option(
         value,
         kind: SearchInputKind::Text,
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use serde_json::json;
+
+    fn string_option(name: &str, value: &str) -> CommandDataOption {
+        serde_json::from_value(json!({
+            "name": name,
+            "type": 3,
+            "value": value,
+        }))
+        .expect("string command option should deserialize")
+    }
+
+    #[test]
+    fn required_string_rejects_whitespace_only_input() {
+        let options = vec![string_option("search", "   ")];
+
+        let result = validate_required_string_option(&options, "search", MAX_SEARCH_INPUT_LEN);
+
+        assert_eq!(
+            result,
+            Err(InputValidationError::EmptyValue {
+                option_name: "search"
+            })
+        );
+    }
+
+    #[test]
+    fn search_option_rejects_zero_id() {
+        let options = vec![string_option("search", "0")];
+
+        let result = validate_search_option(&options, "search", MAX_SEARCH_INPUT_LEN);
+
+        assert_eq!(
+            result,
+            Err(InputValidationError::NumericIdOutOfRange {
+                option_name: "search",
+                max_id: u32::MAX,
+            })
+        );
+    }
+
+    #[test]
+    fn search_option_rejects_id_above_u32_max() {
+        let above_u32_max = (u32::MAX as u64 + 1).to_string();
+        let options = vec![string_option("search", &above_u32_max)];
+
+        let result = validate_search_option(&options, "search", MAX_SEARCH_INPUT_LEN);
+
+        assert_eq!(
+            result,
+            Err(InputValidationError::NumericIdOutOfRange {
+                option_name: "search",
+                max_id: u32::MAX,
+            })
+        );
+    }
+
+    #[test]
+    fn required_string_length_uses_character_count_for_multibyte_input() {
+        let options = vec![string_option("search", "あいう")];
+
+        let result = validate_required_string_option(&options, "search", 2);
+
+        assert_eq!(
+            result,
+            Err(InputValidationError::TooLong {
+                option_name: "search",
+                max_len: 2,
+            })
+        );
+    }
+
+    #[test]
+    fn search_option_classifies_numeric_id() {
+        let options = vec![string_option("search", "42")];
+
+        let result = validate_search_option(&options, "search", MAX_SEARCH_INPUT_LEN);
+
+        assert_eq!(
+            result,
+            Ok(ValidatedSearchInput {
+                value: "42".to_string(),
+                kind: SearchInputKind::Id,
+            })
+        );
+    }
+
+    #[test]
+    fn search_option_classifies_text_input() {
+        let options = vec![string_option("search", "one piece")];
+
+        let result = validate_search_option(&options, "search", MAX_SEARCH_INPUT_LEN);
+
+        assert_eq!(
+            result,
+            Ok(ValidatedSearchInput {
+                value: "one piece".to_string(),
+                kind: SearchInputKind::Text,
+            })
+        );
+    }
 }
