@@ -4,6 +4,7 @@ query ($id: Int) {
     type
     id
     idMal
+    isAdult
     title {
       romaji
       english
@@ -69,6 +70,7 @@ query ($page: Int, $perPage: Int, $search: String) {
       type
       id
       idMal
+      isAdult
       title {
         romaji
         english

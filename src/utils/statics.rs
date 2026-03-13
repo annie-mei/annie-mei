@@ -1,5 +1,7 @@
 pub const NOT_FOUND_ANIME: &str = "No such anime";
 pub const NOT_FOUND_MANGA: &str = "No such manga";
+pub const NSFW_NOT_ALLOWED: &str =
+    "This content is age-restricted and can only be viewed in NSFW channels";
 pub const EMPTY_STR: &str = "-";
 pub const ANILIST_STATUS_RELEASING: &str = "RELEASING";
 #[cfg(test)]
