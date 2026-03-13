@@ -46,7 +46,13 @@ pub trait Response {
     ) -> Option<T> {
         match self.get_argument() {
             Argument::Id(value) => {
-                let fetched_data = fetch_by_id(self.get_id_query(), *value)?;
+                let fetched_data = match fetch_by_id(self.get_id_query(), *value) {
+                    Ok(fetched_data) => fetched_data,
+                    Err(error) => {
+                        error!(error = %error, id = *value, "Failed to fetch AniList data by id");
+                        return None;
+                    }
+                };
                 let fetch_response: IdResponse<T> = match serde_json::from_str(&fetched_data) {
                     Ok(fetch_response) => fetch_response,
                     Err(error) => {
@@ -66,7 +72,16 @@ pub trait Response {
                     }
                     Err(e) => {
                         info!("Cache miss for {:#?} with error {:#?}", cache_key, e);
-                        let response = fetch_by_name(self.get_search_query(), value.to_string())?;
+                        let response = match fetch_by_name(
+                            self.get_search_query(),
+                            value.to_string(),
+                        ) {
+                            Ok(response) => response,
+                            Err(error) => {
+                                error!(error = %error, search = %value, "Failed to fetch AniList data by search term");
+                                return None;
+                            }
+                        };
                         try_to_cache_response(&cache_key, &response);
                         response
                     }
