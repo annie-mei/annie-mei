@@ -1,7 +1,7 @@
 use diesel::prelude::*;
 use serde_json::json;
 use serenity::model::prelude::UserId;
-use tracing::{info, instrument};
+use tracing::{error, info, instrument};
 
 use crate::utils::{
     privacy::hash_user_id, queries::FETCH_ANILIST_USER, requests::anilist::send_request,
@@ -88,12 +88,34 @@ impl User {
             }
         });
         info!("Body: {:#?}", body);
-        let result: String =
-            send_request(body).map_err(|error| UserError::AniListRequest(error.to_string()))?;
+        let result: String = send_request(body).map_err(|error| {
+            error!(error = %error, "AniList user lookup request failed");
+            UserError::AniListRequest(error.to_string())
+        })?;
         info!("Result: {:#?}", result);
-        let result: serde_json::Value = serde_json::from_str(&result)
-            .map_err(|error| UserError::AniListResponseParse(error.to_string()))?;
+        let result: serde_json::Value = serde_json::from_str(&result).map_err(|error| {
+            error!(error = %error, "AniList user lookup response JSON parse failed");
+            UserError::AniListResponseParse(error.to_string())
+        })?;
 
-        Ok(result["data"]["User"]["id"].as_i64())
+        if result.get("errors").is_some() {
+            let message = format!("AniList errors: {}", result["errors"]);
+            error!(error = %message, "AniList GraphQL returned errors for user lookup");
+            return Err(UserError::AniListResponseParse(message));
+        }
+
+        if result["data"]["User"]["id"].is_null() {
+            let message = "missing data.User.id".to_string();
+            error!(error = %message, "AniList user lookup missing expected id field");
+            return Err(UserError::AniListResponseParse(message));
+        }
+
+        let id = result["data"]["User"]["id"].as_i64().ok_or_else(|| {
+            let message = "data.User.id is not an integer".to_string();
+            error!(error = %message, "AniList user lookup id type mismatch");
+            UserError::AniListResponseParse(message)
+        })?;
+
+        Ok(Some(id))
     }
 }
