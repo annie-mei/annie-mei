@@ -2,23 +2,50 @@ use crate::utils::statics::DATABASE_URL;
 
 use diesel::pg::PgConnection;
 use diesel::prelude::*;
+use diesel::r2d2::{ConnectionManager, Pool, PooledConnection};
 use diesel::sql_query;
 use diesel_migrations::{EmbeddedMigrations, MigrationHarness, embed_migrations};
+use serenity::{client::Context, prelude::TypeMapKey};
 use std::env;
 use tracing::{error, info, instrument};
 
-#[instrument(name = "db.establish_connection", skip_all)]
-pub fn establish_connection() -> PgConnection {
+pub type DbPool = Pool<ConnectionManager<PgConnection>>;
+pub type DbConnection = PooledConnection<ConnectionManager<PgConnection>>;
+
+pub struct DatabasePoolKey;
+
+impl TypeMapKey for DatabasePoolKey {
+    type Value = DbPool;
+}
+
+#[instrument(name = "db.create_pool", skip_all)]
+pub fn create_pool() -> DbPool {
     let database_url = env::var(DATABASE_URL).expect("DATABASE_URL must be set");
-    PgConnection::establish(&database_url).unwrap_or_else(|error| {
+    let manager = ConnectionManager::<PgConnection>::new(database_url.clone());
+
+    Pool::builder().build(manager).unwrap_or_else(|error| {
         let redacted_url = redact_database_url(&database_url);
         error!(
             error = %error,
             database_url = %redacted_url,
-            "Failed to connect to database"
+            "Failed to create database connection pool"
         );
-        panic!("Error connecting to {redacted_url}: {error}")
+        panic!("Error creating pool for {redacted_url}: {error}")
     })
+}
+
+#[instrument(name = "db.get_connection", skip(pool))]
+pub fn get_connection(pool: &DbPool) -> DbConnection {
+    pool.get().unwrap_or_else(|error| {
+        error!(error = %error, "Failed to get database connection from pool");
+        panic!("Error retrieving pooled database connection: {error}")
+    })
+}
+
+#[instrument(name = "db.pool_from_context", skip(ctx))]
+pub async fn get_pool_from_context(ctx: &Context) -> Option<DbPool> {
+    let data = ctx.data.read().await;
+    data.get::<DatabasePoolKey>().cloned()
 }
 
 fn redact_database_url(database_url: &str) -> String {
@@ -38,8 +65,8 @@ fn redact_database_url(database_url: &str) -> String {
 }
 
 #[instrument(name = "db.ping", skip_all)]
-pub fn ping() -> Result<(), diesel::result::Error> {
-    let mut conn = establish_connection();
+pub fn ping(pool: &DbPool) -> Result<(), diesel::result::Error> {
+    let mut conn = get_connection(pool);
     sql_query("SELECT 1").execute(&mut conn)?;
     info!("Database ping successful");
     Ok(())
