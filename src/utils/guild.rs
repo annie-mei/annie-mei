@@ -133,7 +133,11 @@ async fn get_guild_anilist_data(
 
     info!("Body: {:#?}", body);
     let user_media_list_response = match task::spawn_blocking(move || send_request(body)).await {
-        Ok(response) => response,
+        Ok(Ok(response)) => response,
+        Ok(Err(error)) => {
+            error!(error = %error, "Failed to fetch guild AniList media data");
+            return HashMap::new();
+        }
         Err(err) => {
             error!("Failed to fetch guild AniList media data: {err}");
             return HashMap::new();

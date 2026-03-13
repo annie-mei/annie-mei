@@ -13,7 +13,7 @@ use crate::{
     },
 };
 
-use tracing::{debug, info};
+use tracing::{debug, error, info};
 
 pub struct AnimeConfig {
     argument: Argument,
@@ -46,10 +46,16 @@ pub trait Response {
     ) -> Option<T> {
         match self.get_argument() {
             Argument::Id(value) => {
-                let fetched_data = fetch_by_id(self.get_id_query(), *value);
-                let fetch_response: IdResponse<T> = serde_json::from_str(&fetched_data).unwrap();
+                let fetched_data = fetch_by_id(self.get_id_query(), *value)?;
+                let fetch_response: IdResponse<T> = match serde_json::from_str(&fetched_data) {
+                    Ok(fetch_response) => fetch_response,
+                    Err(error) => {
+                        error!(error = %error, "Failed to deserialize AniList id response");
+                        return None;
+                    }
+                };
                 debug!("Deserialized response: {:#?}", fetch_response);
-                fetch_response.data.unwrap().media
+                fetch_response.data.and_then(|data| data.media)
             }
             Argument::Search(value) => {
                 let cache_key = format!("{}:{value}", media_type.as_ref());
@@ -60,12 +66,18 @@ pub trait Response {
                     }
                     Err(e) => {
                         info!("Cache miss for {:#?} with error {:#?}", cache_key, e);
-                        let response = fetch_by_name(self.get_search_query(), value.to_string());
+                        let response = fetch_by_name(self.get_search_query(), value.to_string())?;
                         try_to_cache_response(&cache_key, &response);
                         response
                     }
                 };
-                let fetch_response: MediaResponse<T> = serde_json::from_str(&fetched_data).unwrap();
+                let fetch_response: MediaResponse<T> = match serde_json::from_str(&fetched_data) {
+                    Ok(fetch_response) => fetch_response,
+                    Err(error) => {
+                        error!(error = %error, "Failed to deserialize AniList media response");
+                        return None;
+                    }
+                };
                 debug!("Deserialized response: {:#?}", fetch_response);
                 let result = fetch_response.fuzzy_match(value, media_type);
                 debug!("Fuzzy Response: {:#?}", result);

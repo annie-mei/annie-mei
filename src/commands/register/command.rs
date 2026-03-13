@@ -85,7 +85,22 @@ async fn register_new_user(
     })
     .await
     {
-        Ok(anilist_id) => anilist_id,
+        Ok(Ok(Some(anilist_id))) => anilist_id,
+        Ok(Ok(None)) => {
+            return format!(
+                "Hello {}, I could not find the Anilist account {}.",
+                user.name, anilist_username
+            );
+        }
+        Ok(Err(error)) => {
+            error!(
+                error = %error,
+                discord_user_id = %hash_user_id(user.id.get()),
+                anilist_username_len = anilist_username.len(),
+                "AniList username lookup failed"
+            );
+            return "I couldn't validate that AniList username right now. Please try again in a few minutes.".to_string();
+        }
         Err(e) => {
             error!(
                 error = %e,
@@ -97,16 +112,8 @@ async fn register_new_user(
         }
     };
 
-    if anilist_id.is_none() {
-        return format!(
-            "Hello {}, I could not find the Anilist account {}.",
-            user.name, anilist_username
-        );
-    };
-
     let discord_id = user.id.get() as i64;
     let user_name = user.name.clone();
-    let anilist_id = anilist_id.unwrap();
     let anilist_username_for_db = anilist_username.clone();
 
     let db_write_result = task::spawn_blocking(move || {
@@ -116,21 +123,35 @@ async fn register_new_user(
             anilist_id,
             anilist_username_for_db,
             &mut connection,
-        );
+        )
     })
     .await;
 
-    if let Err(err) = db_write_result {
-        error!(
-            error = %err,
-            discord_user_id = %hash_user_id(discord_id as u64),
-            "Failed to save user registration"
-        );
-        return format!(
-            "Hello {}, I hit an internal error while linking your Anilist account. Please try again later.",
-            user_name
-        );
-    }
+    match db_write_result {
+        Ok(Ok(_)) => {}
+        Ok(Err(error)) => {
+            error!(
+                error = %error,
+                discord_user_id = %hash_user_id(discord_id as u64),
+                "Failed to save user registration"
+            );
+            return format!(
+                "Hello {}, I hit an internal error while linking your Anilist account. Please try again later.",
+                user_name
+            );
+        }
+        Err(err) => {
+            error!(
+                error = %err,
+                discord_user_id = %hash_user_id(discord_id as u64),
+                "Failed to join user registration database task"
+            );
+            return format!(
+                "Hello {}, I hit an internal error while linking your Anilist account. Please try again later.",
+                user_name
+            );
+        }
+    };
 
     info!(
         discord_user_id = %hash_user_id(discord_id as u64),
