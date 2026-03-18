@@ -79,7 +79,7 @@ impl User {
             .map_err(UserError::Database)
     }
 
-    #[instrument(name = "http.anilist.lookup_user", fields(username_len = username.len()))]
+    #[instrument(name = "http.anilist.lookup_user", skip(username), fields(username_len = username.len()))]
     pub fn get_anilist_id_from_username(username: &str) -> Result<Option<i64>, UserError> {
         let body = json!({
             "query": FETCH_ANILIST_USER,
@@ -87,12 +87,19 @@ impl User {
                 "username": username
             }
         });
-        info!("Body: {:#?}", body);
+        info!(
+            username_len = username.len(),
+            request_body_len = body.to_string().len(),
+            "Prepared AniList user lookup request"
+        );
         let result: String = send_request(body).map_err(|error| {
             error!(error = %error, "AniList user lookup request failed");
             UserError::AniListRequest(error.to_string())
         })?;
-        info!("Result: {:#?}", result);
+        info!(
+            response_body_len = result.len(),
+            "Received AniList user lookup response"
+        );
         let result: serde_json::Value = serde_json::from_str(&result).map_err(|error| {
             error!(error = %error, "AniList user lookup response JSON parse failed");
             UserError::AniListResponseParse(error.to_string())
