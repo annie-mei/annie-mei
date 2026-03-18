@@ -98,24 +98,121 @@ impl User {
             UserError::AniListResponseParse(error.to_string())
         })?;
 
-        if result.get("errors").is_some() {
-            let message = format!("AniList errors: {}", result["errors"]);
-            error!(error = %message, "AniList GraphQL returned errors for user lookup");
-            return Err(UserError::AniListResponseParse(message));
-        }
+        parse_anilist_user_id_response(&result)
+    }
+}
 
-        if result["data"]["User"]["id"].is_null() {
-            let message = "missing data.User.id".to_string();
-            error!(error = %message, "AniList user lookup missing expected id field");
-            return Err(UserError::AniListResponseParse(message));
-        }
+#[instrument(name = "http.anilist.parse_user_lookup_response", skip(result))]
+fn parse_anilist_user_id_response(result: &serde_json::Value) -> Result<Option<i64>, UserError> {
+    if result.get("errors").is_some() {
+        let message = format!("AniList errors: {}", result["errors"]);
+        error!(error = %message, "AniList GraphQL returned errors for user lookup");
+        return Err(UserError::AniListResponseParse(message));
+    }
 
-        let id = result["data"]["User"]["id"].as_i64().ok_or_else(|| {
-            let message = "data.User.id is not an integer".to_string();
-            error!(error = %message, "AniList user lookup id type mismatch");
-            UserError::AniListResponseParse(message)
-        })?;
+    if result["data"]["User"].is_null() {
+        info!("AniList user not found");
+        return Ok(None);
+    }
 
-        Ok(Some(id))
+    if result["data"]["User"]["id"].is_null() {
+        let message = "missing data.User.id".to_string();
+        error!(error = %message, "AniList user lookup missing expected id field");
+        return Err(UserError::AniListResponseParse(message));
+    }
+
+    let id = result["data"]["User"]["id"].as_i64().ok_or_else(|| {
+        let message = "data.User.id is not an integer".to_string();
+        error!(error = %message, "AniList user lookup id type mismatch");
+        UserError::AniListResponseParse(message)
+    })?;
+
+    Ok(Some(id))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use serde_json::json;
+
+    #[test]
+    fn parse_user_lookup_returns_id_when_present() {
+        let payload = json!({
+            "data": {
+                "User": {
+                    "id": 12345
+                }
+            }
+        });
+
+        let result = parse_anilist_user_id_response(&payload);
+
+        assert!(matches!(result, Ok(Some(12345))));
+    }
+
+    #[test]
+    fn parse_user_lookup_returns_none_when_user_not_found() {
+        let payload = json!({
+            "data": {
+                "User": null
+            }
+        });
+
+        let result = parse_anilist_user_id_response(&payload);
+
+        assert!(matches!(result, Ok(None)));
+    }
+
+    #[test]
+    fn parse_user_lookup_errors_when_graphql_errors_present() {
+        let payload = json!({
+            "errors": [{
+                "message": "User not found"
+            }],
+            "data": {
+                "User": null
+            }
+        });
+
+        let result = parse_anilist_user_id_response(&payload);
+
+        assert!(matches!(
+            result,
+            Err(UserError::AniListResponseParse(message)) if message.contains("AniList errors")
+        ));
+    }
+
+    #[test]
+    fn parse_user_lookup_errors_when_id_missing() {
+        let payload = json!({
+            "data": {
+                "User": {}
+            }
+        });
+
+        let result = parse_anilist_user_id_response(&payload);
+
+        assert!(matches!(
+            result,
+            Err(UserError::AniListResponseParse(message)) if message == "missing data.User.id"
+        ));
+    }
+
+    #[test]
+    fn parse_user_lookup_errors_when_id_not_integer() {
+        let payload = json!({
+            "data": {
+                "User": {
+                    "id": "abc"
+                }
+            }
+        });
+
+        let result = parse_anilist_user_id_response(&payload);
+
+        assert!(matches!(
+            result,
+            Err(UserError::AniListResponseParse(message)) if message == "data.User.id is not an integer"
+        ));
     }
 }
