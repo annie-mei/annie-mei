@@ -44,6 +44,6 @@ strum = { version = "0.28.0", features = ["derive"] }
 titlecase = "3.6.0"
 tokio = { version = "1.50.0", features = ["full"] }
 tracing = "0.1.44"
-tracing-subscriber = { version = "0.3.22", features = ["env-filter"] }
+tracing-subscriber = { version = "0.3.23", features = ["env-filter"] }
 url = "2.5"
 wana_kana = "4.0.0"
