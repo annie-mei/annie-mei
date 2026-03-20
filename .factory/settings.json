@@ -86,5 +86,8 @@
     "deny": [
       "Read(./.entire/metadata/**)"
     ]
+  },
+  "enabledPlugins": {
+    "core@factory-plugins": true
   }
 }
