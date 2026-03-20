@@ -4,7 +4,9 @@ use serenity::model::prelude::UserId;
 use tracing::{error, info, instrument};
 
 use crate::utils::{
-    privacy::hash_user_id, queries::FETCH_ANILIST_USER, requests::anilist::send_request,
+    privacy::hash_user_id,
+    queries::FETCH_ANILIST_USER,
+    requests::anilist::{AniListRequestError, send_request},
 };
 
 #[derive(Debug)]
@@ -92,10 +94,7 @@ impl User {
             request_body_len = body.to_string().len(),
             "Prepared AniList user lookup request"
         );
-        let result: String = send_request(body).map_err(|error| {
-            error!(error = %error, "AniList user lookup request failed");
-            UserError::AniListRequest(error.to_string())
-        })?;
+        let result: String = normalize_user_lookup_response(send_request(body))?;
         info!(
             response_body_len = result.len(),
             "Received AniList user lookup response"
@@ -106,6 +105,26 @@ impl User {
         })?;
 
         parse_anilist_user_id_response(&result)
+    }
+}
+
+fn normalize_user_lookup_response(
+    result: Result<String, AniListRequestError>,
+) -> Result<String, UserError> {
+    match result {
+        Ok(result) => Ok(result),
+        Err(AniListRequestError::NonSuccessStatus { status: 404, body }) => {
+            info!(
+                response_status = 404,
+                response_body_len = body.len(),
+                "AniList user lookup returned not found status"
+            );
+            Ok(body)
+        }
+        Err(error) => {
+            error!(error = %error, "AniList user lookup request failed");
+            Err(UserError::AniListRequest(error.to_string()))
+        }
     }
 }
 
@@ -220,6 +239,31 @@ mod tests {
         assert!(matches!(
             result,
             Err(UserError::AniListResponseParse(message)) if message == "data.User.id is not an integer"
+        ));
+    }
+
+    #[test]
+    fn normalize_user_lookup_response_accepts_404_body_for_parsing() {
+        let body = "{\"data\":{\"User\":null}}".to_string();
+
+        let result = normalize_user_lookup_response(Err(AniListRequestError::NonSuccessStatus {
+            status: 404,
+            body: body.clone(),
+        }));
+
+        assert!(matches!(result, Ok(response_body) if response_body == body));
+    }
+
+    #[test]
+    fn normalize_user_lookup_response_rejects_non_404_status() {
+        let result = normalize_user_lookup_response(Err(AniListRequestError::NonSuccessStatus {
+            status: 500,
+            body: "{}".to_string(),
+        }));
+
+        assert!(matches!(
+            result,
+            Err(UserError::AniListRequest(message)) if message.contains("status=500")
         ));
     }
 }

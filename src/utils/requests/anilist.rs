@@ -9,7 +9,7 @@ const ANILIST_TIMEOUT_SECS: u64 = 30;
 pub enum AniListRequestError {
     ClientBuildFailed(String),
     RequestFailed(String),
-    NonSuccessStatus(String),
+    NonSuccessStatus { status: u16, body: String },
     ResponseBodyReadFailed(String),
 }
 
@@ -22,8 +22,12 @@ impl std::fmt::Display for AniListRequestError {
             AniListRequestError::RequestFailed(error) => {
                 write!(f, "Failed to call AniList API: {error}")
             }
-            AniListRequestError::NonSuccessStatus(error) => {
-                write!(f, "AniList API returned non-success status: {error}")
+            AniListRequestError::NonSuccessStatus { status, body } => {
+                write!(
+                    f,
+                    "AniList API returned non-success status: status={status}, body_len={}",
+                    body.len()
+                )
             }
             AniListRequestError::ResponseBodyReadFailed(error) => {
                 write!(f, "Failed to read AniList response body: {error}")
@@ -50,11 +54,20 @@ pub fn send_request(json: Value) -> Result<String, AniListRequestError> {
         .header("Accept", "application/json")
         .body(json.to_string())
         .send()
-        .map_err(|error| AniListRequestError::RequestFailed(error.to_string()))?
-        .error_for_status()
-        .map_err(|error| AniListRequestError::NonSuccessStatus(error.to_string()))?;
+        .map_err(|error| AniListRequestError::RequestFailed(error.to_string()))?;
 
-    response
+    let status = response.status();
+
+    let body = response
         .text()
-        .map_err(|error| AniListRequestError::ResponseBodyReadFailed(error.to_string()))
+        .map_err(|error| AniListRequestError::ResponseBodyReadFailed(error.to_string()))?;
+
+    if !status.is_success() {
+        return Err(AniListRequestError::NonSuccessStatus {
+            status: status.as_u16(),
+            body,
+        });
+    }
+
+    Ok(body)
 }
