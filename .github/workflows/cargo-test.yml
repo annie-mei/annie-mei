@@ -20,7 +20,9 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v6
       - name: Install Rust
-        run: rustup update stable && rustup default stable
+        run: |
+          toolchain="$(awk -F'"' '/^channel/ { print $2 }' rust-toolchain.toml)"
+          rustup toolchain install "$toolchain" --profile minimal
       - name: Install dependencies
         run: sudo apt-get update && sudo apt-get install -y libpq-dev
       - name: Cache

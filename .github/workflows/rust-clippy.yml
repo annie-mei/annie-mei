@@ -26,7 +26,9 @@ jobs:
       - name: Build-checkout
         uses: actions/checkout@v6
       - name: Install Rust
-        run: rustup update stable && rustup default stable
+        run: |
+          toolchain="$(awk -F'"' '/^channel/ { print $2 }' rust-toolchain.toml)"
+          rustup toolchain install "$toolchain" --profile minimal
       - name: Cache
         uses: Swatinem/rust-cache@v2.9.1
         with:
