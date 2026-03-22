@@ -12,11 +12,13 @@
     "linear": {
       "type": "remote",
       "url": "https://mcp.linear.app/mcp",
+      "headers": { "Authorization": "Bearer {env:LINEAR_TOKEN}" },
       "enabled": true,
     },
     "sentry": {
       "type": "remote",
       "url": "https://mcp.sentry.dev/mcp",
+      "headers": { "Authorization": "Bearer {env:SENTRY_TOKEN}" },
       "enabled": true,
     },
   },
