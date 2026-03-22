@@ -146,11 +146,9 @@ fn parse_anilist_user_id_response(result: &serde_json::Value) -> Result<Option<i
         return Err(UserError::AniListResponseParse(message));
     }
 
-    let user = user.ok_or_else(|| {
-        let message = "missing data.User".to_string();
-        error!(error = %message, "AniList user lookup missing expected user field");
-        UserError::AniListResponseParse(message)
-    })?;
+    // Safety: the early return above already handles None and Null,
+    // so `user` is guaranteed to be Some(non-null value) here.
+    let user = user.expect("unreachable: None/Null already handled above");
 
     let user_id = user.get("id").ok_or_else(|| {
         let message = "missing data.User.id".to_string();
