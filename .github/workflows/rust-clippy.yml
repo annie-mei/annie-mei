@@ -32,7 +32,9 @@ jobs:
         with:
           cache-on-failure: "true"
           prefix-key: "annie-mei"
-          shared-key: "cargo"
+          shared-key: "cargo-ci"
+          key: "clippy-tooling"
+          save-if: ${{ github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/') }}
       - name: Install crates
         run: cargo install clippy-sarif sarif-fmt
       - name: Run Clippy

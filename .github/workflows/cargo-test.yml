@@ -28,6 +28,7 @@ jobs:
         with:
           cache-on-failure: "true"
           prefix-key: "annie-mei"
-          shared-key: "cargo"
+          shared-key: "cargo-ci"
+          save-if: ${{ github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/') }}
       - name: Run tests
         run: cargo test --all-features
