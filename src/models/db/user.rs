@@ -148,7 +148,9 @@ fn parse_anilist_user_id_response(result: &serde_json::Value) -> Result<Option<i
 
     // Safety: the early return above already handles None and Null,
     // so `user` is guaranteed to be Some(non-null value) here.
-    let user = user.expect("unreachable: None/Null already handled above");
+    let Some(user) = user else {
+        unreachable!("None/Null already handled above")
+    };
 
     let user_id = user.get("id").ok_or_else(|| {
         let message = "missing data.User.id".to_string();
@@ -235,7 +237,7 @@ mod tests {
     }
 
     #[test]
-    fn parse_user_lookup_errors_when_missing_data() {
+    fn parse_user_lookup_returns_none_when_data_missing() {
         let payload = json!({});
 
         let result = parse_anilist_user_id_response(&payload);
