@@ -43,6 +43,7 @@ pub fn validate_username(input: &str) -> Result<(), ValidationError> {
     validate_length(input, MAX_USERNAME_LENGTH)
 }
 
+#[instrument(name = "validation.validate_length", skip(input), fields(max_length = max_length))]
 fn validate_length(input: &str, max_length: usize) -> Result<(), ValidationError> {
     let char_count = input.chars().count();
 
