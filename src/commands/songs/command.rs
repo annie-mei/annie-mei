@@ -54,7 +54,11 @@ pub async fn run(ctx: &Context, interaction: &mut CommandInteraction) {
         Ok(result) => result,
         Err(err) => {
             error!(error = %err, "spawn_blocking panicked during song fetch");
-            None
+            let builder = EditInteractionResponse::new().content(
+                "An internal error occurred while fetching songs. Please try again later.",
+            );
+            let _ = interaction.edit_response(&ctx.http, builder).await;
+            return;
         }
     };
 
