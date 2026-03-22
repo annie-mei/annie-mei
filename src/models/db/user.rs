@@ -1,11 +1,34 @@
 use diesel::prelude::*;
 use serde_json::json;
 use serenity::model::prelude::UserId;
-use tracing::{info, instrument};
+use tracing::{error, info, instrument};
 
 use crate::utils::{
-    privacy::hash_user_id, queries::FETCH_ANILIST_USER, requests::anilist::send_request,
+    privacy::hash_user_id,
+    queries::FETCH_ANILIST_USER,
+    requests::anilist::{AniListRequestError, send_request},
 };
+
+#[derive(Debug)]
+pub enum UserError {
+    Database(diesel::result::Error),
+    AniListRequest(String),
+    AniListResponseParse(String),
+}
+
+impl std::fmt::Display for UserError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            UserError::Database(error) => write!(f, "Database error: {error}"),
+            UserError::AniListRequest(error) => write!(f, "AniList request failed: {error}"),
+            UserError::AniListResponseParse(error) => {
+                write!(f, "AniList response parse error: {error}")
+            }
+        }
+    }
+}
+
+impl std::error::Error for UserError {}
 
 #[derive(Queryable)]
 #[allow(dead_code)]
@@ -36,7 +59,7 @@ impl User {
         anilist_id: i64,
         anilist_username: String,
         conn: &mut PgConnection,
-    ) -> User {
+    ) -> Result<User, UserError> {
         use crate::schema::users;
         diesel::insert_into(users::table)
             .values((
@@ -51,22 +74,201 @@ impl User {
                 users::anilist_username.eq(anilist_username),
             ))
             .get_result(conn)
-            .expect("Error saving user")
+            .map_err(UserError::Database)
     }
 
-    #[instrument(name = "http.anilist.lookup_user", fields(username_len = username.len()))]
-    pub fn get_anilist_id_from_username(username: &str) -> Option<i64> {
+    #[instrument(name = "http.anilist.lookup_user", skip(username), fields(username_len = username.len()))]
+    pub fn get_anilist_id_from_username(username: &str) -> Result<Option<i64>, UserError> {
         let body = json!({
             "query": FETCH_ANILIST_USER,
             "variables": {
                 "username": username
             }
         });
-        info!("Body: {:#?}", body);
-        let result: String = send_request(body);
-        info!("Result: {:#?}", result);
-        let result: serde_json::Value = serde_json::from_str(&result).unwrap();
+        info!(
+            username_len = username.len(),
+            request_body_len = body.to_string().len(),
+            "Prepared AniList user lookup request"
+        );
 
-        result["data"]["User"]["id"].as_i64()
+        let result: String = normalize_user_lookup_response(send_request(body))?;
+        info!(
+            response_body_len = result.len(),
+            "Received AniList user lookup response"
+        );
+
+        let result: serde_json::Value = serde_json::from_str(&result).map_err(|error| {
+            error!(error = %error, "AniList user lookup response JSON parse failed");
+            UserError::AniListResponseParse(error.to_string())
+        })?;
+
+        parse_anilist_user_id_response(&result)
+    }
+}
+
+#[instrument(name = "http.anilist.normalize_user_lookup_response", skip(result))]
+fn normalize_user_lookup_response(
+    result: Result<String, AniListRequestError>,
+) -> Result<String, UserError> {
+    match result {
+        Ok(body) => Ok(body),
+        Err(AniListRequestError::NonSuccessStatus { status: 404, body }) => {
+            info!(
+                response_status = 404,
+                response_body_len = body.len(),
+                "AniList user lookup returned not found status"
+            );
+            Ok(body)
+        }
+        Err(error) => {
+            error!(error = %error, "AniList user lookup request failed");
+            Err(UserError::AniListRequest(error.to_string()))
+        }
+    }
+}
+
+#[instrument(name = "http.anilist.parse_user_lookup_response", skip(result))]
+fn parse_anilist_user_id_response(result: &serde_json::Value) -> Result<Option<i64>, UserError> {
+    let user = result.get("data").and_then(|data| data.get("User"));
+
+    if matches!(user, Some(serde_json::Value::Null) | None) {
+        if result.get("errors").is_some() {
+            info!("AniList user not found (with GraphQL errors)");
+        } else {
+            info!("AniList user not found");
+        }
+        return Ok(None);
+    }
+
+    if result.get("errors").is_some() {
+        let message = format!("AniList errors: {}", result["errors"]);
+        error!(error = %message, "AniList GraphQL returned errors for user lookup");
+        return Err(UserError::AniListResponseParse(message));
+    }
+
+    let user = user.ok_or_else(|| {
+        let message = "missing data.User".to_string();
+        error!(error = %message, "AniList user lookup missing expected user field");
+        UserError::AniListResponseParse(message)
+    })?;
+
+    let user_id = user.get("id").ok_or_else(|| {
+        let message = "missing data.User.id".to_string();
+        error!(error = %message, "AniList user lookup missing expected id field");
+        UserError::AniListResponseParse(message)
+    })?;
+
+    if user_id.is_null() {
+        let message = "data.User.id is null".to_string();
+        error!(error = %message, "AniList user lookup id is null");
+        return Err(UserError::AniListResponseParse(message));
+    }
+
+    let id = user_id.as_i64().ok_or_else(|| {
+        let message = "data.User.id is not an integer".to_string();
+        error!(error = %message, "AniList user lookup id type mismatch");
+        UserError::AniListResponseParse(message)
+    })?;
+
+    Ok(Some(id))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use serde_json::json;
+
+    #[test]
+    fn parse_user_lookup_returns_id_when_present() {
+        let payload = json!({
+            "data": {
+                "User": {
+                    "id": 12345
+                }
+            }
+        });
+
+        let result = parse_anilist_user_id_response(&payload);
+        assert!(matches!(result, Ok(Some(12345))));
+    }
+
+    #[test]
+    fn parse_user_lookup_returns_none_when_user_null() {
+        let payload = json!({
+            "data": {
+                "User": null
+            }
+        });
+
+        let result = parse_anilist_user_id_response(&payload);
+        assert!(matches!(result, Ok(None)));
+    }
+
+    #[test]
+    fn parse_user_lookup_returns_none_when_user_null_with_errors() {
+        let payload = json!({
+            "errors": [{
+                "message": "User not found"
+            }],
+            "data": {
+                "User": null
+            }
+        });
+
+        let result = parse_anilist_user_id_response(&payload);
+        assert!(matches!(result, Ok(None)));
+    }
+
+    #[test]
+    fn parse_user_lookup_errors_when_graphql_errors_with_non_null_user() {
+        let payload = json!({
+            "errors": [{
+                "message": "Some other error"
+            }],
+            "data": {
+                "User": {
+                    "id": 12345
+                }
+            }
+        });
+
+        let result = parse_anilist_user_id_response(&payload);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn parse_user_lookup_errors_when_missing_data() {
+        let payload = json!({});
+
+        let result = parse_anilist_user_id_response(&payload);
+        assert!(matches!(result, Ok(None)));
+    }
+
+    #[test]
+    fn parse_user_lookup_errors_when_id_not_integer() {
+        let payload = json!({
+            "data": {
+                "User": {
+                    "id": "not_a_number"
+                }
+            }
+        });
+
+        let result = parse_anilist_user_id_response(&payload);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn parse_user_lookup_errors_when_id_missing() {
+        let payload = json!({
+            "data": {
+                "User": {
+                    "name": "someone"
+                }
+            }
+        });
+
+        let result = parse_anilist_user_id_response(&payload);
+        assert!(result.is_err());
     }
 }
