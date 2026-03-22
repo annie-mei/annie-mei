@@ -34,7 +34,7 @@ jobs:
       - name: Install dependencies
         run: apt-get update && apt-get install -y libpq-dev
       - name: Cache
-        uses: Swatinem/rust-cache@v2
+        uses: Swatinem/rust-cache@v2.9.1
         with:
           cache-on-failure: "true"
           prefix-key: "annie-mei"
@@ -145,7 +145,7 @@ jobs:
             sudo systemctl start annie-mei
             # Verify service started
             sleep 2
-            sudo systemctl is-active annie-mei || { 
+            sudo systemctl is-active annie-mei || {
               echo "Service failed to start, rolling back"
               mv annie-mei.backup annie-mei
               sudo systemctl start annie-mei
