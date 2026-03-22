@@ -1,2 +1,3 @@
-[build]
-rustc-wrapper = "sccache"
+# sccache is opt-in via environment variable (RUSTC_WRAPPER=sccache)
+# rather than hardcoded here, so environments without sccache installed
+# (CI, Factory cloud) don't fail. See ANNIE-122 for rationale.
