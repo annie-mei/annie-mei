@@ -40,7 +40,13 @@ pub async fn run(ctx: &Context, interaction: &mut CommandInteraction) {
 
     let anilist_username = match arg {
         ResolvedValue::String(name) => name.to_string(),
-        _ => panic!("Invalid argument type"),
+        other => {
+            error!("Expected String argument for register, got {:?}", other);
+            let builder = EditInteractionResponse::new()
+                .content("Invalid argument type. Please provide your Anilist username as text.");
+            let _register = interaction.edit_response(&ctx.http, builder).await;
+            return;
+        }
     };
 
     let Some(database_pool) = database::get_pool_from_context(ctx).await else {
@@ -64,21 +70,39 @@ async fn register_new_user(
     database_pool: database::DbPool,
 ) -> String {
     let username = anilist_username.to_string();
-    let anilist_id =
-        task::spawn_blocking(move || User::get_anilist_id_from_username(username.as_ref()))
+    let anilist_id_result =
+        match task::spawn_blocking(move || User::get_anilist_id_from_username(username.as_ref()))
             .await
-            .unwrap();
+        {
+            Ok(result) => result,
+            Err(err) => {
+                error!(error = %err, "spawn_blocking panicked during AniList user lookup");
+                return format!(
+                    "Hello {}, I hit an internal error while looking up your Anilist account. Please try again later.",
+                    user.name
+                );
+            }
+        };
 
-    if anilist_id.is_none() {
-        return format!(
-            "Hello {}, I could not find the Anilist account {}.",
-            user.name, anilist_username
-        );
+    let anilist_id = match anilist_id_result {
+        Ok(Some(id)) => id,
+        Ok(None) => {
+            return format!(
+                "Hello {}, I could not find the Anilist account {}.",
+                user.name, anilist_username
+            );
+        }
+        Err(err) => {
+            error!(error = %err, "Failed to look up AniList user");
+            return format!(
+                "Hello {}, I hit an error while looking up Anilist account {}. Please try again later.",
+                user.name, anilist_username
+            );
+        }
     };
 
     let discord_id = user.id.get() as i64;
     let user_name = user.name.clone();
-    let anilist_id = anilist_id.unwrap();
     let anilist_username_for_db = anilist_username.clone();
 
     let db_write_result = task::spawn_blocking(move || {
@@ -88,20 +112,34 @@ async fn register_new_user(
             anilist_id,
             anilist_username_for_db,
             &mut connection,
-        );
+        )
     })
     .await;
 
-    if let Err(err) = db_write_result {
-        error!(
-            error = %err,
-            discord_user_id = %hash_user_id(discord_id as u64),
-            "Failed to save user registration"
-        );
-        return format!(
-            "Hello {}, I hit an internal error while linking your Anilist account. Please try again later.",
-            user_name
-        );
+    match db_write_result {
+        Ok(Ok(_)) => {}
+        Ok(Err(err)) => {
+            error!(
+                error = %err,
+                discord_user_id = %hash_user_id(discord_id as u64),
+                "Failed to save user registration to database"
+            );
+            return format!(
+                "Hello {}, I hit an internal error while linking your Anilist account. Please try again later.",
+                user_name
+            );
+        }
+        Err(err) => {
+            error!(
+                error = %err,
+                discord_user_id = %hash_user_id(discord_id as u64),
+                "spawn_blocking panicked during user registration"
+            );
+            return format!(
+                "Hello {}, I hit an internal error while linking your Anilist account. Please try again later.",
+                user_name
+            );
+        }
     }
 
     info!(
