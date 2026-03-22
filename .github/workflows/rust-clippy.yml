@@ -28,7 +28,7 @@ jobs:
       - name: Install Rust
         run: |
           toolchain="$(awk -F'"' '/^channel/ { print $2 }' rust-toolchain.toml)"
-          rustup toolchain install "$toolchain" --profile minimal
+          rustup toolchain install "$toolchain" --profile minimal --component clippy
       - name: Cache
         uses: Swatinem/rust-cache@v2.9.1
         with:
