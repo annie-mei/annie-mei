@@ -9,18 +9,30 @@ use crate::{
 use serenity::all::CommandDataOptionValue;
 use tracing::{error, info, instrument};
 
-#[instrument(name = "command.songs.fetcher", skip(args))]
-pub fn fetcher(args: CommandDataOptionValue) -> Option<MalResponse> {
-    let anime_response: Option<Anime> = anime_fetcher(Type::Anime, args);
-    let anime = anime_response?;
+pub enum SongFetchResult {
+    Found(MalResponse),
+    AnimeNotFound,
+    AnimeNotFoundOnMal,
+    FetchError,
+}
 
-    let mal_id = anime.get_mal_id()?;
+#[instrument(name = "command.songs.fetcher", skip(args))]
+pub fn fetcher(args: CommandDataOptionValue) -> SongFetchResult {
+    let anime_response: Option<Anime> = anime_fetcher(Type::Anime, args);
+    let Some(anime) = anime_response else {
+        return SongFetchResult::AnimeNotFound;
+    };
+
+    let Some(mal_id) = anime.get_mal_id() else {
+        info!("Anime found on AniList but has no MAL ID");
+        return SongFetchResult::AnimeNotFoundOnMal;
+    };
 
     let mal_fetcher_response = match my_anime_list::send_request(mal_id) {
         Ok(response) => response,
         Err(err) => {
             error!(error = %err, mal_id = mal_id, "Failed to fetch MAL data for anime");
-            return None;
+            return SongFetchResult::FetchError;
         }
     };
 
@@ -28,10 +40,10 @@ pub fn fetcher(args: CommandDataOptionValue) -> Option<MalResponse> {
         Ok(response) => response,
         Err(err) => {
             error!(error = %err, mal_id = mal_id, "Failed to deserialize MAL response");
-            return None;
+            return SongFetchResult::FetchError;
         }
     };
 
     info!("Mal Response: {:#?}", mal_response);
-    Some(mal_response)
+    SongFetchResult::Found(mal_response)
 }
