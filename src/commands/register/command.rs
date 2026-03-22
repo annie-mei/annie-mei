@@ -1,4 +1,5 @@
 use crate::{
+    commands::input_validation::validate_username,
     models::db::user::User,
     utils::{
         database,
@@ -48,6 +49,14 @@ pub async fn run(ctx: &Context, interaction: &mut CommandInteraction) {
             return;
         }
     };
+
+    if let Err(err) = validate_username(&anilist_username) {
+        let builder = EditInteractionResponse::new().content(format!(
+            "Invalid username: {err}. Please check your input and try again."
+        ));
+        let _register = interaction.edit_response(&ctx.http, builder).await;
+        return;
+    }
 
     let Some(database_pool) = database::get_pool_from_context(ctx).await else {
         let builder = EditInteractionResponse::new()
