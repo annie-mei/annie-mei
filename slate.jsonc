@@ -1,13 +1,5 @@
 {
   "$schema": "https://randomlabs.ai/config.json",
-  "permission": {
-    "*": "allow",
-    "bash": "ask",
-    "read": {
-      "*.env": "ask",
-      "*": "allow",
-    },
-  },
   "mcp": {
     "linear": {
       "type": "remote",
