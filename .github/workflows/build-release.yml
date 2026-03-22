@@ -23,7 +23,6 @@ jobs:
     container: rust:1-bullseye
     env:
       CARGO_TERM_COLOR: always
-      RUSTC_WRAPPER: ""
     steps:
       - name: Checkout
         uses: actions/checkout@v6
