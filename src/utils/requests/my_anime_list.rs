@@ -8,7 +8,6 @@ use crate::utils::statics::MAL_CLIENT_ID;
 
 #[derive(Debug)]
 pub enum MalRequestError {
-    MissingClientId,
     ClientBuild(String),
     RequestFailed(String),
     NonSuccessStatus { status: u16, body: String },
@@ -18,9 +17,6 @@ pub enum MalRequestError {
 impl std::fmt::Display for MalRequestError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            MalRequestError::MissingClientId => {
-                write!(f, "MAL_CLIENT_ID environment variable is not set")
-            }
             MalRequestError::ClientBuild(error) => {
                 write!(f, "Failed to build MAL HTTP client: {error}")
             }
@@ -56,7 +52,7 @@ fn build_mal_url(mal_id: u32) -> String {
 
 #[instrument(name = "http.mal.send_request", skip_all, fields(mal_id = mal_id))]
 pub fn send_request(mal_id: u32) -> Result<String, MalRequestError> {
-    let mal_client_id = env::var(MAL_CLIENT_ID).map_err(|_| MalRequestError::MissingClientId)?;
+    let mal_client_id = env::var(MAL_CLIENT_ID).expect("Expected MAL_CLIENT_ID in the environment");
 
     let client = Client::builder()
         .timeout(Duration::from_secs(MAL_TIMEOUT_SECS))
