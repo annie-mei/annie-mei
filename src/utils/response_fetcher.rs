@@ -4,24 +4,28 @@ use crate::models::{
     transformers::Transformers,
 };
 use serenity::all::CommandDataOptionValue;
-use tracing::{info, instrument};
+use tracing::{error, info, instrument};
 
+#[instrument(name = "fetcher.strip_quotes")]
 fn strip_quotes(string: &str) -> String {
     string.replace('"', "")
 }
 
 #[instrument(name = "fetcher.return_argument", skip(arg))]
-fn return_argument(arg: CommandDataOptionValue) -> Argument {
+fn return_argument(arg: CommandDataOptionValue) -> Option<Argument> {
     let val = match arg {
         CommandDataOptionValue::String(name) => name,
-        _ => panic!("Invalid argument type"),
+        other => {
+            error!("Expected String argument, got {:?}", other);
+            return None;
+        }
     };
 
     match val.parse::<u32>() {
-        Ok(id) => Argument::Id(id),
+        Ok(id) => Some(Argument::Id(id)),
         Err(_) => {
             let val = strip_quotes(&val);
-            Argument::Search(val)
+            Some(Argument::Search(val))
         }
     }
 }
@@ -34,7 +38,7 @@ pub fn fetcher<
     arg: CommandDataOptionValue,
 ) -> Option<T> {
     info!("Fetcher found arg: {:#?}", arg);
-    let argument = return_argument(arg);
+    let argument = return_argument(arg)?;
 
     match media_type {
         Type::Anime => {

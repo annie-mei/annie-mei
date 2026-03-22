@@ -131,11 +131,18 @@ async fn get_guild_anilist_data(
         }
     });
 
-    info!("Body: {:#?}", body);
+    info!(
+        request_body_len = body.to_string().len(),
+        "Sending batch AniList media list query"
+    );
     let user_media_list_response = match task::spawn_blocking(move || send_request(body)).await {
-        Ok(response) => response,
+        Ok(Ok(response)) => response,
+        Ok(Err(err)) => {
+            error!(error = %err, "AniList batch media list request failed");
+            return HashMap::new();
+        }
         Err(err) => {
-            error!("Failed to fetch guild AniList media data: {err}");
+            error!(error = %err, "Failed to fetch guild AniList media data");
             return HashMap::new();
         }
     };

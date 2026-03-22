@@ -1,5 +1,8 @@
 use crate::{
-    commands::songs::fetcher::fetcher as SongFetcher,
+    commands::{
+        input_validation::validate_search_term,
+        songs::fetcher::{SongFetchResult, fetcher as SongFetcher},
+    },
     models::mal_response::MalResponse,
     utils::{privacy::configure_sentry_scope, statics::NOT_FOUND_ANIME},
 };
@@ -13,7 +16,7 @@ use serenity::{
 };
 
 use tokio::task;
-use tracing::{info, instrument};
+use tracing::{error, info, instrument};
 
 pub fn register() -> CreateCommand {
     CreateCommand::new("songs")
@@ -40,18 +43,46 @@ pub async fn run(ctx: &Context, interaction: &mut CommandInteraction) {
 
     info!("Got command 'songs' with args: {arg:#?}");
 
-    let response = task::spawn_blocking(move || SongFetcher(arg))
-        .await
-        .unwrap();
+    if let serenity::all::CommandDataOptionValue::String(ref search_term) = arg
+        && let Err(err) = validate_search_term(search_term)
+    {
+        let builder = EditInteractionResponse::new().content(format!(
+            "Invalid search input: {err}. Please check your input and try again."
+        ));
+        let _ = interaction.edit_response(&ctx.http, builder).await;
+        return;
+    }
+
+    let response = match task::spawn_blocking(move || SongFetcher(arg)).await {
+        Ok(result) => result,
+        Err(err) => {
+            error!(error = %err, "spawn_blocking panicked during song fetch");
+            let builder = EditInteractionResponse::new().content(
+                "An internal error occurred while fetching songs. Please try again later.",
+            );
+            let _ = interaction.edit_response(&ctx.http, builder).await;
+            return;
+        }
+    };
 
     let _songs_response = match response {
-        None => {
+        SongFetchResult::Found(song_response) => {
+            let builder = EditInteractionResponse::new()
+                .embed(build_message_from_song_response(song_response));
+            interaction.edit_response(&ctx.http, builder).await
+        }
+        SongFetchResult::AnimeNotFound => {
             let builder = EditInteractionResponse::new().content(NOT_FOUND_ANIME);
             interaction.edit_response(&ctx.http, builder).await
         }
-        Some(song_response) => {
+        SongFetchResult::AnimeNotFoundOnMal => {
             let builder = EditInteractionResponse::new()
-                .embed(build_message_from_song_response(song_response));
+                .content("Anime not found on MAL. Song data is only available for anime listed on MyAnimeList.");
+            interaction.edit_response(&ctx.http, builder).await
+        }
+        SongFetchResult::FetchError => {
+            let builder = EditInteractionResponse::new()
+                .content("An error occurred while fetching song data. Please try again later.");
             interaction.edit_response(&ctx.http, builder).await
         }
     };
