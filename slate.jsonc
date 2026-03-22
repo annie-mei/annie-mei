@@ -1,0 +1,23 @@
+{
+  "$schema": "https://randomlabs.ai/config.json",
+  "permission": {
+    "*": "allow",
+    "bash": "ask",
+    "read": {
+      "*.env": "ask",
+      "*": "allow",
+    },
+  },
+  "mcp": {
+    "linear": {
+      "type": "remote",
+      "url": "https://mcp.linear.app/mcp",
+      "enabled": true,
+    },
+    "sentry": {
+      "type": "remote",
+      "url": "https://mcp.sentry.dev/mcp",
+      "enabled": true,
+    },
+  },
+}
