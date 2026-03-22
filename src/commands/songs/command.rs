@@ -13,7 +13,7 @@ use serenity::{
 };
 
 use tokio::task;
-use tracing::{info, instrument};
+use tracing::{error, info, instrument};
 
 pub fn register() -> CreateCommand {
     CreateCommand::new("songs")
@@ -40,9 +40,13 @@ pub async fn run(ctx: &Context, interaction: &mut CommandInteraction) {
 
     info!("Got command 'songs' with args: {arg:#?}");
 
-    let response = task::spawn_blocking(move || SongFetcher(arg))
-        .await
-        .unwrap();
+    let response = match task::spawn_blocking(move || SongFetcher(arg)).await {
+        Ok(result) => result,
+        Err(err) => {
+            error!(error = %err, "spawn_blocking panicked during song fetch");
+            None
+        }
+    };
 
     let _songs_response = match response {
         None => {

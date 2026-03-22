@@ -7,21 +7,31 @@ use crate::{
 };
 
 use serenity::all::CommandDataOptionValue;
-use tracing::{info, instrument};
+use tracing::{error, info, instrument};
 
 #[instrument(name = "command.songs.fetcher", skip(args))]
 pub fn fetcher(args: CommandDataOptionValue) -> Option<MalResponse> {
     let anime_response: Option<Anime> = anime_fetcher(Type::Anime, args);
-    match anime_response {
-        None => None,
-        Some(anime) => {
-            let mal_id = anime.get_mal_id();
-            mal_id?;
-            let mal_fetcher_response: String = my_anime_list::send_request(mal_id.unwrap());
-            let mal_response: MalResponse = serde_json::from_str(&mal_fetcher_response).unwrap();
+    let anime = anime_response?;
 
-            info!("Mal Response: {:#?}", mal_response);
-            Some(mal_response)
+    let mal_id = anime.get_mal_id()?;
+
+    let mal_fetcher_response = match my_anime_list::send_request(mal_id) {
+        Ok(response) => response,
+        Err(err) => {
+            error!(error = %err, mal_id = mal_id, "Failed to fetch MAL data for anime");
+            return None;
         }
-    }
+    };
+
+    let mal_response: MalResponse = match serde_json::from_str(&mal_fetcher_response) {
+        Ok(response) => response,
+        Err(err) => {
+            error!(error = %err, mal_id = mal_id, "Failed to deserialize MAL response");
+            return None;
+        }
+    };
+
+    info!("Mal Response: {:#?}", mal_response);
+    Some(mal_response)
 }
