@@ -84,14 +84,13 @@ pub trait Response {
                         response
                     }
                 };
-                let fetch_response: MediaResponse<T> =
-                    match serde_json::from_str(&fetched_data) {
-                        Ok(response) => response,
-                        Err(err) => {
-                            error!(error = %err, "Failed to deserialize AniList search response");
-                            return None;
-                        }
-                    };
+                let fetch_response: MediaResponse<T> = match serde_json::from_str(&fetched_data) {
+                    Ok(response) => response,
+                    Err(err) => {
+                        error!(error = %err, "Failed to deserialize AniList search response");
+                        return None;
+                    }
+                };
                 debug!("Deserialized response: {:#?}", fetch_response);
                 let result = fetch_response.fuzzy_match(value, media_type);
                 debug!("Fuzzy Response: {:#?}", result);

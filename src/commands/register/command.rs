@@ -79,19 +79,20 @@ async fn register_new_user(
     database_pool: database::DbPool,
 ) -> String {
     let username = anilist_username.to_string();
-    let anilist_id_result =
-        match task::spawn_blocking(move || User::get_anilist_id_from_username(username.as_ref()))
-            .await
-        {
-            Ok(result) => result,
-            Err(err) => {
-                error!(error = %err, "spawn_blocking panicked during AniList user lookup");
-                return format!(
-                    "Hello {}, I hit an internal error while looking up your Anilist account. Please try again later.",
-                    user.name
-                );
-            }
-        };
+    let anilist_id_result = match task::spawn_blocking(move || {
+        User::get_anilist_id_from_username(username.as_ref())
+    })
+    .await
+    {
+        Ok(result) => result,
+        Err(err) => {
+            error!(error = %err, "spawn_blocking panicked during AniList user lookup");
+            return format!(
+                "Hello {}, I hit an internal error while looking up your Anilist account. Please try again later.",
+                user.name
+            );
+        }
+    };
 
     let anilist_id = match anilist_id_result {
         Ok(Some(id)) => id,

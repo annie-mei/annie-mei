@@ -1,8 +1,5 @@
 use crate::{
-    commands::{
-        input_validation::validate_search_term,
-        songs::fetcher::fetcher as SongFetcher,
-    },
+    commands::{input_validation::validate_search_term, songs::fetcher::fetcher as SongFetcher},
     models::mal_response::MalResponse,
     utils::{privacy::configure_sentry_scope, statics::NOT_FOUND_ANIME},
 };
@@ -43,14 +40,14 @@ pub async fn run(ctx: &Context, interaction: &mut CommandInteraction) {
 
     info!("Got command 'songs' with args: {arg:#?}");
 
-    if let serenity::all::CommandDataOptionValue::String(ref search_term) = arg {
-        if let Err(err) = validate_search_term(search_term) {
-            let builder = EditInteractionResponse::new().content(format!(
-                "Invalid search input: {err}. Please check your input and try again."
-            ));
-            let _ = interaction.edit_response(&ctx.http, builder).await;
-            return;
-        }
+    if let serenity::all::CommandDataOptionValue::String(ref search_term) = arg
+        && let Err(err) = validate_search_term(search_term)
+    {
+        let builder = EditInteractionResponse::new().content(format!(
+            "Invalid search input: {err}. Please check your input and try again."
+        ));
+        let _ = interaction.edit_response(&ctx.http, builder).await;
+        return;
     }
 
     let response = match task::spawn_blocking(move || SongFetcher(arg)).await {
