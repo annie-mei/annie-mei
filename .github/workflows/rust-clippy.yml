@@ -26,13 +26,17 @@ jobs:
       - name: Build-checkout
         uses: actions/checkout@v6
       - name: Install Rust
-        run: rustup update stable && rustup default stable
+        run: |
+          toolchain="$(awk -F'"' '/^[[:space:]]*channel[[:space:]]*=/ { print $2 }' rust-toolchain.toml)"
+          rustup toolchain install "$toolchain" --profile minimal --component clippy
       - name: Cache
         uses: Swatinem/rust-cache@v2.9.1
         with:
           cache-on-failure: "true"
           prefix-key: "annie-mei"
-          shared-key: "cargo"
+          shared-key: "cargo-ci"
+          key: "clippy-tooling"
+          save-if: ${{ github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/') }}
       - name: Install crates
         run: cargo install clippy-sarif sarif-fmt
       - name: Run Clippy
