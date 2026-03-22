@@ -155,7 +155,7 @@ async fn register_new_user(
     info!(
         discord_user_id = %hash_user_id(discord_id as u64),
         anilist_id,
-        anilist_username = %anilist_username,
+        anilist_username_len = anilist_username.len(),
         "Created user with details"
     );
 
