@@ -45,11 +45,11 @@ pub fn validate_username(input: &str) -> Result<(), ValidationError> {
 
 #[instrument(name = "validation.validate_length", skip(input), fields(max_length = max_length))]
 fn validate_length(input: &str, max_length: usize) -> Result<(), ValidationError> {
-    let char_count = input.chars().count();
-
-    if char_count == 0 {
+    if input.trim().is_empty() {
         return Err(ValidationError::Empty);
     }
+
+    let char_count = input.chars().count();
 
     if char_count > max_length {
         return Err(ValidationError::TooLong {
@@ -135,5 +135,15 @@ mod tests {
         let input = "テスト太";
         assert_eq!(input.chars().count(), 4);
         assert!(validate_username(input).is_ok());
+    }
+
+    #[test]
+    fn whitespace_only_search_term_rejected() {
+        assert_eq!(validate_search_term("   "), Err(ValidationError::Empty));
+    }
+
+    #[test]
+    fn whitespace_only_username_rejected() {
+        assert_eq!(validate_username("  \t  "), Err(ValidationError::Empty));
     }
 }
