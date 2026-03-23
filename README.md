@@ -6,6 +6,7 @@ A Discord bot written in Rust that fetches anime and manga information from AniL
 ![Serenity](https://img.shields.io/badge/Serenity-0.12-blue)
 ![License](https://img.shields.io/badge/License-GPL--3.0-blue)
 ![CodeRabbit Pull Request Reviews](https://img.shields.io/coderabbit/prs/github/annie-mei/annie-mei?utm_source=oss&utm_medium=github&utm_campaign=annie-mei%2Fannie-mei&labelColor=171717&color=FF570A&link=https%3A%2F%2Fcoderabbit.ai&label=CodeRabbit+Reviews)
+[![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/annie-mei/annie-mei)
 
 ## Features
 
