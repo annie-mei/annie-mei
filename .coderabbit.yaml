@@ -12,6 +12,12 @@ reviews:
   collapse_walkthrough: true
   poem: false
   request_changes_workflow: true
+  path_filters:
+    - "!.agents/skills/**"
+    - "!.claude/skills/**"
+    - "!.factory/skills/**"
+    - "!.pi/skills/**"
+    - "!skills-lock.json"
   auto_review:
     enabled: true
     drafts: false
