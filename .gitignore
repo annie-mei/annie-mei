@@ -29,5 +29,4 @@ target/
 # Agents
 opencode.json*
 slate.json*
-.claude/settings.json
 .factory/settings.json
