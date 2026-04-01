@@ -5,6 +5,7 @@ use chrono::Utc;
 use hmac::{Hmac, Mac};
 use openssl::rand::rand_bytes;
 use serde::Serialize;
+use serenity::{client::Context, prelude::TypeMapKey};
 use sha2::Sha256;
 use tracing::instrument;
 use url::Url;
@@ -193,6 +194,18 @@ fn sign_payload_segment(payload_segment: &str, secret: &str) -> Result<String, O
         .map_err(|_| OAuthContextError::InvalidSecret)?;
     mac.update(payload_segment.as_bytes());
     Ok(URL_SAFE_NO_PAD.encode(mac.finalize().into_bytes()))
+}
+
+pub struct OAuthContextConfigKey;
+
+impl TypeMapKey for OAuthContextConfigKey {
+    type Value = OAuthContextConfig;
+}
+
+#[instrument(name = "oauth.context.get_from_context", skip(ctx))]
+pub async fn get_config_from_context(ctx: &Context) -> Option<OAuthContextConfig> {
+    let data = ctx.data.read().await;
+    data.get::<OAuthContextConfigKey>().cloned()
 }
 
 #[cfg(test)]
