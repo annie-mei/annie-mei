@@ -24,11 +24,16 @@ struct RegisterResponse {
 }
 
 fn handle_register(oauth_url: &str, ttl_seconds: i64) -> RegisterResponse {
-    let ttl_minutes = ttl_seconds / 60;
+    let ttl_minutes = (ttl_seconds + 59) / 60;
+    let expires_in = if ttl_minutes == 1 {
+        "expires in about 1 minute".to_string()
+    } else {
+        format!("expires in about {ttl_minutes} minutes")
+    };
 
     RegisterResponse {
         content: format!(
-            "Click the button below to link your AniList account. This secure link is only for you and expires in about {ttl_minutes} minutes. If the page says the link expired or failed, run `/register` again in Discord.",
+            "Click the button below to link your AniList account. This secure link is only for you and {expires_in}. If the page says the link expired or failed, run `/register` again in Discord.",
         ),
         oauth_url: Some(oauth_url.to_string()),
     }
@@ -119,8 +124,16 @@ mod tests {
         );
         assert!(response.content.contains("button below"));
         assert!(response.content.contains("only for you"));
-        assert!(response.content.contains("5 minutes"));
+        assert!(response.content.contains("about 5 minutes"));
         assert!(response.content.contains("run `/register` again"));
+    }
+
+    #[test]
+    fn register_subminute_ttl_rounds_up_to_one_minute_in_copy() {
+        let response = handle_register("https://auth.example.com/oauth/anilist/start?ctx=abc", 59);
+
+        assert!(response.content.contains("about 1 minute"));
+        assert!(!response.content.contains("about 1 minutes"));
     }
 
     #[test]
