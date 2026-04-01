@@ -1,4 +1,5 @@
 use std::env;
+use std::sync::Arc;
 
 use base64::{Engine as _, engine::general_purpose::URL_SAFE_NO_PAD};
 use chrono::Utc;
@@ -199,11 +200,11 @@ fn sign_payload_segment(payload_segment: &str, secret: &str) -> Result<String, O
 pub struct OAuthContextConfigKey;
 
 impl TypeMapKey for OAuthContextConfigKey {
-    type Value = OAuthContextConfig;
+    type Value = Arc<OAuthContextConfig>;
 }
 
 #[instrument(name = "oauth.context.get_from_context", skip(ctx))]
-pub async fn get_config_from_context(ctx: &Context) -> Option<OAuthContextConfig> {
+pub async fn get_config_from_context(ctx: &Context) -> Option<Arc<OAuthContextConfig>> {
     let data = ctx.data.read().await;
     data.get::<OAuthContextConfigKey>().cloned()
 }

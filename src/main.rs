@@ -220,7 +220,7 @@ async fn main() {
     {
         let mut data = client.data.write().await;
         data.insert::<DatabasePoolKey>(database_pool.clone());
-        data.insert::<OAuthContextConfigKey>(oauth_config);
+        data.insert::<OAuthContextConfigKey>(Arc::new(oauth_config));
     }
 
     let (shutdown_tx, shutdown_rx) = tokio::sync::watch::channel(());
