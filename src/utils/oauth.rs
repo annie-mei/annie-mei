@@ -17,17 +17,29 @@ const CONTEXT_VERSION: u8 = 1;
 const DEFAULT_CONTEXT_TTL_SECONDS: i64 = 300;
 const NONCE_BYTES: usize = 16;
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Clone, PartialEq, Eq)]
 pub struct OAuthContextConfig {
     pub auth_service_base_url: String,
     pub signing_secret: String,
     pub ttl_seconds: i64,
 }
 
+impl std::fmt::Debug for OAuthContextConfig {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("OAuthContextConfig")
+            .field("auth_service_base_url", &self.auth_service_base_url)
+            .field("signing_secret", &"[REDACTED]")
+            .field("ttl_seconds", &self.ttl_seconds)
+            .finish()
+    }
+}
+
 #[derive(Debug)]
 pub enum OAuthContextError {
     MissingEnv(&'static str),
     InvalidBaseUrl(url::ParseError),
+    /// Base URL must be origin-only so `Url::join("/oauth/...")` does not drop a configured path prefix.
+    AuthServiceBaseUrlHasPath,
     InvalidTtl(String),
     InvalidSecret,
     Nonce(openssl::error::ErrorStack),
@@ -40,6 +52,10 @@ impl std::fmt::Display for OAuthContextError {
         match self {
             Self::MissingEnv(key) => write!(f, "missing required environment variable {key}"),
             Self::InvalidBaseUrl(err) => write!(f, "invalid auth service base URL: {err}"),
+            Self::AuthServiceBaseUrlHasPath => write!(
+                f,
+                "auth service base URL must not include a path; use the scheme and host only (e.g. https://auth.example.com)"
+            ),
             Self::InvalidTtl(value) => write!(
                 f,
                 "OAUTH_CONTEXT_TTL_SECONDS must be a positive integer, got {value}"
@@ -70,7 +86,12 @@ struct OAuthContextPayload<'a> {
 pub fn load_context_config() -> Result<OAuthContextConfig, OAuthContextError> {
     let auth_service_base_url = env::var(AUTH_SERVICE_BASE_URL)
         .map_err(|_| OAuthContextError::MissingEnv(AUTH_SERVICE_BASE_URL))?;
-    Url::parse(&auth_service_base_url).map_err(OAuthContextError::InvalidBaseUrl)?;
+    let parsed_base =
+        Url::parse(&auth_service_base_url).map_err(OAuthContextError::InvalidBaseUrl)?;
+    let path = parsed_base.path();
+    if !path.is_empty() && path != "/" {
+        return Err(OAuthContextError::AuthServiceBaseUrlHasPath);
+    }
 
     let signing_secret = env::var(OAUTH_CONTEXT_SIGNING_SECRET)
         .map_err(|_| OAuthContextError::MissingEnv(OAUTH_CONTEXT_SIGNING_SECRET))?;
@@ -358,5 +379,33 @@ mod tests {
         let result = load_context_config();
 
         assert!(matches!(result, Err(OAuthContextError::InvalidBaseUrl(_))));
+    }
+
+    #[test]
+    fn load_context_config_rejects_base_url_with_path() {
+        let _lock = env_lock()
+            .lock()
+            .expect("env test lock should not be poisoned");
+        let _base_url = EnvVarGuard::set(
+            AUTH_SERVICE_BASE_URL,
+            Some("https://auth.annie-mei.test/api-prefix"),
+        );
+        let _secret = EnvVarGuard::set(OAUTH_CONTEXT_SIGNING_SECRET, Some("super-secret"));
+        let _ttl = EnvVarGuard::set(OAUTH_CONTEXT_TTL_SECONDS, None);
+
+        let result = load_context_config();
+
+        assert!(matches!(
+            result,
+            Err(OAuthContextError::AuthServiceBaseUrlHasPath)
+        ));
+    }
+
+    #[test]
+    fn oauth_context_config_debug_redacts_signing_secret() {
+        let config = test_config();
+        let formatted = format!("{config:?}");
+        assert!(formatted.contains("[REDACTED]"));
+        assert!(!formatted.contains("super-secret"));
     }
 }
