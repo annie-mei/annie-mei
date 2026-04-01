@@ -117,7 +117,7 @@ pub fn load_context_config() -> Result<OAuthContextConfig, OAuthContextError> {
 
 #[instrument(
     name = "oauth.context.build_start_url",
-    skip(config),
+    skip(config, discord_user_id, guild_id, interaction_id),
     fields(discord_user_id_len = discord_user_id.len(), has_guild_id = guild_id.is_some())
 )]
 pub fn build_oauth_start_url(
