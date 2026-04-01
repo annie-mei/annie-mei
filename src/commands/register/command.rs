@@ -1,5 +1,5 @@
 use crate::utils::{
-    oauth::{OAuthContextError, build_oauth_start_url, load_context_config},
+    oauth::{OAuthContextError, build_oauth_start_url, get_config_from_context},
     privacy::{configure_sentry_scope, hash_user_id},
 };
 
@@ -23,6 +23,11 @@ struct RegisterResponse {
     oauth_url: Option<String>,
 }
 
+#[instrument(
+    name = "command.register.handle_register",
+    skip(oauth_url),
+    fields(ttl_seconds)
+)]
 fn handle_register(oauth_url: &str, ttl_seconds: i64) -> RegisterResponse {
     let ttl_minutes = (ttl_seconds + 59) / 60;
     let expires_in = if ttl_minutes == 1 {
@@ -39,6 +44,7 @@ fn handle_register(oauth_url: &str, ttl_seconds: i64) -> RegisterResponse {
     }
 }
 
+#[instrument(name = "command.register.handle_error", skip(err))]
 fn handle_register_error(err: &OAuthContextError) -> RegisterResponse {
     let content = match err {
         OAuthContextError::MissingEnv(_) => {
@@ -60,32 +66,40 @@ pub async fn run(ctx: &Context, interaction: &CommandInteraction) {
     let user = &interaction.user;
     configure_sentry_scope("Register", user.id.get(), None);
 
-    let response = match load_context_config().and_then(|config| {
-        let guild_id = interaction.guild_id.map(|id| id.to_string());
-        let oauth_url = build_oauth_start_url(
-            &user.id.get().to_string(),
-            guild_id.as_deref(),
-            &interaction.id.to_string(),
-            &config,
-        )?;
-
-        info!(
-            discord_user_id = %hash_user_id(user.id.get()),
-            has_guild_id = interaction.guild_id.is_some(),
-            ttl_seconds = config.ttl_seconds,
-            "Generated OAuth register link"
-        );
-
-        Ok(handle_register(oauth_url.as_ref(), config.ttl_seconds))
-    }) {
-        Ok(response) => response,
-        Err(err) => {
+    let response = match get_config_from_context(ctx).await {
+        Some(config) => {
+            let guild_id = interaction.guild_id.map(|id| id.to_string());
+            match build_oauth_start_url(
+                &user.id.get().to_string(),
+                guild_id.as_deref(),
+                &interaction.id.to_string(),
+                &config,
+            ) {
+                Ok(oauth_url) => {
+                    info!(
+                        discord_user_id = %hash_user_id(user.id.get()),
+                        has_guild_id = interaction.guild_id.is_some(),
+                        ttl_seconds = config.ttl_seconds,
+                        "Generated OAuth register link"
+                    );
+                    handle_register(oauth_url.as_ref(), config.ttl_seconds)
+                }
+                Err(err) => {
+                    error!(
+                        error = %err,
+                        discord_user_id = %hash_user_id(user.id.get()),
+                        "Failed to build OAuth start URL"
+                    );
+                    handle_register_error(&err)
+                }
+            }
+        }
+        None => {
             error!(
-                error = %err,
                 discord_user_id = %hash_user_id(user.id.get()),
-                "Failed to prepare AniList OAuth register flow"
+                "OAuth configuration not found in context"
             );
-            handle_register_error(&err)
+            handle_register_error(&OAuthContextError::MissingEnv("OAuth config not available"))
         }
     };
 
