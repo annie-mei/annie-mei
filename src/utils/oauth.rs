@@ -95,6 +95,9 @@ pub fn load_context_config() -> Result<OAuthContextConfig, OAuthContextError> {
 
     let signing_secret = env::var(OAUTH_CONTEXT_SIGNING_SECRET)
         .map_err(|_| OAuthContextError::MissingEnv(OAUTH_CONTEXT_SIGNING_SECRET))?;
+    if signing_secret.is_empty() {
+        return Err(OAuthContextError::InvalidSecret);
+    }
 
     let ttl_seconds = match env::var(OAUTH_CONTEXT_TTL_SECONDS) {
         Ok(value) => value
