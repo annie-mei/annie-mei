@@ -24,6 +24,7 @@ use serenity::{
 
 use utils::{
     database::{DatabasePoolKey, create_pool, get_connection, run_migration},
+    oauth::{OAuthContextConfigKey, load_context_config},
     privacy::{hash_user_id, redact_url_credentials},
     statics::{DISCORD_TOKEN, ENV, SENTRY_DSN, SENTRY_TRACES_SAMPLE_RATE},
 };
@@ -69,7 +70,7 @@ impl EventHandler for Handler {
                     "songs" => commands::songs::command::run(&ctx, &mut command).await,
                     "manga" => commands::manga::command::run(&ctx, &mut command).await,
                     "anime" => commands::anime::command::run(&ctx, &mut command).await,
-                    "register" => commands::register::command::run(&ctx, &mut command).await,
+                    "register" => commands::register::command::run(&ctx, &command).await,
                     _ => {
                         let embed = CreateEmbed::new()
                             .title("Error")
@@ -201,6 +202,9 @@ async fn main() {
     let connection = &mut get_connection(&database_pool);
     run_migration(connection);
 
+    info!("Loading OAuth configuration");
+    let oauth_config = load_context_config().expect("Failed to load OAuth context config");
+
     let token = env::var(DISCORD_TOKEN).expect("Expected a token in the environment");
     let intents = GatewayIntents::GUILD_MESSAGES
         | GatewayIntents::DIRECT_MESSAGES
@@ -216,6 +220,7 @@ async fn main() {
     {
         let mut data = client.data.write().await;
         data.insert::<DatabasePoolKey>(database_pool.clone());
+        data.insert::<OAuthContextConfigKey>(Arc::new(oauth_config));
     }
 
     let (shutdown_tx, shutdown_rx) = tokio::sync::watch::channel(());

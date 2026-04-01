@@ -190,3 +190,6 @@ Required environment variables:
 - `GEMINI_API_KEY` - API key for the Gemini / OpenAI-compatible LLM endpoint
 - `LLM_BASE_URL` - Optional base URL override for the LLM API (defaults to Gemini OpenAI compatibility endpoint)
 - `LLM_MODEL` - Optional model name override (defaults to `gemini-2.0-flash`)
+- `AUTH_SERVICE_BASE_URL` - Base URL for the auth service (e.g. `https://auth.example.com`)
+- `OAUTH_CONTEXT_SIGNING_SECRET` - HMAC signing secret for OAuth context tokens
+- `OAUTH_CONTEXT_TTL_SECONDS` - Optional TTL for OAuth context in seconds (defaults to 300)

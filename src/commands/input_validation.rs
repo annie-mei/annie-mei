@@ -3,9 +3,6 @@ use tracing::instrument;
 /// Maximum character length for search inputs (AniList, MAL, etc.).
 const MAX_SEARCH_LENGTH: usize = 255;
 
-/// Maximum character length for username inputs (register command).
-const MAX_USERNAME_LENGTH: usize = 20;
-
 #[derive(Debug, PartialEq)]
 pub enum ValidationError {
     Empty,
@@ -35,12 +32,6 @@ impl std::error::Error for ValidationError {}
 #[instrument(name = "validation.search_term", fields(input_len = input.chars().count()))]
 pub fn validate_search_term(input: &str) -> Result<(), ValidationError> {
     validate_length(input, MAX_SEARCH_LENGTH)
-}
-
-/// Validate a username (AniList username for the register command).
-#[instrument(name = "validation.username", fields(input_len = input.chars().count()))]
-pub fn validate_username(input: &str) -> Result<(), ValidationError> {
-    validate_length(input, MAX_USERNAME_LENGTH)
 }
 
 #[instrument(name = "validation.validate_length", skip(input), fields(max_length = max_length))]
@@ -105,45 +96,7 @@ mod tests {
     }
 
     #[test]
-    fn valid_username() {
-        assert!(validate_username("InfernapeXavier").is_ok());
-    }
-
-    #[test]
-    fn empty_username_rejected() {
-        assert_eq!(validate_username(""), Err(ValidationError::Empty));
-    }
-
-    #[test]
-    fn username_at_max_length() {
-        let input = "a".repeat(MAX_USERNAME_LENGTH);
-        assert!(validate_username(&input).is_ok());
-    }
-
-    #[test]
-    fn username_exceeds_max_length() {
-        let input = "a".repeat(MAX_USERNAME_LENGTH + 1);
-        assert!(matches!(
-            validate_username(&input),
-            Err(ValidationError::TooLong { .. })
-        ));
-    }
-
-    #[test]
-    fn unicode_username_counts_characters_not_bytes() {
-        // 4 characters, under the username limit
-        let input = "テスト太";
-        assert_eq!(input.chars().count(), 4);
-        assert!(validate_username(input).is_ok());
-    }
-
-    #[test]
     fn whitespace_only_search_term_rejected() {
         assert_eq!(validate_search_term("   "), Err(ValidationError::Empty));
-    }
-
-    #[test]
-    fn whitespace_only_username_rejected() {
-        assert_eq!(validate_username("  \t  "), Err(ValidationError::Empty));
     }
 }
