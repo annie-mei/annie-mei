@@ -69,7 +69,7 @@ impl EventHandler for Handler {
                     "songs" => commands::songs::command::run(&ctx, &mut command).await,
                     "manga" => commands::manga::command::run(&ctx, &mut command).await,
                     "anime" => commands::anime::command::run(&ctx, &mut command).await,
-                    "register" => commands::register::command::run(&ctx, &mut command).await,
+                    "register" => commands::register::command::run(&ctx, &command).await,
                     _ => {
                         let embed = CreateEmbed::new()
                             .title("Error")
