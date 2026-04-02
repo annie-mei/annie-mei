@@ -28,17 +28,17 @@ pub async fn run(ctx: &Context, interaction: &CommandInteraction) {
         )
         .field(
             "Get started",
-            "1. Run `/register` and click the secure AniList link button\n2. Finish the AniList authorization in your browser, then return to Discord\n3. Use `/anime` or `/manga` with an AniList ID or search term\n4. Use `/songs` to fetch openings/endings and links",
+            "1. Run `/register` and click the secure AniList link button\n2. Finish the AniList authorization in your browser, then return to Discord\n3. Use `/anime` or `/manga` with an AniList ID or search term\n4. Use `/songs` to fetch openings/endings and links\n5. If your AniList connection ever expires later, run `/register` again to relink it",
             false,
         )
         .field(
             "Commands",
-            "`/anime search:<term or id>` - anime details\n`/manga search:<term or id>` - manga details\n`/songs search:<term or id>` - OP/ED songs + links\n`/register` - open the AniList OAuth linking flow\n`/ping` - bot health check\n`/help` - show this guide",
+            "`/anime search:<term or id>` - anime details\n`/manga search:<term or id>` - manga details\n`/songs search:<term or id>` - OP/ED songs + links\n`/register` - open the AniList OAuth link or relink flow\n`/ping` - bot health check\n`/help` - show this guide",
             false,
         )
         .field(
             "Tips",
-            "You can search with full names, short names, or AniList IDs. If the AniList link page expires or fails, run `/register` again to get a fresh secure link.",
+            "You can search with full names, short names, or AniList IDs. If the AniList link page expires or fails, or if you need to reconnect your AniList account later, run `/register` again to get a fresh secure link.",
             false,
         )
         .footer(CreateEmbedFooter::new("Annie Mei"))
