@@ -14,7 +14,8 @@ use serenity::{
 use tracing::{error, info, instrument};
 
 pub fn register() -> CreateCommand {
-    CreateCommand::new("register").description("Link your AniList account with a secure OAuth flow")
+    CreateCommand::new("register")
+        .description("Link or relink your AniList account with a secure OAuth flow")
 }
 
 #[derive(Debug, PartialEq, Eq)]
@@ -38,7 +39,7 @@ fn handle_register(oauth_url: &str, ttl_seconds: i64) -> RegisterResponse {
 
     RegisterResponse {
         content: format!(
-            "Click the button below to link your AniList account. This secure link is only for you and {expires_in}. If the page says the link expired or failed, run `/register` again in Discord.",
+            "Click the button below to link your AniList account. This secure link is only for you and {expires_in}. If the page says the link expired or failed, or if you ever need to reconnect AniList later, run `/register` again in Discord.",
         ),
         oauth_url: Some(oauth_url.to_string()),
     }
@@ -140,6 +141,7 @@ mod tests {
         assert!(response.content.contains("only for you"));
         assert!(response.content.contains("about 5 minutes"));
         assert!(response.content.contains("run `/register` again"));
+        assert!(response.content.contains("reconnect AniList later"));
     }
 
     #[test]
