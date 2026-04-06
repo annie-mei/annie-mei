@@ -33,7 +33,7 @@ pub async fn run(ctx: &Context, interaction: &CommandInteraction) {
         )
         .field(
             "Commands",
-            "`/anime search:<term or id>` - anime details\n`/manga search:<term or id>` - manga details\n`/songs search:<term or id>` - OP/ED songs + links\n`/register` - open the AniList OAuth link or relink flow\n`/ping` - bot health check\n`/help` - show this guide",
+            "`/anime search:<term or id>` - anime details\n`/manga search:<term or id>` - manga details\n`/songs search:<term or id>` - OP/ED songs + links\n`/register` - open the AniList OAuth link or relink flow\n`/whoami` - show your linked AniList username and profile link\n`/ping` - bot health check\n`/help` - show this guide",
             false,
         )
         .field(

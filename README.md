@@ -13,6 +13,7 @@ A Discord bot written in Rust that fetches anime and manga information from AniL
 - Fetch detailed anime/manga information from AniList
 - Look up opening and ending theme songs with Spotify links
 - Link your AniList account with a secure OAuth flow to show guild members' scores
+- Check your currently linked AniList account
 - Full Japanese kana support for searches
 
 ## Commands
@@ -21,7 +22,8 @@ A Discord bot written in Rust that fetches anime and manga information from AniL
 |---------|-------------|
 | `/help` | Shows available commands |
 | `/ping` | Bot health check |
-| `/register` | Start the secure AniList OAuth linking flow |
+| `/register` | Start or refresh the secure AniList OAuth linking flow |
+| `/whoami` | Show your linked AniList username and profile link |
 | `/anime <search>` | Look up anime by name or AniList ID |
 | `/manga <search>` | Look up manga by name or AniList ID |
 | `/songs <search>` | Find theme songs for an anime |
