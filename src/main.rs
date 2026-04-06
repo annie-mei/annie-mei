@@ -71,6 +71,7 @@ impl EventHandler for Handler {
                     "manga" => commands::manga::command::run(&ctx, &mut command).await,
                     "anime" => commands::anime::command::run(&ctx, &mut command).await,
                     "register" => commands::register::command::run(&ctx, &command).await,
+                    "whoami" => commands::whoami::run(&ctx, &mut command).await,
                     _ => {
                         let embed = CreateEmbed::new()
                             .title("Error")
@@ -98,6 +99,7 @@ impl EventHandler for Handler {
             commands::manga::command::register(),
             commands::anime::command::register(),
             commands::register::command::register(),
+            commands::whoami::register(),
         ];
 
         let guild_commands = Command::set_global_commands(&ctx.http, commands).await;
