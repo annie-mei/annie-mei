@@ -39,15 +39,14 @@ pub fn handle_whoami(profile: Option<LinkedAniListProfile>) -> CommandResponse {
             profile.profile_url()
         )),
         None => CommandResponse::Content(
-            "You have not linked an AniList account yet. Run `/register anilist:<username>` first."
-                .to_string(),
+            "You have not linked an AniList account yet. Run `/register` first.".to_string(),
         ),
     }
 }
 
 #[instrument(name = "command.whoami.run", skip(ctx, interaction))]
 pub async fn run(ctx: &Context, interaction: &mut CommandInteraction) {
-    let _ = interaction.defer(&ctx.http).await;
+    let _ = interaction.defer_ephemeral(&ctx.http).await;
 
     let user = &interaction.user;
     configure_sentry_scope("WhoAmI", user.id.get(), None);
