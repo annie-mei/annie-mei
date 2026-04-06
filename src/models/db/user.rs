@@ -1,3 +1,4 @@
+use crate::utils::privacy::hash_user_id;
 use diesel::prelude::*;
 use serenity::model::prelude::UserId;
 use tracing::instrument;
@@ -12,15 +13,16 @@ pub struct User {
 
 impl User {
     #[instrument(name = "db.user.get_by_discord_id", skip(conn), fields(discord_user_id = %hash_user_id(user_discord_id as u64)))]
-    pub fn get_user_by_discord_id(user_discord_id: i64, conn: &mut PgConnection) -> Option<User> {
+    pub fn get_user_by_discord_id(
+        user_discord_id: i64,
+        conn: &mut PgConnection,
+    ) -> Result<Option<User>, diesel::result::Error> {
         use crate::schema::users::dsl::*;
 
         users
             .filter(discord_id.eq(user_discord_id))
             .first::<User>(conn)
             .optional()
-            .ok()
-            .flatten()
     }
 
     #[instrument(name = "db.user.get_by_discord_ids", skip(conn, user_discord_ids), fields(user_count = user_discord_ids.len()))]

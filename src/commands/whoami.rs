@@ -67,10 +67,10 @@ pub async fn run(ctx: &Context, interaction: &mut CommandInteraction) {
     .await;
 
     let response = match db_result {
-        Ok(profile) => handle_whoami(profile.map(|entry| LinkedAniListProfile {
+        Ok(Ok(profile)) => handle_whoami(profile.map(|entry| LinkedAniListProfile {
             username: entry.anilist_username,
         })),
-        Err(err) => {
+        Ok(Err(err)) => {
             error!(
                 error = %err,
                 discord_user_id = %hash_user_id(discord_id as u64),
@@ -81,14 +81,25 @@ pub async fn run(ctx: &Context, interaction: &mut CommandInteraction) {
                     .to_string(),
             )
         }
+        Err(err) => {
+            error!(
+                error = %err,
+                discord_user_id = %hash_user_id(discord_id as u64),
+                "Failed to join whoami database task"
+            );
+            CommandResponse::Content(
+                "I hit an internal error while looking up your AniList account. Please try again later."
+                    .to_string(),
+            )
+        }
     };
 
-    let content = match response {
-        CommandResponse::Content(content) => content,
-        _ => unreachable!("/whoami returns Content"),
+    let builder = match response {
+        CommandResponse::Content(content) => EditInteractionResponse::new().content(content),
+        CommandResponse::Embed(embed) => EditInteractionResponse::new().embed(*embed),
+        CommandResponse::Message(content) => EditInteractionResponse::new().content(content),
     };
 
-    let builder = EditInteractionResponse::new().content(content);
     let _ = interaction.edit_response(&ctx.http, builder).await;
 }
 
