@@ -18,8 +18,10 @@ permissions:
 jobs:
   apply-version-bump:
     name: Apply Version Bump
-    # Only run if the check workflow succeeded
-    if: github.event.workflow_run.conclusion == 'success'
+    # Only run if the check workflow succeeded and was triggered by Dependabot
+    if: |
+      github.event.workflow_run.conclusion == 'success' && 
+      github.event.workflow_run.actor.login == 'dependabot[bot]'
     runs-on: blacksmith-4vcpu-ubuntu-2404
     env:
       CARGO_TERM_COLOR: always
