@@ -105,10 +105,14 @@ jobs:
           git push origin HEAD:${HEAD_REF}
 
       - name: Summary
+        env:
+          BUMP_NEEDED: ${{ steps.load.outputs.bump_needed }}
+          NEW_VERSION: ${{ steps.load.outputs.new_version }}
+          HEAD_REF: ${{ steps.load.outputs.head_ref }}
         run: |
-          if [ "${{ steps.load.outputs.bump_needed }}" == "true" ]; then
-            echo "✅ Version bumped to ${{ steps.load.outputs.new_version }}"
-            echo "Changes committed to branch: ${{ steps.load.outputs.head_ref }}"
+          if [ "$BUMP_NEEDED" == "true" ]; then
+            echo "✅ Version bumped to $NEW_VERSION"
+            echo "Changes committed to branch: $HEAD_REF"
           else
             echo "ℹ️ No version bump needed"
           fi

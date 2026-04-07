@@ -46,11 +46,12 @@ jobs:
           # Fetch main to compare
           git fetch origin main
           
-          # Get the diff of Cargo.toml between main and this branch
-          DIFF=$(git diff origin/main -- Cargo.toml || true)
+          # Get the package version from main branch (not the diff, to avoid matching dependency versions)
+          MAIN_VERSION=$(git show origin/main:Cargo.toml | grep -E '^version\s*=' | head -1 | sed 's/.*"\([^"]*\)".*/\1/')
+          echo "Main branch version: $MAIN_VERSION"
           
-          # Check if version line was modified in this PR
-          if echo "$DIFF" | grep -q '^[+-]version\s*='; then
+          # Check if package version was already modified (differs from main)
+          if [ "$CURRENT_VERSION" != "$MAIN_VERSION" ]; then
             echo "Version was already modified in this PR - no bump needed"
             echo "bump_needed=false" >> $GITHUB_OUTPUT
             echo "new_version=" >> $GITHUB_OUTPUT
@@ -69,12 +70,17 @@ jobs:
           fi
 
       - name: Save bump info as artifact
+        env:
+          BUMP_NEEDED: ${{ steps.check.outputs.bump_needed }}
+          CURRENT_VERSION: ${{ steps.check.outputs.current_version }}
+          NEW_VERSION: ${{ steps.check.outputs.new_version }}
+          HEAD_REF: ${{ github.head_ref }}
         run: |
           mkdir -p /tmp/bump-info
-          echo "bump_needed=${{ steps.check.outputs.bump_needed }}" > /tmp/bump-info/outputs.env
-          echo "current_version=${{ steps.check.outputs.current_version }}" >> /tmp/bump-info/outputs.env
-          echo "new_version=${{ steps.check.outputs.new_version }}" >> /tmp/bump-info/outputs.env
-          echo "head_ref=${{ github.head_ref }}" >> /tmp/bump-info/outputs.env
+          echo "bump_needed=$BUMP_NEEDED" > /tmp/bump-info/outputs.env
+          echo "current_version=$CURRENT_VERSION" >> /tmp/bump-info/outputs.env
+          echo "new_version=$NEW_VERSION" >> /tmp/bump-info/outputs.env
+          echo "head_ref=$HEAD_REF" >> /tmp/bump-info/outputs.env
 
       - name: Upload bump info artifact
         uses: actions/upload-artifact@v4
@@ -84,9 +90,13 @@ jobs:
           retention-days: 1
 
       - name: Summary
+        env:
+          BUMP_NEEDED: ${{ steps.check.outputs.bump_needed }}
+          CURRENT_VERSION: ${{ steps.check.outputs.current_version }}
+          NEW_VERSION: ${{ steps.check.outputs.new_version }}
         run: |
-          if [ "${{ steps.check.outputs.bump_needed }}" == "true" ]; then
-            echo "✅ Version bump needed: ${{ steps.check.outputs.current_version }} -> ${{ steps.check.outputs.new_version }}"
+          if [ "$BUMP_NEEDED" == "true" ]; then
+            echo "✅ Version bump needed: $CURRENT_VERSION -> $NEW_VERSION"
           else
             echo "ℹ️ No version bump needed"
           fi
