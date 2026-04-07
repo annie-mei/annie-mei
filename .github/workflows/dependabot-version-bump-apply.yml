@@ -27,6 +27,8 @@ jobs:
       CARGO_TERM_COLOR: always
     steps:
       - name: Download bump info artifact
+        id: download
+        continue-on-error: true
         uses: actions/download-artifact@v4
         with:
           name: version-bump-outputs
@@ -35,6 +37,7 @@ jobs:
 
       - name: Load bump info
         id: load
+        if: steps.download.outcome == 'success'
         run: cat outputs.env >> $GITHUB_OUTPUT
 
       - name: Checkout PR branch
