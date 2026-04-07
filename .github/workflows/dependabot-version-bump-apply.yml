@@ -18,33 +18,46 @@ permissions:
 jobs:
   apply-version-bump:
     name: Apply Version Bump
-    # Only run if the check workflow succeeded and found a bump is needed
-    if: |
-      github.event.workflow_run.conclusion == 'success' &&
-      github.event.workflow_run.outputs.bump_needed == 'true'
+    # Only run if the check workflow succeeded
+    if: github.event.workflow_run.conclusion == 'success'
     runs-on: blacksmith-4vcpu-ubuntu-2404
     env:
       CARGO_TERM_COLOR: always
     steps:
+      - name: Download bump info artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: version-bump-outputs
+          run-id: ${{ github.event.workflow_run.id }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Load bump info
+        id: load
+        run: cat outputs.env >> $GITHUB_OUTPUT
+
       - name: Checkout PR branch
+        if: steps.load.outputs.bump_needed == 'true'
         uses: actions/checkout@v6
         with:
-          ref: ${{ github.event.workflow_run.outputs.head_ref }}
+          ref: ${{ steps.load.outputs.head_ref }}
           token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Install Rust
+        if: steps.load.outputs.bump_needed == 'true'
         run: |
           toolchain="$(awk -F'"' '/^[[:space:]]*channel[[:space:]]*=/ { print $2 }' rust-toolchain.toml)"
           rustup toolchain install "$toolchain" --profile minimal
 
       - name: Install dependencies
+        if: steps.load.outputs.bump_needed == 'true'
         run: sudo apt-get update && sudo apt-get install -y libpq-dev
 
       - name: Apply version bump
+        if: steps.load.outputs.bump_needed == 'true'
+        env:
+          CURRENT_VERSION: ${{ steps.load.outputs.current_version }}
+          NEW_VERSION: ${{ steps.load.outputs.new_version }}
         run: |
-          CURRENT_VERSION="${{ github.event.workflow_run.outputs.current_version }}"
-          NEW_VERSION="${{ github.event.workflow_run.outputs.new_version }}"
-          
           echo "Bumping version: $CURRENT_VERSION -> $NEW_VERSION"
           
           # Update Cargo.toml using sed
@@ -54,6 +67,7 @@ jobs:
           grep -E '^version\s*=' Cargo.toml
 
       - name: Setup Rust cache
+        if: steps.load.outputs.bump_needed == 'true'
         uses: Swatinem/rust-cache@v2.9.1
         with:
           cache-on-failure: "true"
@@ -61,15 +75,17 @@ jobs:
           shared-key: "cargo-version-bump"
 
       - name: Run cargo check to update Cargo.lock
+        if: steps.load.outputs.bump_needed == 'true'
         run: cargo check
 
       - name: Commit version bump
+        if: steps.load.outputs.bump_needed == 'true'
+        env:
+          NEW_VERSION: ${{ steps.load.outputs.new_version }}
+          HEAD_REF: ${{ steps.load.outputs.head_ref }}
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          
-          NEW_VERSION="${{ github.event.workflow_run.outputs.new_version }}"
-          HEAD_REF="${{ github.event.workflow_run.outputs.head_ref }}"
           
           # Stage the changes
           git add Cargo.toml Cargo.lock
@@ -88,5 +104,9 @@ jobs:
 
       - name: Summary
         run: |
-          echo "✅ Version bumped to ${{ github.event.workflow_run.outputs.new_version }}"
-          echo "Changes committed to branch: ${{ github.event.workflow_run.outputs.head_ref }}"
+          if [ "${{ steps.load.outputs.bump_needed }}" == "true" ]; then
+            echo "✅ Version bumped to ${{ steps.load.outputs.new_version }}"
+            echo "Changes committed to branch: ${{ steps.load.outputs.head_ref }}"
+          else
+            echo "ℹ️ No version bump needed"
+          fi
