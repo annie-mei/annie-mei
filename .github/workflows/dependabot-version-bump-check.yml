@@ -1,0 +1,102 @@
+# Part 1: Detect if version bump is needed for Dependabot PRs
+#
+# This workflow runs on pull_request (safe, read-only) and:
+# 1. Detects if version bump is needed
+# 2. Calculates the new version
+# 3. Saves bump info as an artifact for the apply workflow
+
+name: Dependabot Version Bump - Check
+
+on:
+  pull_request:
+    branches:
+      - "main"
+    paths:
+      - "Cargo.toml"
+      - "Cargo.lock"
+
+permissions:
+  contents: read
+
+jobs:
+  check-version-bump:
+    name: Check if Version Bump is Needed
+    # Only run for Dependabot PRs
+    if: github.actor == 'dependabot[bot]'
+    runs-on: blacksmith-4vcpu-ubuntu-2404
+    outputs:
+      bump_needed: ${{ steps.check.outputs.bump_needed }}
+      current_version: ${{ steps.check.outputs.current_version }}
+      new_version: ${{ steps.check.outputs.new_version }}
+      head_ref: ${{ github.head_ref }}
+    steps:
+      - name: Checkout PR branch
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ github.head_ref }}
+
+      - name: Check if version bump is needed
+        id: check
+        run: |
+          # Get current version from Cargo.toml
+          CURRENT_VERSION=$(grep -E '^version\s*=' Cargo.toml | head -1 | sed 's/.*"\([^"]*\)".*/\1/')
+          echo "current_version=$CURRENT_VERSION" >> $GITHUB_OUTPUT
+          echo "Current version: $CURRENT_VERSION"
+
+          # Fetch main to compare
+          git fetch origin main
+          
+          # Get the package version from main branch (not the diff, to avoid matching dependency versions)
+          MAIN_VERSION=$(git show origin/main:Cargo.toml | grep -E '^version\s*=' | head -1 | sed 's/.*"\([^"]*\)".*/\1/')
+          echo "Main branch version: $MAIN_VERSION"
+          
+          # Check if package version was already modified (differs from main)
+          if [ "$CURRENT_VERSION" != "$MAIN_VERSION" ]; then
+            echo "Version was already modified in this PR - no bump needed"
+            echo "bump_needed=false" >> $GITHUB_OUTPUT
+            echo "new_version=" >> $GITHUB_OUTPUT
+          else
+            echo "Version not modified by Dependabot - bump needed"
+            echo "bump_needed=true" >> $GITHUB_OUTPUT
+            
+            # Calculate new patch version
+            MAJOR=$(echo "$CURRENT_VERSION" | cut -d. -f1)
+            MINOR=$(echo "$CURRENT_VERSION" | cut -d. -f2)
+            PATCH=$(echo "$CURRENT_VERSION" | cut -d. -f3)
+            NEW_PATCH=$((PATCH + 1))
+            NEW_VERSION="${MAJOR}.${MINOR}.${NEW_PATCH}"
+            echo "new_version=$NEW_VERSION" >> $GITHUB_OUTPUT
+            echo "Will bump to: $NEW_VERSION"
+          fi
+
+      - name: Save bump info as artifact
+        env:
+          BUMP_NEEDED: ${{ steps.check.outputs.bump_needed }}
+          CURRENT_VERSION: ${{ steps.check.outputs.current_version }}
+          NEW_VERSION: ${{ steps.check.outputs.new_version }}
+          HEAD_REF: ${{ github.head_ref }}
+        run: |
+          mkdir -p /tmp/bump-info
+          echo "bump_needed=$BUMP_NEEDED" > /tmp/bump-info/outputs.env
+          echo "current_version=$CURRENT_VERSION" >> /tmp/bump-info/outputs.env
+          echo "new_version=$NEW_VERSION" >> /tmp/bump-info/outputs.env
+          echo "head_ref=$HEAD_REF" >> /tmp/bump-info/outputs.env
+
+      - name: Upload bump info artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: version-bump-outputs
+          path: /tmp/bump-info/outputs.env
+          retention-days: 1
+
+      - name: Summary
+        env:
+          BUMP_NEEDED: ${{ steps.check.outputs.bump_needed }}
+          CURRENT_VERSION: ${{ steps.check.outputs.current_version }}
+          NEW_VERSION: ${{ steps.check.outputs.new_version }}
+        run: |
+          if [ "$BUMP_NEEDED" == "true" ]; then
+            echo "✅ Version bump needed: $CURRENT_VERSION -> $NEW_VERSION"
+          else
+            echo "ℹ️ No version bump needed"
+          fi
