@@ -1,0 +1,77 @@
+# Part 1: Detect if version bump is needed for Dependabot PRs
+#
+# This workflow runs on pull_request (safe, read-only) and:
+# 1. Detects if version bump is needed
+# 2. Calculates the new version
+# 3. Saves bump info as an artifact for the apply workflow
+
+name: Dependabot Version Bump - Check
+
+on:
+  pull_request:
+    branches:
+      - "main"
+    paths:
+      - "Cargo.toml"
+      - "Cargo.lock"
+
+permissions:
+  contents: read
+
+jobs:
+  check-version-bump:
+    name: Check if Version Bump is Needed
+    # Only run for Dependabot PRs
+    if: github.actor == 'dependabot[bot]'
+    runs-on: blacksmith-4vcpu-ubuntu-2404
+    outputs:
+      bump_needed: ${{ steps.check.outputs.bump_needed }}
+      current_version: ${{ steps.check.outputs.current_version }}
+      new_version: ${{ steps.check.outputs.new_version }}
+      head_ref: ${{ github.head_ref }}
+    steps:
+      - name: Checkout PR branch
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ github.head_ref }}
+
+      - name: Check if version bump is needed
+        id: check
+        run: |
+          # Get current version from Cargo.toml
+          CURRENT_VERSION=$(grep -E '^version\s*=' Cargo.toml | head -1 | sed 's/.*"\([^"]*\)".*/\1/')
+          echo "current_version=$CURRENT_VERSION" >> $GITHUB_OUTPUT
+          echo "Current version: $CURRENT_VERSION"
+
+          # Fetch main to compare
+          git fetch origin main
+          
+          # Get the diff of Cargo.toml between main and this branch
+          DIFF=$(git diff origin/main -- Cargo.toml || true)
+          
+          # Check if version line was modified in this PR
+          if echo "$DIFF" | grep -q '^[+-]version\s*='; then
+            echo "Version was already modified in this PR - no bump needed"
+            echo "bump_needed=false" >> $GITHUB_OUTPUT
+            echo "new_version=" >> $GITHUB_OUTPUT
+          else
+            echo "Version not modified by Dependabot - bump needed"
+            echo "bump_needed=true" >> $GITHUB_OUTPUT
+            
+            # Calculate new patch version
+            MAJOR=$(echo "$CURRENT_VERSION" | cut -d. -f1)
+            MINOR=$(echo "$CURRENT_VERSION" | cut -d. -f2)
+            PATCH=$(echo "$CURRENT_VERSION" | cut -d. -f3)
+            NEW_PATCH=$((PATCH + 1))
+            NEW_VERSION="${MAJOR}.${MINOR}.${NEW_PATCH}"
+            echo "new_version=$NEW_VERSION" >> $GITHUB_OUTPUT
+            echo "Will bump to: $NEW_VERSION"
+          fi
+
+      - name: Summary
+        run: |
+          if [ "${{ steps.check.outputs.bump_needed }}" == "true" ]; then
+            echo "✅ Version bump needed: ${{ steps.check.outputs.current_version }} -> ${{ steps.check.outputs.new_version }}"
+          else
+            echo "ℹ️ No version bump needed"
+          fi
