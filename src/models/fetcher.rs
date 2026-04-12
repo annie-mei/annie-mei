@@ -14,7 +14,7 @@ use crate::{
 };
 
 use tokio::task;
-use tracing::{debug, error, info};
+use tracing::{debug, error, info, instrument};
 
 pub struct AnimeConfig {
     argument: Argument,
@@ -40,6 +40,7 @@ pub trait Response {
     fn get_search_query(&self) -> String;
 }
 
+#[instrument(name = "anilist.fetch", skip(response_config), fields(media_type = ?media_type))]
 pub async fn fetch<
     T: serde::de::DeserializeOwned + Transformers + std::fmt::Debug + std::clone::Clone,
 >(
