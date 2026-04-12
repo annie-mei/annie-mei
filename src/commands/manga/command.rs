@@ -22,8 +22,7 @@ use serenity::{
     model::application::CommandOptionType,
 };
 
-use tokio::task;
-use tracing::{error, info, instrument};
+use tracing::{info, instrument};
 
 pub fn register() -> CreateCommand {
     CreateCommand::new("manga")
@@ -85,15 +84,7 @@ pub async fn run(ctx: &Context, interaction: &mut CommandInteraction) {
 
     info!("Got command 'manga' with search_term: {search_term}");
 
-    // Fetch manga data on a blocking thread (AniList uses blocking reqwest).
-    let manga_result: Option<Manga> =
-        match task::spawn_blocking(move || AniListSource.fetch_manga(&search_term)).await {
-            Ok(result) => result,
-            Err(e) => {
-                error!(error = %e, "spawn_blocking panicked while fetching manga");
-                None
-            }
-        };
+    let manga_result: Option<Manga> = AniListSource.fetch_manga(&search_term).await;
 
     // Block adult content in non-NSFW channels.
     if let Some(ref manga) = manga_result

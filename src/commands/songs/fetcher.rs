@@ -17,8 +17,8 @@ pub enum SongFetchResult {
 }
 
 #[instrument(name = "command.songs.fetcher", skip(args))]
-pub fn fetcher(args: CommandDataOptionValue) -> SongFetchResult {
-    let anime_response: Option<Anime> = anime_fetcher(Type::Anime, args);
+pub async fn fetcher(args: CommandDataOptionValue) -> SongFetchResult {
+    let anime_response: Option<Anime> = anime_fetcher(Type::Anime, args).await;
     let Some(anime) = anime_response else {
         return SongFetchResult::AnimeNotFound;
     };
@@ -28,7 +28,7 @@ pub fn fetcher(args: CommandDataOptionValue) -> SongFetchResult {
         return SongFetchResult::AnimeNotFoundOnMal;
     };
 
-    let mal_fetcher_response = match my_anime_list::send_request(mal_id) {
+    let mal_fetcher_response = match my_anime_list::send_request(mal_id).await {
         Ok(response) => response,
         Err(err) => {
             error!(error = %err, mal_id = mal_id, "Failed to fetch MAL data for anime");

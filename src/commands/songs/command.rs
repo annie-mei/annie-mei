@@ -18,6 +18,14 @@ use serenity::{
 use tokio::task;
 use tracing::{error, info, instrument};
 
+struct SongEmbedData {
+    title: String,
+    openings: String,
+    endings: String,
+    thumbnail: String,
+    mal_link: String,
+}
+
 pub fn register() -> CreateCommand {
     CreateCommand::new("songs")
         .description("Fetches the songs of an anime")
@@ -53,22 +61,33 @@ pub async fn run(ctx: &Context, interaction: &mut CommandInteraction) {
         return;
     }
 
-    let response = match task::spawn_blocking(move || SongFetcher(arg)).await {
-        Ok(result) => result,
-        Err(err) => {
-            error!(error = %err, "spawn_blocking panicked during song fetch");
-            let builder = EditInteractionResponse::new().content(
-                "An internal error occurred while fetching songs. Please try again later.",
-            );
-            let _ = interaction.edit_response(&ctx.http, builder).await;
-            return;
-        }
-    };
+    let response = SongFetcher(arg).await;
 
     let _songs_response = match response {
         SongFetchResult::Found(song_response) => {
-            let builder = EditInteractionResponse::new()
-                .embed(build_message_from_song_response(song_response));
+            let embed_data =
+                match task::spawn_blocking(move || build_message_from_song_response(song_response))
+                    .await
+                {
+                    Ok(data) => data,
+                    Err(err) => {
+                        error!(error = %err, "spawn_blocking panicked while building song embed");
+                        let builder = EditInteractionResponse::new().content(
+                        "An internal error occurred while fetching songs. Please try again later.",
+                    );
+                        let _ = interaction.edit_response(&ctx.http, builder).await;
+                        return;
+                    }
+                };
+
+            let builder = EditInteractionResponse::new().embed(
+                CreateEmbed::new()
+                    .title(embed_data.title)
+                    .field("Openings", embed_data.openings, false)
+                    .field("Endings", embed_data.endings, false)
+                    .thumbnail(embed_data.thumbnail)
+                    .field("\u{200b}", embed_data.mal_link, false),
+            );
             interaction.edit_response(&ctx.http, builder).await
         }
         SongFetchResult::AnimeNotFound => {
@@ -89,11 +108,12 @@ pub async fn run(ctx: &Context, interaction: &mut CommandInteraction) {
 }
 
 #[instrument(name = "command.songs.build_message", skip(mal_response))]
-fn build_message_from_song_response(mal_response: MalResponse) -> CreateEmbed {
-    CreateEmbed::new()
-        .title(mal_response.transform_title())
-        .field("Openings", mal_response.transform_openings(), false)
-        .field("Endings", mal_response.transform_endings(), false)
-        .thumbnail(mal_response.transform_thumbnail())
-        .field("\u{200b}", mal_response.transform_mal_link(), false)
+fn build_message_from_song_response(mal_response: MalResponse) -> SongEmbedData {
+    SongEmbedData {
+        title: mal_response.transform_title(),
+        openings: mal_response.transform_openings(),
+        endings: mal_response.transform_endings(),
+        thumbnail: mal_response.transform_thumbnail(),
+        mal_link: mal_response.transform_mal_link(),
+    }
 }

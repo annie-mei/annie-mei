@@ -1,5 +1,5 @@
 use crate::models::{
-    fetcher::{AnimeConfig, Argument, MangaConfig, Response},
+    fetcher::{AnimeConfig, Argument, MangaConfig, Response, fetch},
     media_type::MediaType as Type,
     transformers::Transformers,
 };
@@ -31,7 +31,7 @@ fn return_argument(arg: CommandDataOptionValue) -> Option<Argument> {
 }
 
 #[instrument(name = "fetcher.fetch", skip(arg), fields(media_type = ?media_type))]
-pub fn fetcher<
+pub async fn fetcher<
     T: serde::de::DeserializeOwned + Transformers + std::fmt::Debug + std::clone::Clone,
 >(
     media_type: Type,
@@ -43,11 +43,11 @@ pub fn fetcher<
     match media_type {
         Type::Anime => {
             let anime_response: AnimeConfig = Response::new(argument);
-            anime_response.fetch::<T>(media_type)
+            fetch::<T>(&anime_response, media_type).await
         }
         Type::Manga => {
             let manga_response: MangaConfig = Response::new(argument);
-            manga_response.fetch::<T>(media_type)
+            fetch::<T>(&manga_response, media_type).await
         }
     }
 }

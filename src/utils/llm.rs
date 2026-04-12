@@ -24,9 +24,10 @@
 
 use std::env;
 use std::fmt;
+use std::future::Future;
 use std::time::Duration;
 
-use reqwest::blocking::Client;
+use reqwest::Client;
 use serde::{Deserialize, Serialize};
 use tracing::{info, instrument};
 
@@ -160,14 +161,17 @@ pub trait LlmClient: Send + Sync {
     ///
     /// If the implementation has a system prompt configured, it is
     /// automatically prepended to the conversation.
-    fn chat(&self, user_message: &str) -> Result<String, LlmError>;
+    fn chat(&self, user_message: &str) -> impl Future<Output = Result<String, LlmError>> + Send;
 
     /// Send a full conversation (multiple messages) and return the
     /// assistant's reply.
     ///
     /// The caller has full control over the message list — no system
     /// prompt is automatically prepended.
-    fn chat_with_messages(&self, messages: &[ChatMessage]) -> Result<String, LlmError>;
+    fn chat_with_messages(
+        &self,
+        messages: &[ChatMessage],
+    ) -> impl Future<Output = Result<String, LlmError>> + Send;
 
     /// Return the model name this client is configured for.
     fn model(&self) -> &str;
@@ -313,7 +317,7 @@ impl GeminiClient {
             model = %self.config.model,
         )
     )]
-    fn send_chat_completion(
+    async fn send_chat_completion(
         &self,
         messages: &[ChatMessage],
     ) -> Result<ChatCompletionResponse, LlmError> {
@@ -335,11 +339,13 @@ impl GeminiClient {
             .header("Authorization", format!("Bearer {}", self.config.api_key))
             .body(body_json)
             .send()
+            .await
             .map_err(|e| LlmError::Request(e.to_string()))?;
 
         let status = response.status();
         let text = response
             .text()
+            .await
             .map_err(|e| LlmError::ResponseBody(e.to_string()))?;
 
         if !status.is_success() {
@@ -367,9 +373,9 @@ impl LlmClient for GeminiClient {
             has_system_prompt = self.config.system_prompt.is_some(),
         )
     )]
-    fn chat(&self, user_message: &str) -> Result<String, LlmError> {
+    async fn chat(&self, user_message: &str) -> Result<String, LlmError> {
         let messages = self.build_messages(user_message);
-        let response = self.send_chat_completion(&messages)?;
+        let response = self.send_chat_completion(&messages).await?;
 
         info!(usage = ?response.usage, "Chat completion received");
 
@@ -384,8 +390,8 @@ impl LlmClient for GeminiClient {
             message_count = messages.len(),
         )
     )]
-    fn chat_with_messages(&self, messages: &[ChatMessage]) -> Result<String, LlmError> {
-        let response = self.send_chat_completion(messages)?;
+    async fn chat_with_messages(&self, messages: &[ChatMessage]) -> Result<String, LlmError> {
+        let response = self.send_chat_completion(messages).await?;
 
         info!(usage = ?response.usage, "Chat completion received");
 
