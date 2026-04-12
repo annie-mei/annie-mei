@@ -112,8 +112,7 @@ impl MalResponse {
         let mut lines: Vec<String> = Vec::with_capacity(songs.len());
 
         for song in songs {
-            let mut line = String::new();
-            write!(line, "{}. ", song.display_number).unwrap();
+            let mut line = format!("{}. ", song.display_number);
 
             match &song.spotify_url {
                 Some(url) => {
