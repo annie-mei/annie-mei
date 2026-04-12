@@ -47,7 +47,7 @@ static MAL_CLIENT: LazyLock<Result<Client, String>> = LazyLock::new(|| {
         .map_err(|error| error.to_string())
 });
 
-#[instrument(name = "http.mal.client")]
+#[instrument(name = "http.mal.client", level = "trace")]
 fn get_client() -> Result<&'static Client, MalRequestError> {
     match &*MAL_CLIENT {
         Ok(client) => Ok(client),
