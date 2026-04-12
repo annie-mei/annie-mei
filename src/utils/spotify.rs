@@ -1,6 +1,9 @@
-use crate::utils::{
-    redis::{check_cache, try_to_cache_response},
-    statics::{SPOTIFY_CLIENT_ID, SPOTIFY_CLIENT_SECRET},
+use crate::{
+    models::mal_response::ParsedSong,
+    utils::{
+        redis::{check_cache, try_to_cache_response},
+        statics::{SPOTIFY_CLIENT_ID, SPOTIFY_CLIENT_SECRET},
+    },
 };
 
 use rspotify::{
@@ -10,7 +13,7 @@ use rspotify::{
 };
 
 use std::env;
-use tracing::info;
+use tracing::{info, instrument};
 
 fn get_spotify_client() -> ClientCredsSpotify {
     let client_id =
@@ -114,5 +117,21 @@ fn get_url_from_search_result(search_result: SearchResult) -> Option<String> {
     } else {
         info!("Something else");
         None
+    }
+}
+
+/// Fill in `spotify_url` for each [`ParsedSong`] that has an artist.
+/// This performs synchronous Spotify + Redis I/O and is intended to run
+/// inside `spawn_blocking`.
+#[instrument(name = "spotify.enrich_songs", skip(songs), fields(count = songs.len()))]
+pub fn enrich_songs_with_spotify(songs: &mut [ParsedSong]) {
+    for song in songs.iter_mut() {
+        if let Some(ref artist) = song.artist_names {
+            song.spotify_url = get_song_url(
+                song.romaji_name.clone(),
+                song.kana_name.clone(),
+                artist.clone(),
+            );
+        }
     }
 }
