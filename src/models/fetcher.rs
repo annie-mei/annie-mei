@@ -40,6 +40,37 @@ pub trait Response {
     fn get_search_query(&self) -> String;
 }
 
+#[instrument(
+    name = "anilist.fetch_from_network_and_cache",
+    skip(search_query),
+    fields(cache_key = %cache_key, lookup_len = lookup_value.len())
+)]
+async fn fetch_from_network_and_cache(
+    search_query: String,
+    lookup_value: String,
+    cache_key: String,
+) -> Option<String> {
+    let response = match fetch_by_name(search_query, lookup_value).await {
+        Ok(data) => data,
+        Err(err) => {
+            error!(error = %err, "Failed to fetch AniList data by name");
+            return None;
+        }
+    };
+
+    let cache_key_for_write = cache_key.clone();
+    let response_to_cache = response.clone();
+    if let Err(err) = task::spawn_blocking(move || {
+        try_to_cache_response(&cache_key_for_write, &response_to_cache)
+    })
+    .await
+    {
+        error!(error = %err, cache_key = %cache_key, "Failed to cache AniList response");
+    }
+
+    Some(response)
+}
+
 #[instrument(name = "anilist.fetch", skip(response_config), fields(media_type = ?media_type))]
 pub async fn fetch<
     T: serde::de::DeserializeOwned + Transformers + std::fmt::Debug + std::clone::Clone,
@@ -69,67 +100,30 @@ pub async fn fetch<
         Argument::Search(value) => {
             let cache_key = format!("{}:{value}", media_type.as_ref());
             let cache_key_for_lookup = cache_key.clone();
+            let search_query = response_config.get_search_query();
+            let lookup_value = value.to_string();
 
-            let fetched_data = match task::spawn_blocking(move || {
-                check_cache(&cache_key_for_lookup)
-            })
-            .await
-            {
-                Ok(Ok(cached_value)) => {
-                    info!("Cache hit for {:#?}", cache_key);
-                    cached_value
-                }
-                Ok(Err(err)) => {
-                    info!("Cache miss for {:#?} with error {:#?}", cache_key, err);
-                    let response =
-                        match fetch_by_name(response_config.get_search_query(), value.to_string())
-                            .await
-                        {
-                            Ok(data) => data,
-                            Err(err) => {
-                                error!(error = %err, "Failed to fetch AniList data by name");
-                                return None;
-                            }
-                        };
-
-                    let cache_key_for_write = cache_key.clone();
-                    let response_to_cache = response.clone();
-                    if let Err(err) = task::spawn_blocking(move || {
-                        try_to_cache_response(&cache_key_for_write, &response_to_cache)
-                    })
-                    .await
-                    {
-                        error!(error = %err, "Failed to cache AniList response");
+            let fetched_data =
+                match task::spawn_blocking(move || check_cache(&cache_key_for_lookup)).await {
+                    Ok(Ok(cached_value)) => {
+                        info!("Cache hit for {:#?}", cache_key);
+                        cached_value
                     }
-
-                    response
-                }
-                Err(err) => {
-                    error!(error = %err, "Failed to read AniList cache");
-                    let response =
-                        match fetch_by_name(response_config.get_search_query(), value.to_string())
-                            .await
-                        {
-                            Ok(data) => data,
-                            Err(err) => {
-                                error!(error = %err, "Failed to fetch AniList data by name");
-                                return None;
-                            }
-                        };
-
-                    let cache_key_for_write = cache_key.clone();
-                    let response_to_cache = response.clone();
-                    if let Err(err) = task::spawn_blocking(move || {
-                        try_to_cache_response(&cache_key_for_write, &response_to_cache)
-                    })
-                    .await
-                    {
-                        error!(error = %err, "Failed to cache AniList response");
+                    Ok(Err(err)) => {
+                        info!("Cache miss for {:#?} with error {:#?}", cache_key, err);
+                        fetch_from_network_and_cache(
+                            search_query.clone(),
+                            lookup_value.clone(),
+                            cache_key.clone(),
+                        )
+                        .await?
                     }
-
-                    response
-                }
-            };
+                    Err(err) => {
+                        error!(error = %err, "Failed to read AniList cache");
+                        fetch_from_network_and_cache(search_query, lookup_value, cache_key.clone())
+                            .await?
+                    }
+                };
             let fetch_response: MediaResponse<T> = match serde_json::from_str(&fetched_data) {
                 Ok(response) => response,
                 Err(err) => {
