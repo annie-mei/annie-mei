@@ -1,12 +1,9 @@
-use crate::utils::{
-    formatter::{bold, linker},
-    spotify::get_song_url,
-};
+use crate::utils::formatter::{bold, linker};
 
 use std::{collections::HashSet, fmt::Write};
 
 use serde::Deserialize;
-use tracing::{info, instrument};
+use tracing::instrument;
 
 #[derive(Deserialize, Debug, Clone)]
 pub struct MalResponse {
@@ -227,36 +224,6 @@ impl MalResponse {
 
         song[start_index + 1..end_index].parse::<u32>().ok()
     }
-
-    // --- Legacy wrappers (used by command.rs until the pipeline is updated) ---
-
-    pub fn transform_openings(&self) -> String {
-        let mut songs = self.parse_openings();
-        Self::enrich_and_format(&mut songs)
-    }
-
-    pub fn transform_endings(&self) -> String {
-        let mut songs = self.parse_endings();
-        Self::enrich_and_format(&mut songs)
-    }
-
-    fn enrich_and_format(songs: &mut [ParsedSong]) -> String {
-        for song in songs.iter_mut() {
-            if let Some(ref artist) = song.artist_names {
-                info!("Romaji Song Name: {:#?}", song.romaji_name);
-                info!("Kana Song Name: {:#?}", song.kana_name);
-                song.spotify_url = get_song_url(
-                    song.romaji_name.clone(),
-                    song.kana_name.clone(),
-                    artist.clone(),
-                );
-                info!("Spotify Url: {:#?}", song.spotify_url);
-            }
-        }
-        Self::format_parsed_songs(songs)
-    }
-
-    // --- End legacy wrappers ---
 
     pub fn transform_mal_link(&self) -> String {
         let link = format!("https://www.myanimelist.net/anime/{}", self.id);

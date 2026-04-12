@@ -4,7 +4,10 @@ use crate::{
         songs::fetcher::{SongFetchResult, fetcher as SongFetcher},
     },
     models::mal_response::MalResponse,
-    utils::{privacy::configure_sentry_scope, statics::NOT_FOUND_ANIME},
+    utils::{
+        privacy::configure_sentry_scope, spotify::enrich_songs_with_spotify,
+        statics::NOT_FOUND_ANIME,
+    },
 };
 
 use serde_json::json;
@@ -17,14 +20,6 @@ use serenity::{
 
 use tokio::task;
 use tracing::{error, info, instrument};
-
-struct SongEmbedData {
-    title: String,
-    openings: String,
-    endings: String,
-    thumbnail: String,
-    mal_link: String,
-}
 
 pub fn register() -> CreateCommand {
     CreateCommand::new("songs")
@@ -64,29 +59,42 @@ pub async fn run(ctx: &Context, interaction: &mut CommandInteraction) {
     let response = SongFetcher(arg).await;
 
     let _songs_response = match response {
-        SongFetchResult::Found(song_response) => {
-            let embed_data =
-                match task::spawn_blocking(move || build_message_from_song_response(song_response))
-                    .await
-                {
-                    Ok(data) => data,
-                    Err(err) => {
-                        error!(error = %err, "spawn_blocking panicked while building song embed");
-                        let builder = EditInteractionResponse::new().content(
+        SongFetchResult::Found(mal_response) => {
+            // Pure parsing — no I/O, no spawn_blocking needed
+            let mut openings = mal_response.parse_openings();
+            let mut endings = mal_response.parse_endings();
+
+            // Narrow spawn_blocking: only the sync Spotify + Redis I/O
+            let (openings, endings) = match task::spawn_blocking(move || {
+                enrich_songs_with_spotify(&mut openings);
+                enrich_songs_with_spotify(&mut endings);
+                (openings, endings)
+            })
+            .await
+            {
+                Ok(result) => result,
+                Err(err) => {
+                    error!(error = %err, "spawn_blocking panicked during Spotify enrichment");
+                    let builder = EditInteractionResponse::new().content(
                         "An internal error occurred while fetching songs. Please try again later.",
                     );
-                        let _ = interaction.edit_response(&ctx.http, builder).await;
-                        return;
-                    }
-                };
+                    let _ = interaction.edit_response(&ctx.http, builder).await;
+                    return;
+                }
+            };
 
+            // Pure formatting — no I/O, no spawn_blocking needed
             let builder = EditInteractionResponse::new().embed(
                 CreateEmbed::new()
-                    .title(embed_data.title)
-                    .field("Openings", embed_data.openings, false)
-                    .field("Endings", embed_data.endings, false)
-                    .thumbnail(embed_data.thumbnail)
-                    .field("\u{200b}", embed_data.mal_link, false),
+                    .title(mal_response.transform_title())
+                    .field(
+                        "Openings",
+                        MalResponse::format_parsed_songs(&openings),
+                        false,
+                    )
+                    .field("Endings", MalResponse::format_parsed_songs(&endings), false)
+                    .thumbnail(mal_response.transform_thumbnail())
+                    .field("\u{200b}", mal_response.transform_mal_link(), false),
             );
             interaction.edit_response(&ctx.http, builder).await
         }
@@ -105,15 +113,4 @@ pub async fn run(ctx: &Context, interaction: &mut CommandInteraction) {
             interaction.edit_response(&ctx.http, builder).await
         }
     };
-}
-
-#[instrument(name = "command.songs.build_message", skip(mal_response))]
-fn build_message_from_song_response(mal_response: MalResponse) -> SongEmbedData {
-    SongEmbedData {
-        title: mal_response.transform_title(),
-        openings: mal_response.transform_openings(),
-        endings: mal_response.transform_endings(),
-        thumbnail: mal_response.transform_thumbnail(),
-        mal_link: mal_response.transform_mal_link(),
-    }
 }
