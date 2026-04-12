@@ -56,6 +56,7 @@ impl MalResponse {
         Self::truncate_and_parse(self.ending_themes.clone())
     }
 
+    #[instrument(name = "mal_response.truncate_and_parse", skip(songs))]
     fn truncate_and_parse(songs: Option<Vec<SongInfo>>) -> Vec<ParsedSong> {
         match songs {
             None => vec![],
@@ -67,6 +68,7 @@ impl MalResponse {
         }
     }
 
+    #[instrument(name = "mal_response.parse_songs", skip(songs), fields(count = songs.len()))]
     fn parse_songs(songs: Vec<SongInfo>) -> Vec<ParsedSong> {
         let mut result = vec![];
         let mut seen_numbers: HashSet<u32> = HashSet::new();
