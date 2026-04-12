@@ -1,7 +1,8 @@
 use std::env;
+use std::sync::LazyLock;
 use std::time::Duration;
 
-use reqwest::blocking::Client;
+use reqwest::Client;
 use tracing::{info, instrument};
 
 use crate::utils::statics::MAL_CLIENT_ID;
@@ -39,6 +40,21 @@ const MY_ANIME_LIST_BASE: &str = "https://api.myanimelist.net/v2";
 const FIELDS_TO_FETCH: [&str; 3] = ["id", "opening_themes", "ending_themes"];
 const MAL_TIMEOUT_SECS: u64 = 10;
 
+static MAL_CLIENT: LazyLock<Result<Client, String>> = LazyLock::new(|| {
+    Client::builder()
+        .timeout(Duration::from_secs(MAL_TIMEOUT_SECS))
+        .build()
+        .map_err(|error| error.to_string())
+});
+
+#[instrument(name = "http.mal.client")]
+fn get_client() -> Result<&'static Client, MalRequestError> {
+    match &*MAL_CLIENT {
+        Ok(client) => Ok(client),
+        Err(error) => Err(MalRequestError::ClientBuild(error.clone())),
+    }
+}
+
 #[instrument(name = "http.mal.build_url", fields(mal_id = mal_id))]
 fn build_mal_url(mal_id: u32) -> String {
     let mal_url = format!(
@@ -51,23 +67,22 @@ fn build_mal_url(mal_id: u32) -> String {
 }
 
 #[instrument(name = "http.mal.send_request", skip_all, fields(mal_id = mal_id))]
-pub fn send_request(mal_id: u32) -> Result<String, MalRequestError> {
+pub async fn send_request(mal_id: u32) -> Result<String, MalRequestError> {
     let mal_client_id = env::var(MAL_CLIENT_ID).expect("Expected MAL_CLIENT_ID in the environment");
 
-    let client = Client::builder()
-        .timeout(Duration::from_secs(MAL_TIMEOUT_SECS))
-        .build()
-        .map_err(|error| MalRequestError::ClientBuild(error.to_string()))?;
+    let client = get_client()?;
 
     let response = client
         .get(build_mal_url(mal_id))
         .header("X-MAL-CLIENT-ID", mal_client_id)
         .send()
+        .await
         .map_err(|error| MalRequestError::RequestFailed(error.to_string()))?;
 
     let status = response.status();
     let body = response
         .text()
+        .await
         .map_err(|error| MalRequestError::ResponseBodyReadFailed(error.to_string()))?;
 
     if !status.is_success() {

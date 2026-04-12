@@ -1,6 +1,7 @@
+use std::sync::LazyLock;
 use std::time::Duration;
 
-use reqwest::blocking::Client;
+use reqwest::Client;
 use serde_json::Value;
 use tracing::instrument;
 
@@ -38,16 +39,28 @@ impl std::error::Error for AniListRequestError {}
 
 const ANILIST_TIMEOUT_SECS: u64 = 10;
 
+static ANILIST_CLIENT: LazyLock<Result<Client, String>> = LazyLock::new(|| {
+    Client::builder()
+        .timeout(Duration::from_secs(ANILIST_TIMEOUT_SECS))
+        .build()
+        .map_err(|error| error.to_string())
+});
+
+#[instrument(name = "http.anilist.client")]
+fn get_client() -> Result<&'static Client, AniListRequestError> {
+    match &*ANILIST_CLIENT {
+        Ok(client) => Ok(client),
+        Err(error) => Err(AniListRequestError::ClientBuild(error.clone())),
+    }
+}
+
 #[instrument(
     name = "http.anilist.send_request",
     skip(json),
     fields(endpoint = "https://graphql.anilist.co/")
 )]
-pub fn send_request(json: Value) -> Result<String, AniListRequestError> {
-    let client = Client::builder()
-        .timeout(Duration::from_secs(ANILIST_TIMEOUT_SECS))
-        .build()
-        .map_err(|error| AniListRequestError::ClientBuild(error.to_string()))?;
+pub async fn send_request(json: Value) -> Result<String, AniListRequestError> {
+    let client = get_client()?;
 
     let response = client
         .post("https://graphql.anilist.co/")
@@ -55,11 +68,13 @@ pub fn send_request(json: Value) -> Result<String, AniListRequestError> {
         .header("Accept", "application/json")
         .body(json.to_string())
         .send()
+        .await
         .map_err(|error| AniListRequestError::RequestFailed(error.to_string()))?;
 
     let status = response.status();
     let body = response
         .text()
+        .await
         .map_err(|error| AniListRequestError::ResponseBodyReadFailed(error.to_string()))?;
 
     if !status.is_success() {
