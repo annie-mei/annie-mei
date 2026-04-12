@@ -46,7 +46,7 @@ static ANILIST_CLIENT: LazyLock<Result<Client, String>> = LazyLock::new(|| {
         .map_err(|error| error.to_string())
 });
 
-#[instrument(name = "http.anilist.client")]
+#[instrument(name = "http.anilist.client", level = "trace")]
 fn get_client() -> Result<&'static Client, AniListRequestError> {
     match &*ANILIST_CLIENT {
         Ok(client) => Ok(client),
