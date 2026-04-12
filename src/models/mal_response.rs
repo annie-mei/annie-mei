@@ -182,9 +182,11 @@ impl MalResponse {
         if !has_song_number {
             return None;
         }
-        let start_index = song.find('#').unwrap();
-        let end_index = song.find(':').unwrap();
-        Some(song[start_index + 1..end_index].parse::<u32>().unwrap())
+
+        let start_index = song.find('#')?;
+        let end_index = song.find(':')?;
+
+        song[start_index + 1..end_index].parse::<u32>().ok()
     }
 
     pub fn transform_endings(&self) -> String {
@@ -225,5 +227,24 @@ impl MalResponse {
 
     pub fn transform_title(&self) -> String {
         self.title.to_string()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::MalResponse;
+
+    #[test]
+    fn get_song_number_parses_numeric_prefixes() {
+        let song = "#1: \"Again\" by YUI";
+
+        assert_eq!(MalResponse::get_song_number(song), Some(1));
+    }
+
+    #[test]
+    fn get_song_number_ignores_non_numeric_prefixes() {
+        let song = "#TV: \"Again\" by YUI";
+
+        assert_eq!(MalResponse::get_song_number(song), None);
     }
 }
