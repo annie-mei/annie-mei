@@ -13,6 +13,7 @@ use crate::{
     },
 };
 
+use tokio::task;
 use tracing::{debug, error, info};
 
 pub struct AnimeConfig {
@@ -37,65 +38,108 @@ pub trait Response {
     fn get_argument(&self) -> &Argument;
     fn get_id_query(&self) -> String;
     fn get_search_query(&self) -> String;
+}
 
-    fn fetch<
-        T: serde::de::DeserializeOwned + Transformers + std::fmt::Debug + std::clone::Clone,
-    >(
-        &self,
-        media_type: Type,
-    ) -> Option<T> {
-        match self.get_argument() {
-            Argument::Id(value) => {
-                let fetched_data = match fetch_by_id(self.get_id_query(), *value) {
-                    Ok(data) => data,
-                    Err(err) => {
-                        error!(error = %err, id = *value, "Failed to fetch AniList data by id");
-                        return None;
+pub async fn fetch<
+    T: serde::de::DeserializeOwned + Transformers + std::fmt::Debug + std::clone::Clone,
+>(
+    response_config: &impl Response,
+    media_type: Type,
+) -> Option<T> {
+    match response_config.get_argument() {
+        Argument::Id(value) => {
+            let fetched_data = match fetch_by_id(response_config.get_id_query(), *value).await {
+                Ok(data) => data,
+                Err(err) => {
+                    error!(error = %err, id = *value, "Failed to fetch AniList data by id");
+                    return None;
+                }
+            };
+            let fetch_response: IdResponse<T> = match serde_json::from_str(&fetched_data) {
+                Ok(response) => response,
+                Err(err) => {
+                    error!(error = %err, "Failed to deserialize AniList id response");
+                    return None;
+                }
+            };
+            debug!("Deserialized response: {:#?}", fetch_response);
+            fetch_response.data.and_then(|data| data.media)
+        }
+        Argument::Search(value) => {
+            let cache_key = format!("{}:{value}", media_type.as_ref());
+            let cache_key_for_lookup = cache_key.clone();
+
+            let fetched_data = match task::spawn_blocking(move || {
+                check_cache(&cache_key_for_lookup)
+            })
+            .await
+            {
+                Ok(Ok(cached_value)) => {
+                    info!("Cache hit for {:#?}", cache_key);
+                    cached_value
+                }
+                Ok(Err(err)) => {
+                    info!("Cache miss for {:#?} with error {:#?}", cache_key, err);
+                    let response =
+                        match fetch_by_name(response_config.get_search_query(), value.to_string())
+                            .await
+                        {
+                            Ok(data) => data,
+                            Err(err) => {
+                                error!(error = %err, "Failed to fetch AniList data by name");
+                                return None;
+                            }
+                        };
+
+                    let cache_key_for_write = cache_key.clone();
+                    let response_to_cache = response.clone();
+                    if let Err(err) = task::spawn_blocking(move || {
+                        try_to_cache_response(&cache_key_for_write, &response_to_cache)
+                    })
+                    .await
+                    {
+                        error!(error = %err, "Failed to cache AniList response");
                     }
-                };
-                let fetch_response: IdResponse<T> = match serde_json::from_str(&fetched_data) {
-                    Ok(response) => response,
-                    Err(err) => {
-                        error!(error = %err, "Failed to deserialize AniList id response");
-                        return None;
+
+                    response
+                }
+                Err(err) => {
+                    error!(error = %err, "Failed to read AniList cache");
+                    let response =
+                        match fetch_by_name(response_config.get_search_query(), value.to_string())
+                            .await
+                        {
+                            Ok(data) => data,
+                            Err(err) => {
+                                error!(error = %err, "Failed to fetch AniList data by name");
+                                return None;
+                            }
+                        };
+
+                    let cache_key_for_write = cache_key.clone();
+                    let response_to_cache = response.clone();
+                    if let Err(err) = task::spawn_blocking(move || {
+                        try_to_cache_response(&cache_key_for_write, &response_to_cache)
+                    })
+                    .await
+                    {
+                        error!(error = %err, "Failed to cache AniList response");
                     }
-                };
-                debug!("Deserialized response: {:#?}", fetch_response);
-                fetch_response.data.and_then(|data| data.media)
-            }
-            Argument::Search(value) => {
-                let cache_key = format!("{}:{value}", media_type.as_ref());
-                let fetched_data = match check_cache(&cache_key) {
-                    Ok(value) => {
-                        info!("Cache hit for {:#?}", cache_key);
-                        value
-                    }
-                    Err(e) => {
-                        info!("Cache miss for {:#?} with error {:#?}", cache_key, e);
-                        let response =
-                            match fetch_by_name(self.get_search_query(), value.to_string()) {
-                                Ok(data) => data,
-                                Err(err) => {
-                                    error!(error = %err, "Failed to fetch AniList data by name");
-                                    return None;
-                                }
-                            };
-                        try_to_cache_response(&cache_key, &response);
-                        response
-                    }
-                };
-                let fetch_response: MediaResponse<T> = match serde_json::from_str(&fetched_data) {
-                    Ok(response) => response,
-                    Err(err) => {
-                        error!(error = %err, "Failed to deserialize AniList search response");
-                        return None;
-                    }
-                };
-                debug!("Deserialized response: {:#?}", fetch_response);
-                let result = fetch_response.fuzzy_match(value, media_type);
-                debug!("Fuzzy Response: {:#?}", result);
-                result
-            }
+
+                    response
+                }
+            };
+            let fetch_response: MediaResponse<T> = match serde_json::from_str(&fetched_data) {
+                Ok(response) => response,
+                Err(err) => {
+                    error!(error = %err, "Failed to deserialize AniList search response");
+                    return None;
+                }
+            };
+            debug!("Deserialized response: {:#?}", fetch_response);
+            let result = fetch_response.fuzzy_match(value, media_type);
+            debug!("Fuzzy Response: {:#?}", result);
+            result
         }
     }
 }

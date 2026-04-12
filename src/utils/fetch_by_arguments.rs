@@ -5,9 +5,9 @@ use tracing::{info, instrument};
 use wana_kana::{ConvertJapanese, IsJapaneseStr};
 
 #[instrument(name = "anilist.fetch_by_id", skip(query), fields(id = id))]
-pub fn fetch_by_id(query: String, id: u32) -> Result<String, AniListRequestError> {
+pub async fn fetch_by_id(query: String, id: u32) -> Result<String, AniListRequestError> {
     let json = json!({"query": query, "variables": {"id":id}});
-    let result = send_request(json)?;
+    let result = send_request(json).await?;
 
     info!("Fetched By ID: {:#?}", id);
 
@@ -15,14 +15,14 @@ pub fn fetch_by_id(query: String, id: u32) -> Result<String, AniListRequestError
 }
 
 #[instrument(name = "anilist.fetch_by_name", skip(query), fields(name_len = name.len()))]
-pub fn fetch_by_name(query: String, name: String) -> Result<String, AniListRequestError> {
+pub async fn fetch_by_name(query: String, name: String) -> Result<String, AniListRequestError> {
     let searchable_name = if name.as_str().is_japanese() {
         name.to_romaji()
     } else {
         name.clone()
     };
     let json = json!({"query": query, "variables": {"search":searchable_name}});
-    let result = send_request(json)?;
+    let result = send_request(json).await?;
 
     info!("Fetched By Name: {:#?}", searchable_name);
 

@@ -17,6 +17,8 @@
 //! assert!(response.is_embed());
 //! ```
 
+use std::future::Future;
+
 use crate::models::{anilist_anime::Anime, anilist_manga::Manga};
 
 /// Abstraction over media-data retrieval (AniList today, pluggable tomorrow).
@@ -28,12 +30,12 @@ pub trait MediaDataSource: Send + Sync {
     /// Fetch anime data for the given search term (name **or** numeric ID).
     ///
     /// Returns `None` when no matching anime is found.
-    fn fetch_anime(&self, search_term: &str) -> Option<Anime>;
+    fn fetch_anime(&self, search_term: &str) -> impl Future<Output = Option<Anime>> + Send;
 
     /// Fetch manga data for the given search term (name **or** numeric ID).
     ///
     /// Returns `None` when no matching manga is found.
-    fn fetch_manga(&self, search_term: &str) -> Option<Manga>;
+    fn fetch_manga(&self, search_term: &str) -> impl Future<Output = Option<Manga>> + Send;
 }
 
 /// Production [`MediaDataSource`] backed by the AniList GraphQL API.
@@ -43,21 +45,21 @@ pub trait MediaDataSource: Send + Sync {
 pub struct AniListSource;
 
 impl MediaDataSource for AniListSource {
-    fn fetch_anime(&self, search_term: &str) -> Option<Anime> {
+    async fn fetch_anime(&self, search_term: &str) -> Option<Anime> {
         use crate::models::media_type::MediaType;
         use crate::utils::response_fetcher::fetcher;
         use serenity::all::CommandDataOptionValue;
 
         let arg = CommandDataOptionValue::String(search_term.to_string());
-        fetcher::<Anime>(MediaType::Anime, arg)
+        fetcher::<Anime>(MediaType::Anime, arg).await
     }
 
-    fn fetch_manga(&self, search_term: &str) -> Option<Manga> {
+    async fn fetch_manga(&self, search_term: &str) -> Option<Manga> {
         use crate::models::media_type::MediaType;
         use crate::utils::response_fetcher::fetcher;
         use serenity::all::CommandDataOptionValue;
 
         let arg = CommandDataOptionValue::String(search_term.to_string());
-        fetcher::<Manga>(MediaType::Manga, arg)
+        fetcher::<Manga>(MediaType::Manga, arg).await
     }
 }
