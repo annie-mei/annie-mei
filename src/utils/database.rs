@@ -7,6 +7,7 @@ use diesel::sql_query;
 use diesel_migrations::{EmbeddedMigrations, MigrationHarness, embed_migrations};
 use serenity::{client::Context, prelude::TypeMapKey};
 use std::env;
+use std::time::Duration;
 use tracing::{error, info, instrument};
 
 pub type DbPool = Pool<ConnectionManager<PgConnection>>;
@@ -23,15 +24,20 @@ pub fn create_pool() -> DbPool {
     let database_url = env::var(DATABASE_URL).expect("DATABASE_URL must be set");
     let manager = ConnectionManager::<PgConnection>::new(database_url.clone());
 
-    Pool::builder().build(manager).unwrap_or_else(|error| {
-        let redacted_url = redact_database_url(&database_url);
-        error!(
-            error = %error,
-            database_url = %redacted_url,
-            "Failed to create database connection pool"
-        );
-        panic!("Error creating pool for {redacted_url}: {error}")
-    })
+    Pool::builder()
+        .test_on_check_out(true)
+        .max_lifetime(Some(Duration::from_secs(20 * 60)))
+        .idle_timeout(Some(Duration::from_secs(10 * 60)))
+        .build(manager)
+        .unwrap_or_else(|error| {
+            let redacted_url = redact_database_url(&database_url);
+            error!(
+                error = %error,
+                database_url = %redacted_url,
+                "Failed to create database connection pool"
+            );
+            panic!("Error creating pool for {redacted_url}: {error}")
+        })
 }
 
 #[instrument(name = "db.get_connection", skip(pool))]
