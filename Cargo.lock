@@ -185,7 +185,7 @@ dependencies = [
 
 [[package]]
 name = "annie-mei"
-version = "2.10.8"
+version = "2.10.9"
 dependencies = [
  "axum",
  "base64",
