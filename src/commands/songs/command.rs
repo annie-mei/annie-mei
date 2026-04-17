@@ -119,3 +119,35 @@ fn enrich_song_sections(
     enrich_songs_with_spotify(&mut endings);
     (openings, endings)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn song_without_artist(song_name: &str, display_number: u32) -> ParsedSong {
+        ParsedSong {
+            display_number,
+            song_name: song_name.to_string(),
+            romaji_name: song_name.to_string(),
+            kana_name: None,
+            artist_names: None,
+            episode_numbers: None,
+            spotify_url: None,
+        }
+    }
+
+    #[test]
+    fn enrich_song_sections_leaves_songs_without_artists_unchanged() {
+        let openings = vec![song_without_artist("Opening Song", 1)];
+        let endings = vec![song_without_artist("Ending Song", 2)];
+
+        let (openings, endings) = enrich_song_sections(openings, endings);
+
+        assert_eq!(openings.len(), 1);
+        assert_eq!(endings.len(), 1);
+        assert_eq!(openings[0].song_name, "Opening Song");
+        assert_eq!(endings[0].song_name, "Ending Song");
+        assert!(openings[0].spotify_url.is_none());
+        assert!(endings[0].spotify_url.is_none());
+    }
+}
