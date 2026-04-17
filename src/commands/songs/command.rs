@@ -3,7 +3,7 @@ use crate::{
         input_validation::validate_search_term,
         songs::fetcher::{SongFetchResult, fetcher as SongFetcher},
     },
-    models::mal_response::MalResponse,
+    models::mal_response::{MalResponse, ParsedSong},
     utils::{
         privacy::configure_sentry_scope, spotify::enrich_songs_with_spotify,
         statics::NOT_FOUND_ANIME,
@@ -61,27 +61,22 @@ pub async fn run(ctx: &Context, interaction: &mut CommandInteraction) {
     let _songs_response = match response {
         SongFetchResult::Found(mal_response) => {
             // Pure parsing — no I/O, no spawn_blocking needed
-            let mut openings = mal_response.parse_openings();
-            let mut endings = mal_response.parse_endings();
+            let openings = mal_response.parse_openings();
+            let endings = mal_response.parse_endings();
 
             // Narrow spawn_blocking: only the sync Spotify + Redis I/O
-            let (openings, endings) = match task::spawn_blocking(move || {
-                enrich_songs_with_spotify(&mut openings);
-                enrich_songs_with_spotify(&mut endings);
-                (openings, endings)
-            })
-            .await
-            {
-                Ok(result) => result,
-                Err(err) => {
-                    error!(error = %err, "spawn_blocking panicked during Spotify enrichment");
-                    let builder = EditInteractionResponse::new().content(
+            let (openings, endings) =
+                match task::spawn_blocking(move || enrich_song_sections(openings, endings)).await {
+                    Ok(result) => result,
+                    Err(err) => {
+                        error!(error = %err, "spawn_blocking panicked during Spotify enrichment");
+                        let builder = EditInteractionResponse::new().content(
                         "An internal error occurred while fetching songs. Please try again later.",
                     );
-                    let _ = interaction.edit_response(&ctx.http, builder).await;
-                    return;
-                }
-            };
+                        let _ = interaction.edit_response(&ctx.http, builder).await;
+                        return;
+                    }
+                };
 
             // Pure formatting — no I/O, no spawn_blocking needed
             let builder = EditInteractionResponse::new().embed(
@@ -113,4 +108,14 @@ pub async fn run(ctx: &Context, interaction: &mut CommandInteraction) {
             interaction.edit_response(&ctx.http, builder).await
         }
     };
+}
+
+#[instrument(name = "songs.enrich_spotify_section", skip(openings, endings), fields(openings_len = openings.len(), endings_len = endings.len()))]
+fn enrich_song_sections(
+    mut openings: Vec<ParsedSong>,
+    mut endings: Vec<ParsedSong>,
+) -> (Vec<ParsedSong>, Vec<ParsedSong>) {
+    enrich_songs_with_spotify(&mut openings);
+    enrich_songs_with_spotify(&mut endings);
+    (openings, endings)
 }

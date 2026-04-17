@@ -89,8 +89,7 @@ pub async fn get_guild_data_for_media<T: Transformers>(
     };
 
     let anilist_users = match task::spawn_blocking(move || {
-        let mut conn = get_connection(&database_pool);
-        User::get_users_by_discord_id(guild_members, &mut conn)
+        fetch_guild_members_with_ids_blocking(database_pool, guild_members)
     })
     .await
     {
@@ -103,6 +102,15 @@ pub async fn get_guild_data_for_media<T: Transformers>(
     };
 
     get_guild_anilist_data(anilist_users, media.get_id(), media.get_type()).await
+}
+
+#[instrument(name = "guild.fetch_members_blocking", skip(database_pool, guild_member_ids), fields(member_count = guild_member_ids.len()))]
+fn fetch_guild_members_with_ids_blocking(
+    database_pool: crate::utils::database::DbPool,
+    guild_member_ids: Vec<UserId>,
+) -> Option<Vec<User>> {
+    let mut conn = get_connection(&database_pool);
+    User::get_users_by_discord_id(guild_member_ids, &mut conn)
 }
 
 #[instrument(name = "guild.fetch_anilist_data", skip(guild_members, media_type), fields(member_count = guild_members.len(), media_id = media_id, media_type = %media_type))]

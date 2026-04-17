@@ -13,8 +13,9 @@ use rspotify::{
 };
 
 use std::env;
-use tracing::{info, instrument};
+use tracing::{error, info, instrument};
 
+#[instrument(name = "spotify.get_client", skip_all)]
 fn get_spotify_client() -> ClientCredsSpotify {
     let client_id =
         env::var(SPOTIFY_CLIENT_ID).expect("Expected a spotify client id in the environment");
@@ -29,6 +30,7 @@ fn get_spotify_client() -> ClientCredsSpotify {
     spotify
 }
 
+#[instrument(name = "spotify.get_song_url", skip(kana_name), fields(artist = %artist_name))]
 pub fn get_song_url(
     romaji_name: String,
     kana_name: Option<String>,
@@ -89,12 +91,14 @@ pub fn get_song_url(
     None
 }
 
-fn send_search_request(
-    song_name: &String,
-    artist_name: &String,
-) -> Result<SearchResult, ClientError> {
+#[instrument(name = "spotify.send_search_request", skip(song_name, artist_name))]
+fn send_search_request(song_name: &str, artist_name: &str) -> Result<SearchResult, ClientError> {
     let spotify = get_spotify_client();
-    spotify.request_token().unwrap();
+    if let Err(err) = spotify.request_token() {
+        error!(error = %err, "Failed to request Spotify token");
+        return Err(err);
+    }
+
     spotify.search(
         format!("track:{song_name} artist:{artist_name}").as_str(),
         SearchType::Track,
@@ -105,6 +109,7 @@ fn send_search_request(
     )
 }
 
+#[instrument(name = "spotify.extract_track_url", skip(search_result))]
 fn get_url_from_search_result(search_result: SearchResult) -> Option<String> {
     if let SearchResult::Tracks(page) = search_result {
         // Gets URL for top result

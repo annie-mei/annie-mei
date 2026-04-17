@@ -13,6 +13,7 @@ use crate::{
     },
 };
 
+use redis::RedisResult;
 use tokio::task;
 use tracing::{debug, error, info, instrument};
 
@@ -61,7 +62,7 @@ async fn fetch_from_network_and_cache(
     let cache_key_for_write = cache_key.clone();
     let response_to_cache = response.clone();
     if let Err(err) = task::spawn_blocking(move || {
-        try_to_cache_response(&cache_key_for_write, &response_to_cache)
+        write_cached_anilist_response(cache_key_for_write, response_to_cache)
     })
     .await
     {
@@ -69,6 +70,16 @@ async fn fetch_from_network_and_cache(
     }
 
     Some(response)
+}
+
+#[instrument(name = "anilist.read_cache_blocking", skip(cache_key))]
+fn read_cached_anilist_response(cache_key: String) -> RedisResult<String> {
+    check_cache(&cache_key)
+}
+
+#[instrument(name = "anilist.write_cache_blocking", skip(cache_key, response))]
+fn write_cached_anilist_response(cache_key: String, response: String) {
+    try_to_cache_response(&cache_key, &response)
 }
 
 #[instrument(name = "anilist.fetch", skip(response_config), fields(media_type = ?media_type))]
@@ -103,27 +114,30 @@ pub async fn fetch<
             let search_query = response_config.get_search_query();
             let lookup_value = value.to_string();
 
-            let fetched_data =
-                match task::spawn_blocking(move || check_cache(&cache_key_for_lookup)).await {
-                    Ok(Ok(cached_value)) => {
-                        info!("Cache hit for {:#?}", cache_key);
-                        cached_value
-                    }
-                    Ok(Err(err)) => {
-                        info!("Cache miss for {:#?} with error {:#?}", cache_key, err);
-                        fetch_from_network_and_cache(
-                            search_query.clone(),
-                            lookup_value.clone(),
-                            cache_key.clone(),
-                        )
+            let fetched_data = match task::spawn_blocking(move || {
+                read_cached_anilist_response(cache_key_for_lookup)
+            })
+            .await
+            {
+                Ok(Ok(cached_value)) => {
+                    info!("Cache hit for {:#?}", cache_key);
+                    cached_value
+                }
+                Ok(Err(err)) => {
+                    info!("Cache miss for {:#?} with error {:#?}", cache_key, err);
+                    fetch_from_network_and_cache(
+                        search_query.clone(),
+                        lookup_value.clone(),
+                        cache_key.clone(),
+                    )
+                    .await?
+                }
+                Err(err) => {
+                    error!(error = %err, "Failed to read AniList cache");
+                    fetch_from_network_and_cache(search_query, lookup_value, cache_key.clone())
                         .await?
-                    }
-                    Err(err) => {
-                        error!(error = %err, "Failed to read AniList cache");
-                        fetch_from_network_and_cache(search_query, lookup_value, cache_key.clone())
-                            .await?
-                    }
-                };
+                }
+            };
             let fetch_response: MediaResponse<T> = match serde_json::from_str(&fetched_data) {
                 Ok(response) => response,
                 Err(err) => {

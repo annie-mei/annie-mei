@@ -10,14 +10,26 @@ use crate::utils::statics::{DEFAULT_SERVER_PORT, SERVER_PORT};
 
 const VERSION: &str = env!("CARGO_PKG_VERSION");
 
+#[instrument(name = "http.healthz.redis_blocking", skip_all)]
+fn run_redis_health_check() -> redis::RedisResult<()> {
+    crate::utils::redis::ping()
+}
+
+#[instrument(name = "http.healthz.database_blocking", skip_all)]
+fn run_database_health_check(
+    database_pool: &crate::utils::database::DbPool,
+) -> Result<(), diesel::result::Error> {
+    crate::utils::database::ping(database_pool)
+}
+
 #[instrument(name = "http.healthz", skip_all)]
 async fn healthz(
     State(database_pool): State<crate::utils::database::DbPool>,
 ) -> (StatusCode, Json<Value>) {
     let health_check_pool = database_pool.clone();
     let (redis_result, db_result) = tokio::join!(
-        tokio::task::spawn_blocking(crate::utils::redis::ping),
-        tokio::task::spawn_blocking(move || crate::utils::database::ping(&health_check_pool)),
+        tokio::task::spawn_blocking(run_redis_health_check),
+        tokio::task::spawn_blocking(move || run_database_health_check(&health_check_pool)),
     );
 
     let redis_ok = match &redis_result {
