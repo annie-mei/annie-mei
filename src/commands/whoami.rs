@@ -44,7 +44,7 @@ pub fn handle_whoami(profile: Option<LinkedAniListProfile>) -> CommandResponse {
     }
 }
 
-#[instrument(name = "whoami.fetch_profile_blocking", skip(database_pool), fields(discord_user_id = %hash_user_id(discord_id as u64)))]
+#[instrument(name = "whoami.fetch_profile_blocking", skip(database_pool, discord_id), fields(discord_user_id = %hash_user_id(discord_id as u64)))]
 fn fetch_whoami_profile(
     database_pool: crate::utils::database::DbPool,
     discord_id: i64,
