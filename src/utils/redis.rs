@@ -30,16 +30,17 @@ pub fn ping() -> RedisResult<()> {
 
 #[instrument(name = "redis.check_cache", fields(key = %key, key_len = key.len()))]
 pub fn check_cache(key: &str) -> RedisResult<String> {
-    let mut redis_client_connection = get_redis_client().unwrap();
+    let mut redis_client_connection = get_redis_client()?;
     let cached_value: String = redis_client_connection.get(key)?;
     Ok(cached_value)
 }
 
 #[instrument(name = "redis.cache_response", skip(response), fields(key = %key, key_len = key.len(), response_len = response.len()))]
 fn cache_response(key: &str, response: &str) -> RedisResult<()> {
-    let mut redis_client_connection = get_redis_client().unwrap();
+    let mut redis_client_connection = get_redis_client()?;
     // Expires cached value in 5 hours
-    redis_client_connection.set_ex(key, response, 18_000)
+    redis_client_connection.set_ex::<_, _, ()>(key, response, 18_000)?;
+    Ok(())
 }
 
 #[instrument(name = "redis.try_cache_response", skip(response), fields(key = %key, key_len = key.len(), response_len = response.len()))]

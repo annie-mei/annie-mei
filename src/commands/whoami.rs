@@ -44,6 +44,15 @@ pub fn handle_whoami(profile: Option<LinkedAniListProfile>) -> CommandResponse {
     }
 }
 
+#[instrument(name = "whoami.fetch_profile_blocking", skip(database_pool, discord_id), fields(discord_user_id = %hash_user_id(discord_id as u64)))]
+fn fetch_whoami_profile(
+    database_pool: crate::utils::database::DbPool,
+    discord_id: i64,
+) -> Result<Option<User>, diesel::result::Error> {
+    let mut connection = database::get_connection(&database_pool);
+    User::get_user_by_discord_id(discord_id, &mut connection)
+}
+
 #[instrument(name = "command.whoami.run", skip(ctx, interaction))]
 pub async fn run(ctx: &Context, interaction: &mut CommandInteraction) {
     let _ = interaction.defer_ephemeral(&ctx.http).await;
@@ -59,11 +68,8 @@ pub async fn run(ctx: &Context, interaction: &mut CommandInteraction) {
     };
 
     let discord_id = user.id.get() as i64;
-    let db_result = task::spawn_blocking(move || {
-        let mut connection = database::get_connection(&database_pool);
-        User::get_user_by_discord_id(discord_id, &mut connection)
-    })
-    .await;
+    let db_result =
+        task::spawn_blocking(move || fetch_whoami_profile(database_pool, discord_id)).await;
 
     let response = match db_result {
         Ok(Ok(profile)) => handle_whoami(profile.map(|entry| LinkedAniListProfile {

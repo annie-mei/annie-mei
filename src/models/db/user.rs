@@ -12,7 +12,7 @@ pub struct User {
 }
 
 impl User {
-    #[instrument(name = "db.user.get_by_discord_id", skip(conn), fields(discord_user_id = %hash_user_id(user_discord_id as u64)))]
+    #[instrument(name = "db.user.get_by_discord_id", skip(conn, user_discord_id), fields(discord_user_id = %hash_user_id(user_discord_id as u64)))]
     pub fn get_user_by_discord_id(
         user_discord_id: i64,
         conn: &mut PgConnection,
