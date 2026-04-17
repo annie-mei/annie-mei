@@ -30,7 +30,7 @@ fn get_spotify_client() -> ClientCredsSpotify {
     spotify
 }
 
-#[instrument(name = "spotify.get_song_url", skip(kana_name), fields(artist = %artist_name))]
+#[instrument(name = "spotify.get_song_url", skip(kana_name, romaji_name, artist_name), fields(song = %romaji_name, artist = %artist_name))]
 pub fn get_song_url(
     romaji_name: String,
     kana_name: Option<String>,
@@ -91,7 +91,7 @@ pub fn get_song_url(
     None
 }
 
-#[instrument(name = "spotify.send_search_request", skip(song_name, artist_name))]
+#[instrument(name = "spotify.send_search_request", skip(song_name, artist_name), fields(song = %song_name, artist = %artist_name))]
 fn send_search_request(song_name: &str, artist_name: &str) -> Result<SearchResult, ClientError> {
     let spotify = get_spotify_client();
     if let Err(err) = spotify.request_token() {
