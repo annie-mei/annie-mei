@@ -68,8 +68,8 @@ pub async fn run(ctx: &Context, interaction: &mut CommandInteraction) {
     };
 
     let discord_id = user.id.get() as i64;
-    let db_pool = database_pool.clone();
-    let db_result = task::spawn_blocking(move || fetch_whoami_profile(db_pool, discord_id)).await;
+    let db_result =
+        task::spawn_blocking(move || fetch_whoami_profile(database_pool, discord_id)).await;
 
     let response = match db_result {
         Ok(Ok(profile)) => handle_whoami(profile.map(|entry| LinkedAniListProfile {

@@ -72,12 +72,12 @@ async fn fetch_from_network_and_cache(
     Some(response)
 }
 
-#[instrument(name = "anilist.read_cache_blocking", skip(cache_key))]
+#[instrument(name = "anilist.read_cache_blocking", skip(cache_key), fields(cache_key = %cache_key))]
 fn read_cached_anilist_response(cache_key: String) -> RedisResult<String> {
     check_cache(&cache_key)
 }
 
-#[instrument(name = "anilist.write_cache_blocking", skip(cache_key, response))]
+#[instrument(name = "anilist.write_cache_blocking", skip(cache_key, response), fields(cache_key = %cache_key))]
 fn write_cached_anilist_response(cache_key: String, response: String) {
     try_to_cache_response(&cache_key, &response)
 }
