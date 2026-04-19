@@ -25,8 +25,7 @@ pub struct PageData<T> {
 
 impl<T: Transformers + std::clone::Clone> FetchResponse<T> {
     pub fn no_results(&self) -> bool {
-        let media_list = self
-            .data
+        self.data
             .as_ref()
             .unwrap()
             .page
@@ -35,14 +34,15 @@ impl<T: Transformers + std::clone::Clone> FetchResponse<T> {
             .media_list
             .as_ref()
             .unwrap()
-            .clone();
-
-        media_list.is_empty()
+            .is_empty()
     }
 
-    pub fn filter(&self, media_type: MediaType) -> Vec<T> {
-        let media_list = self
-            .data
+    /// Borrow the backing media list, filtered by the requested media type.
+    ///
+    /// Returns references into `self` rather than clones so callers avoid
+    /// duplicating every candidate just to narrow the set.
+    pub fn filter(&self, media_type: MediaType) -> Vec<&T> {
+        self.data
             .as_ref()
             .unwrap()
             .page
@@ -51,15 +51,11 @@ impl<T: Transformers + std::clone::Clone> FetchResponse<T> {
             .media_list
             .as_ref()
             .unwrap()
-            .clone();
-
-        media_list
             .iter()
             .filter(|media| match media_type {
                 MediaType::Anime => media.get_type() == "anime",
                 MediaType::Manga => media.get_type() == "manga",
             })
-            .cloned()
             .collect()
     }
 
@@ -68,21 +64,19 @@ impl<T: Transformers + std::clone::Clone> FetchResponse<T> {
         user_input: &str,
         media_type: MediaType,
     ) -> Option<(T, TitleVariant)> {
-        let no_result = &self.no_results();
-
-        if *no_result {
+        if self.no_results() {
             return None;
         }
 
         let name = user_input.to_lowercase();
-        let media_list = &self.filter(media_type);
+        let media_list = self.filter(media_type);
         let english_titles: Vec<String> = media_list
             .iter()
-            .map(|media| media.get_english_title().unwrap_or_default())
+            .map(|media| media.get_english_title().unwrap_or_default().to_string())
             .collect();
         let romaji_titles: Vec<String> = media_list
             .iter()
-            .map(|media| media.get_romaji_title().unwrap_or_default())
+            .map(|media| media.get_romaji_title().unwrap_or_default().to_string())
             .collect();
 
         let top_english_title_match = fuzzy_matcher(&name, english_titles, 0.5).unwrap_or_default();
@@ -124,7 +118,12 @@ impl<T: Transformers + std::clone::Clone> FetchResponse<T> {
         } else {
             let synonyms: Vec<Vec<String>> = media_list
                 .iter()
-                .map(|media| media.get_synonyms().unwrap_or_else(|| [].to_vec()))
+                .map(|media| {
+                    media
+                        .get_synonyms()
+                        .map(<[String]>::to_vec)
+                        .unwrap_or_default()
+                })
                 .collect();
             let top_synonym_match = fuzzy_matcher_synonyms(&name, synonyms).unwrap_or_default();
             if top_synonym_match.index == usize::MAX {

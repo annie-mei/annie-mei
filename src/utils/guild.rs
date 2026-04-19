@@ -101,7 +101,7 @@ pub async fn get_guild_data_for_media<T: Transformers>(
         }
     };
 
-    get_guild_anilist_data(anilist_users, media.get_id(), media.get_type()).await
+    get_guild_anilist_data(anilist_users, media.get_id(), media.get_type().to_owned()).await
 }
 
 #[instrument(name = "guild.fetch_members_blocking", skip(database_pool, guild_member_ids), fields(member_count = guild_member_ids.len()))]

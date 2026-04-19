@@ -163,8 +163,16 @@ impl Transformers for Anime {
         self.id
     }
 
-    fn get_type(&self) -> String {
-        self.media_type.as_ref().unwrap().to_string().to_lowercase()
+    fn get_type(&self) -> &str {
+        // AniList returns the media type as "ANIME" / "MANGA". Downstream
+        // code compares against lower-case constants, so map the known
+        // values to static lower-case strings to avoid per-call allocations.
+        match self.media_type.as_deref() {
+            Some("ANIME") | Some("anime") => "anime",
+            Some("MANGA") | Some("manga") => "manga",
+            Some(other) => other,
+            None => "",
+        }
     }
 
     fn is_adult(&self) -> bool {
@@ -175,56 +183,56 @@ impl Transformers for Anime {
         self.id_mal
     }
 
-    fn get_english_title(&self) -> Option<String> {
-        self.title.english.to_owned()
+    fn get_english_title(&self) -> Option<&str> {
+        self.title.english.as_deref()
     }
 
-    fn get_romaji_title(&self) -> Option<String> {
-        self.title.romaji.to_owned()
+    fn get_romaji_title(&self) -> Option<&str> {
+        self.title.romaji.as_deref()
     }
 
-    fn get_native_title(&self) -> Option<String> {
-        self.title.native.to_owned()
+    fn get_native_title(&self) -> Option<&str> {
+        self.title.native.as_deref()
     }
 
-    fn get_synonyms(&self) -> Option<Vec<String>> {
-        self.synonyms.to_owned()
+    fn get_synonyms(&self) -> Option<&[String]> {
+        self.synonyms.as_deref()
     }
 
-    fn get_format(&self) -> Option<String> {
-        self.format.to_owned()
+    fn get_format(&self) -> Option<&str> {
+        self.format.as_deref()
     }
 
-    fn get_status(&self) -> Option<String> {
-        self.status.to_owned()
+    fn get_status(&self) -> Option<&str> {
+        self.status.as_deref()
     }
 
-    fn get_genres(&self) -> Vec<String> {
-        self.genres.to_owned()
+    fn get_genres(&self) -> &[String] {
+        &self.genres
     }
 
-    fn get_source(&self) -> Option<String> {
-        self.source.to_owned()
+    fn get_source(&self) -> Option<&str> {
+        self.source.as_deref()
     }
 
-    fn get_cover_image(&self) -> CoverImage {
-        self.cover_image.to_owned()
+    fn get_cover_image(&self) -> &CoverImage {
+        &self.cover_image
     }
 
     fn get_average_score(&self) -> Option<u32> {
-        self.average_score.to_owned()
+        self.average_score
     }
 
-    fn get_site_url(&self) -> String {
-        self.site_url.to_owned()
+    fn get_site_url(&self) -> &str {
+        &self.site_url
     }
 
-    fn get_description(&self) -> Option<String> {
-        self.description.to_owned()
+    fn get_description(&self) -> Option<&str> {
+        self.description.as_deref()
     }
 
-    fn get_tags(&self) -> Vec<Tag> {
-        self.tags.to_owned()
+    fn get_tags(&self) -> &[Tag] {
+        &self.tags
     }
 
     fn transform_mal_id(&self) -> Option<String> {
