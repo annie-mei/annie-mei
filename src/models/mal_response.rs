@@ -118,7 +118,7 @@ impl MalResponse {
 
             match &song.spotify_url {
                 Some(url) => {
-                    write!(line, "{}", linker(&bold(song.song_name.clone()), url)).unwrap();
+                    write!(line, "{}", linker(&bold(&song.song_name), url)).unwrap();
                 }
                 None => {
                     write!(line, "{}", song.song_name).unwrap();

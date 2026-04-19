@@ -1,19 +1,19 @@
 use titlecase::titlecase as imported_titlecase;
 
-pub fn bold(input: String) -> String {
+pub fn bold(input: &str) -> String {
     format!("**{input}**")
 }
 
-pub fn italics(input: String) -> String {
+pub fn italics(input: &str) -> String {
     format!("*{input}*")
 }
 
-pub fn code(input: String) -> String {
+pub fn code(input: &str) -> String {
     format!("`{input}`")
 }
 
 #[allow(dead_code)]
-pub fn strike(input: String) -> String {
+pub fn strike(input: &str) -> String {
     format!("~~{input}~~")
 }
 

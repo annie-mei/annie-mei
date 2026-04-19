@@ -88,7 +88,7 @@ pub trait Transformers {
         let genres = self
             .get_genres()
             .iter()
-            .map(|genre| code(titlecase(genre)))
+            .map(|genre| code(&titlecase(genre)))
             .collect::<Vec<String>>()
             .join(" - ");
 
@@ -152,7 +152,7 @@ pub trait Transformers {
         let tags_list = self.get_tags();
 
         match tags_list.first() {
-            Some(tag) => italics(tag.name.clone()),
+            Some(tag) => italics(&tag.name),
             None => EMPTY_STR.to_string(),
         }
     }

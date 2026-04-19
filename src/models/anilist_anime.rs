@@ -142,7 +142,7 @@ impl Anime {
         main_studio_indices
             .into_iter()
             .filter_map(|index| studios.nodes.get(index))
-            .map(|node| code(titlecase(&node.name)))
+            .map(|node| code(&titlecase(&node.name)))
             .collect::<Vec<String>>()
             .join(" x ")
     }

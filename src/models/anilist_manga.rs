@@ -137,12 +137,12 @@ impl Manga {
         let artist_name = staff.nodes[artist_index].name.full.as_str();
 
         if mangaka_name == artist_name {
-            code(titlecase(mangaka_name))
+            code(&titlecase(mangaka_name))
         } else {
             format!(
                 "{} x {}",
-                code(titlecase(mangaka_name)),
-                code(titlecase(artist_name))
+                code(&titlecase(mangaka_name)),
+                code(&titlecase(artist_name))
             )
         }
     }
