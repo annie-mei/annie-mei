@@ -55,11 +55,10 @@ pub fn handle_manga(
     guild_members_data: Option<HashMap<i64, MediaListData>>,
     title_variant: Option<TitleVariant>,
 ) -> CommandResponse {
-    let _ = title_variant; // wired in next commit (transform_response_embed)
     match manga {
         None => CommandResponse::Content(NOT_FOUND_MANGA.to_string()),
         Some(manga_response) => {
-            let embed = manga_response.transform_response_embed(guild_members_data);
+            let embed = manga_response.transform_response_embed(guild_members_data, title_variant);
             CommandResponse::Embed(Box::new(embed))
         }
     }

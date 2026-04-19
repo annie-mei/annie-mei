@@ -55,11 +55,10 @@ pub fn handle_anime(
     guild_members_data: Option<HashMap<i64, MediaListData>>,
     title_variant: Option<TitleVariant>,
 ) -> CommandResponse {
-    let _ = title_variant; // wired in next commit (transform_response_embed)
     match anime {
         None => CommandResponse::Content(NOT_FOUND_ANIME.to_string()),
         Some(anime_response) => {
-            let embed = anime_response.transform_response_embed(guild_members_data);
+            let embed = anime_response.transform_response_embed(guild_members_data, title_variant);
             CommandResponse::Embed(Box::new(embed))
         }
     }
