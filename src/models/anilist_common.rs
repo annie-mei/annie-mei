@@ -15,6 +15,9 @@ pub struct Title {
 pub enum TitleVariant {
     English,
     Romaji,
+    // Reserved for future native-input detection; today the fuzzy matcher
+    // only scores against english/romaji, so this variant is never produced.
+    #[allow(dead_code)]
     Native,
 }
 

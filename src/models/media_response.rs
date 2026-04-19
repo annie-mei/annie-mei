@@ -150,3 +150,77 @@ impl<T: Transformers + std::clone::Clone> FetchResponse<T> {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::models::anilist_anime::Anime;
+
+    fn anime_response_json(english: &str, romaji: &str) -> serde_json::Value {
+        serde_json::json!({
+            "data": {
+                "Page": {
+                    "media": [{
+                        "type": "ANIME",
+                        "id": 1,
+                        "idMal": 1,
+                        "isAdult": false,
+                        "title": {
+                            "romaji": romaji,
+                            "english": english,
+                            "native": "ネイティブ"
+                        },
+                        "synonyms": [],
+                        "season": "FALL",
+                        "seasonYear": 2024,
+                        "format": "TV",
+                        "status": "RELEASING",
+                        "episodes": null,
+                        "duration": 24,
+                        "genres": [],
+                        "source": "MANGA",
+                        "coverImage": {
+                            "extraLarge": "https://example.com/cover.jpg",
+                            "large": null,
+                            "medium": null,
+                            "color": "#000000"
+                        },
+                        "averageScore": 80,
+                        "studios": { "edges": [], "nodes": [] },
+                        "siteUrl": "https://anilist.co/anime/1",
+                        "externalLinks": [],
+                        "trailer": null,
+                        "description": "",
+                        "tags": []
+                    }]
+                }
+            }
+        })
+    }
+
+    #[test]
+    fn fuzzy_match_returns_english_variant_when_user_types_english_title() {
+        let payload = anime_response_json("Attack on Titan", "Shingeki no Kyojin");
+        let response: FetchResponse<Anime> =
+            serde_json::from_value(payload).expect("payload deserializes");
+
+        let (_, variant) = response
+            .fuzzy_match("Attack on Titan", MediaType::Anime)
+            .expect("expected a match");
+
+        assert_eq!(variant, TitleVariant::English);
+    }
+
+    #[test]
+    fn fuzzy_match_returns_romaji_variant_when_user_types_romaji_title() {
+        let payload = anime_response_json("Attack on Titan", "Shingeki no Kyojin");
+        let response: FetchResponse<Anime> =
+            serde_json::from_value(payload).expect("payload deserializes");
+
+        let (_, variant) = response
+            .fuzzy_match("Shingeki no Kyojin", MediaType::Anime)
+            .expect("expected a match");
+
+        assert_eq!(variant, TitleVariant::Romaji);
+    }
+}

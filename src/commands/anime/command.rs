@@ -217,4 +217,89 @@ mod tests {
 
         assert!(response.is_embed());
     }
+
+    /// Helper: build an `Anime` whose title fields are visibly distinct so
+    /// title/footer swaps can be observed in the embed JSON.
+    fn anime_with_distinct_titles() -> Anime {
+        serde_json::from_value(serde_json::json!({
+            "type": "ANIME",
+            "id": 16498,
+            "idMal": 16498,
+            "isAdult": false,
+            "title": {
+                "romaji": "Shingeki no Kyojin",
+                "english": "Attack on Titan",
+                "native": "進撃の巨人"
+            },
+            "synonyms": [],
+            "season": "SPRING",
+            "seasonYear": 2013,
+            "format": "TV",
+            "status": "FINISHED",
+            "episodes": 25,
+            "duration": 24,
+            "genres": ["Action"],
+            "source": "MANGA",
+            "coverImage": {
+                "extraLarge": "https://example.com/cover.jpg",
+                "large": null,
+                "medium": null,
+                "color": "#000000"
+            },
+            "averageScore": 84,
+            "studios": { "edges": [], "nodes": [] },
+            "siteUrl": "https://anilist.co/anime/16498",
+            "externalLinks": [],
+            "trailer": null,
+            "description": "",
+            "tags": []
+        }))
+        .expect("sample anime JSON should deserialize")
+    }
+
+    fn embed_title_and_footer(response: CommandResponse) -> (String, String) {
+        let embed = response.unwrap_embed();
+        let value = serde_json::to_value(&embed).expect("embed serializes");
+        let title = value["title"].as_str().unwrap_or_default().to_string();
+        let footer = value["footer"]["text"]
+            .as_str()
+            .unwrap_or_default()
+            .to_string();
+        (title, footer)
+    }
+
+    #[test]
+    fn english_variant_puts_english_title_in_embed_and_romaji_in_footer() {
+        let response = handle_anime(
+            Some(anime_with_distinct_titles()),
+            None,
+            Some(TitleVariant::English),
+        );
+
+        let (title, footer) = embed_title_and_footer(response);
+        assert_eq!(title, "Attack on Titan");
+        assert_eq!(footer, "Shingeki No Kyojin");
+    }
+
+    #[test]
+    fn romaji_variant_puts_romaji_title_in_embed_and_english_in_footer() {
+        let response = handle_anime(
+            Some(anime_with_distinct_titles()),
+            None,
+            Some(TitleVariant::Romaji),
+        );
+
+        let (title, footer) = embed_title_and_footer(response);
+        assert_eq!(title, "Shingeki No Kyojin");
+        assert_eq!(footer, "Attack on Titan");
+    }
+
+    #[test]
+    fn no_variant_signal_preserves_legacy_romaji_title_english_footer() {
+        let response = handle_anime(Some(anime_with_distinct_titles()), None, None);
+
+        let (title, footer) = embed_title_and_footer(response);
+        assert_eq!(title, "Shingeki No Kyojin");
+        assert_eq!(footer, "Attack on Titan");
+    }
 }
