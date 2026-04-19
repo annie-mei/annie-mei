@@ -5,7 +5,10 @@ use crate::{
         response::CommandResponse,
         traits::{AniListSource, MediaDataSource},
     },
-    models::{anilist_anime::Anime, transformers::Transformers, user_media_list::MediaListData},
+    models::{
+        anilist_anime::Anime, anilist_common::TitleVariant, transformers::Transformers,
+        user_media_list::MediaListData,
+    },
     utils::{
         channel::is_nsfw_channel,
         guild::{get_current_guild_members, get_guild_data_for_media},
@@ -50,7 +53,9 @@ pub fn register() -> CreateCommand {
 pub fn handle_anime(
     anime: Option<Anime>,
     guild_members_data: Option<HashMap<i64, MediaListData>>,
+    title_variant: Option<TitleVariant>,
 ) -> CommandResponse {
+    let _ = title_variant; // wired in next commit (transform_response_embed)
     match anime {
         None => CommandResponse::Content(NOT_FOUND_ANIME.to_string()),
         Some(anime_response) => {
@@ -84,7 +89,11 @@ pub async fn run(ctx: &Context, interaction: &mut CommandInteraction) {
 
     info!("Got command 'anime' with search_term: {search_term}");
 
-    let anime_result: Option<Anime> = AniListSource.fetch_anime(&search_term).await;
+    let fetch_result: Option<(Anime, TitleVariant)> = AniListSource.fetch_anime(&search_term).await;
+    let (anime_result, title_variant): (Option<Anime>, Option<TitleVariant>) = match fetch_result {
+        Some((anime, variant)) => (Some(anime), Some(variant)),
+        None => (None, None),
+    };
 
     // Block adult content in non-NSFW channels.
     if let Some(ref anime) = anime_result
@@ -114,7 +123,7 @@ pub async fn run(ctx: &Context, interaction: &mut CommandInteraction) {
     };
 
     // Delegate to the transport-agnostic core logic.
-    let response = handle_anime(anime_result, guild_members_data);
+    let response = handle_anime(anime_result, guild_members_data, title_variant);
 
     // Map the CommandResponse to the appropriate Discord API call.
     let _result = match response {
@@ -184,7 +193,7 @@ mod tests {
 
     #[test]
     fn anime_not_found_returns_content_with_message() {
-        let response = handle_anime(None, None);
+        let response = handle_anime(None, None, None);
 
         assert!(response.is_content(), "expected Content variant");
         assert_eq!(response.unwrap_content(), NOT_FOUND_ANIME);
@@ -192,7 +201,7 @@ mod tests {
 
     #[test]
     fn anime_success_returns_embed() {
-        let response = handle_anime(Some(sample_anime()), None);
+        let response = handle_anime(Some(sample_anime()), None, None);
 
         assert!(
             response.is_embed(),
@@ -205,7 +214,7 @@ mod tests {
 
     #[test]
     fn anime_success_with_no_guild_data_still_returns_embed() {
-        let response = handle_anime(Some(sample_anime()), None);
+        let response = handle_anime(Some(sample_anime()), None, None);
 
         assert!(response.is_embed());
     }

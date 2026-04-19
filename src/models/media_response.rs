@@ -1,5 +1,5 @@
 use crate::{
-    models::{media_type::MediaType, transformers::Transformers},
+    models::{anilist_common::TitleVariant, media_type::MediaType, transformers::Transformers},
     utils::fuzzy::{fuzzy_matcher, fuzzy_matcher_synonyms},
 };
 
@@ -63,7 +63,11 @@ impl<T: Transformers + std::clone::Clone> FetchResponse<T> {
             .collect()
     }
 
-    pub fn fuzzy_match(&self, user_input: &str, media_type: MediaType) -> Option<T> {
+    pub fn fuzzy_match(
+        &self,
+        user_input: &str,
+        media_type: MediaType,
+    ) -> Option<(T, TitleVariant)> {
         let no_result = &self.no_results();
 
         if *no_result {
@@ -100,10 +104,10 @@ impl<T: Transformers + std::clone::Clone> FetchResponse<T> {
 
         let english_score = top_english_title_match.result.similarity;
         let romaji_score = top_romaji_title_match.result.similarity;
-        let top_match = if english_score < romaji_score {
-            top_romaji_title_match
+        let (top_match, top_variant) = if english_score < romaji_score {
+            (top_romaji_title_match, TitleVariant::Romaji)
         } else {
-            top_english_title_match
+            (top_english_title_match, TitleVariant::English)
         };
 
         if !need_to_match_synonyms {
@@ -112,7 +116,7 @@ impl<T: Transformers + std::clone::Clone> FetchResponse<T> {
                 media_list[top_match.index].get_english_title(),
                 top_match.index
             );
-            Some(media_list[top_match.index].clone())
+            Some((media_list[top_match.index].clone(), top_variant))
         } else {
             let synonyms: Vec<Vec<String>> = media_list
                 .iter()
@@ -125,10 +129,12 @@ impl<T: Transformers + std::clone::Clone> FetchResponse<T> {
                         if media_list.is_empty() {
                             None
                         } else {
-                            Some(media_list[0].clone())
+                            // No clean variant signal — preserve current default
+                            // (Romaji as primary title) for ambiguous fallbacks.
+                            Some((media_list[0].clone(), TitleVariant::Romaji))
                         }
                     }
-                    _ => Some(media_list[top_match.index].clone()),
+                    _ => Some((media_list[top_match.index].clone(), top_variant)),
                 }
             } else {
                 info!(
@@ -136,7 +142,10 @@ impl<T: Transformers + std::clone::Clone> FetchResponse<T> {
                     media_list[top_synonym_match.index].get_romaji_title(),
                     top_synonym_match.index
                 );
-                Some(media_list[top_synonym_match.index].clone())
+                Some((
+                    media_list[top_synonym_match.index].clone(),
+                    TitleVariant::Romaji,
+                ))
             }
         }
     }

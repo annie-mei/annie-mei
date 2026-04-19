@@ -4,8 +4,9 @@ use crate::{
         manga::queries::{FETCH_MANGA, FETCH_MANGA_BY_ID},
     },
     models::{
-        id_response::FetchResponse as IdResponse, media_response::FetchResponse as MediaResponse,
-        media_type::MediaType as Type, transformers::Transformers,
+        anilist_common::TitleVariant, id_response::FetchResponse as IdResponse,
+        media_response::FetchResponse as MediaResponse, media_type::MediaType as Type,
+        transformers::Transformers,
     },
     utils::{
         fetch_by_arguments::{fetch_by_id, fetch_by_name},
@@ -88,7 +89,7 @@ pub async fn fetch<
 >(
     response_config: &impl Response,
     media_type: Type,
-) -> Option<T> {
+) -> Option<(T, TitleVariant)> {
     match response_config.get_argument() {
         Argument::Id(value) => {
             let fetched_data = match fetch_by_id(response_config.get_id_query(), *value).await {
@@ -106,7 +107,13 @@ pub async fn fetch<
                 }
             };
             debug!("Deserialized response: {:#?}", fetch_response);
-            fetch_response.data.and_then(|data| data.media)
+            // ID lookups bypass fuzzy matching, so we have no signal about
+            // which variant the user prefers — default to Romaji to preserve
+            // the existing primary-title behaviour.
+            fetch_response
+                .data
+                .and_then(|data| data.media)
+                .map(|media| (media, TitleVariant::Romaji))
         }
         Argument::Search(value) => {
             let cache_key = format!("{}:{value}", media_type.as_ref());
