@@ -80,7 +80,7 @@ pub fn get_current_guild_members(ctx: &Context, interaction: &CommandInteraction
 #[instrument(name = "guild.fetch_media_data", skip(ctx, media, guild_members), fields(member_count = guild_members.len()))]
 pub async fn get_guild_data_for_media<T: Transformers>(
     ctx: &Context,
-    media: T,
+    media: &T,
     guild_members: Vec<UserId>,
 ) -> HashMap<i64, MediaListData> {
     let Some(database_pool) = get_pool_from_context(ctx).await else {
