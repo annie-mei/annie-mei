@@ -7,6 +7,17 @@ pub struct Title {
     pub native: Option<String>,
 }
 
+/// Which title variant the user's search input best matched.
+///
+/// Used to decide which variant is surfaced as the embed title vs the footer,
+/// so the primary title mirrors what the user typed.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum TitleVariant {
+    English,
+    Romaji,
+    Native,
+}
+
 #[derive(Deserialize, Debug, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct CoverImage {
