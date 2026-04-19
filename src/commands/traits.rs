@@ -8,12 +8,13 @@
 //! ```ignore
 //! use crate::commands::{anime::command::handle_anime, response::CommandResponse};
 //!
-//! // Not-found path — no anime, no guild data.
-//! let response = handle_anime(None, None);
+//! // Not-found path — no anime, no guild data, no variant signal.
+//! let response = handle_anime(None, None, None);
 //! assert!(response.is_content());
 //!
-//! // Success path — pass a pre-built Anime and optional guild data.
-//! let response = handle_anime(Some(sample_anime), Some(guild_data));
+//! // Success path — pass a pre-built Anime, optional guild data, and the
+//! // matched title variant (so the embed surfaces the user's typed variant).
+//! let response = handle_anime(Some(sample_anime), Some(guild_data), Some(title_variant));
 //! assert!(response.is_embed());
 //! ```
 

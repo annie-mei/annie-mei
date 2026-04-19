@@ -104,6 +104,10 @@ impl<T: Transformers + std::clone::Clone> FetchResponse<T> {
 
         let english_score = top_english_title_match.result.similarity;
         let romaji_score = top_romaji_title_match.result.similarity;
+        // On exact ties (including the common case where both variants share
+        // the same string for the same entry), prefer English. AniList lists
+        // English first in its UI, so this matches user expectations and keeps
+        // the prior default behaviour.
         let (top_match, top_variant) = if english_score < romaji_score {
             (top_romaji_title_match, TitleVariant::Romaji)
         } else {

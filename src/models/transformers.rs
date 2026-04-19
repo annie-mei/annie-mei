@@ -191,6 +191,10 @@ pub trait Transformers {
                 self.transform_english_title(),
                 self.transform_romaji_title(),
             ),
+            // Native primary pairs with Romaji in the footer: Romaji is the
+            // direct transliteration, so it acts as a pronunciation aid for
+            // the Native script. English is intentionally omitted here — it
+            // is the variant least related to a native-script search.
             Some(TitleVariant::Native) => {
                 (self.transform_native_title(), self.transform_romaji_title())
             }
