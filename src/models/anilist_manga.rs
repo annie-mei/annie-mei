@@ -112,11 +112,9 @@ impl Manga {
     }
 
     pub fn transform_staff(&self) -> String {
-        if self.staff.is_none() {
+        let Some(staff) = self.staff.as_ref() else {
             return EMPTY_STR.to_string();
-        }
-
-        let staff = &self.staff.as_ref().unwrap();
+        };
 
         if staff.edges.is_empty() || staff.nodes.is_empty() {
             return EMPTY_STR.to_string();
@@ -126,24 +124,25 @@ impl Manga {
         let mut artist_index = 0_usize;
 
         for (index, edge) in staff.edges.iter().enumerate() {
-            if edge.role.to_lowercase().contains("story") {
+            let role_lower = edge.role.to_lowercase();
+            if role_lower.contains("story") {
                 mangaka_index = index;
             }
-            if edge.role.to_lowercase().contains("art") {
+            if role_lower.contains("art") {
                 artist_index = index;
             }
         }
 
-        let mangaka_name = staff.nodes[mangaka_index].name.full.to_string();
-        let artist_name = staff.nodes[artist_index].name.full.to_string();
+        let mangaka_name = staff.nodes[mangaka_index].name.full.as_str();
+        let artist_name = staff.nodes[artist_index].name.full.as_str();
 
         if mangaka_name == artist_name {
-            code(titlecase(&mangaka_name))
+            code(titlecase(mangaka_name))
         } else {
             format!(
                 "{} x {}",
-                code(titlecase(&mangaka_name)),
-                code(titlecase(&artist_name))
+                code(titlecase(mangaka_name)),
+                code(titlecase(artist_name))
             )
         }
     }

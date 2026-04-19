@@ -120,41 +120,31 @@ impl Anime {
     }
 
     pub fn transform_studios(&self) -> String {
-        if self.studios.is_none() {
+        let Some(studios) = self.studios.as_ref() else {
             return EMPTY_STR.to_string();
-        }
-
-        let studios = &self.studios.as_ref().unwrap();
+        };
 
         if studios.edges.is_empty() || studios.nodes.is_empty() {
             return EMPTY_STR.to_string();
         }
 
-        let mut main_studio_indices: Vec<usize> = Vec::new();
-
-        for (index, edge) in studios.edges.iter().enumerate() {
-            if edge.is_main {
-                main_studio_indices.push(index);
-            }
-        }
+        let mut main_studio_indices: Vec<usize> = studios
+            .edges
+            .iter()
+            .enumerate()
+            .filter_map(|(index, edge)| edge.is_main.then_some(index))
+            .collect();
 
         if main_studio_indices.is_empty() {
-            main_studio_indices.push(0_usize);
+            main_studio_indices.push(0);
         }
 
-        let mut main_studios: Vec<String> = Vec::new();
-
-        for main_studio_index in main_studio_indices {
-            main_studios.push(studios.nodes[main_studio_index].name.to_string())
-        }
-
-        let main_studios = main_studios
-            .clone()
+        main_studio_indices
             .into_iter()
-            .map(|studio| code(titlecase(&studio)))
-            .collect::<Vec<String>>();
-
-        main_studios.join(" x ")
+            .filter_map(|index| studios.nodes.get(index))
+            .map(|node| code(titlecase(&node.name)))
+            .collect::<Vec<String>>()
+            .join(" x ")
     }
 }
 
