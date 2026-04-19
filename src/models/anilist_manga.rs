@@ -133,17 +133,23 @@ impl Manga {
             }
         }
 
-        let mangaka_name = staff.nodes[mangaka_index].name.full.as_str();
-        let artist_name = staff.nodes[artist_index].name.full.as_str();
+        // Guard against AniList returning mismatched edges/nodes arrays:
+        // use `.get()` so an out-of-range role index falls back to the
+        // `EMPTY_STR` sentinel instead of panicking on direct indexing.
+        let mangaka_name = staff
+            .nodes
+            .get(mangaka_index)
+            .map(|node| node.name.full.as_str());
+        let artist_name = staff
+            .nodes
+            .get(artist_index)
+            .map(|node| node.name.full.as_str());
 
-        if mangaka_name == artist_name {
-            code(&titlecase(mangaka_name))
-        } else {
-            format!(
-                "{} x {}",
-                code(&titlecase(mangaka_name)),
-                code(&titlecase(artist_name))
-            )
+        match (mangaka_name, artist_name) {
+            (Some(m), Some(a)) if m == a => code(&titlecase(m)),
+            (Some(m), Some(a)) => format!("{} x {}", code(&titlecase(m)), code(&titlecase(a))),
+            (Some(name), None) | (None, Some(name)) => code(&titlecase(name)),
+            (None, None) => EMPTY_STR.to_string(),
         }
     }
 }

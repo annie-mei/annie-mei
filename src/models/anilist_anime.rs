@@ -139,12 +139,21 @@ impl Anime {
             main_studio_indices.push(0);
         }
 
-        main_studio_indices
+        let joined = main_studio_indices
             .into_iter()
             .filter_map(|index| studios.nodes.get(index))
             .map(|node| code(&titlecase(&node.name)))
             .collect::<Vec<String>>()
-            .join(" x ")
+            .join(" x ");
+
+        // If every main-studio index was out of range (mismatched edges/nodes
+        // from AniList), `joined` is empty. Fall back to `EMPTY_STR` so the
+        // embed field keeps a valid non-empty value.
+        if joined.is_empty() {
+            EMPTY_STR.to_string()
+        } else {
+            joined
+        }
     }
 }
 
