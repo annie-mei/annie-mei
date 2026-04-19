@@ -259,13 +259,13 @@ impl Transformers for Anime {
             .iter()
             .filter(|link| link.url_type.to_lowercase() == "streaming")
             .filter_map(|link| {
-                let url = &link.url;
+                let url = link.url.as_str();
                 if url.contains("hbo") {
-                    Some(linker("HBO".to_string(), url.to_string()))
+                    Some(linker("HBO", url))
                 } else if url.contains("netflix") {
-                    Some(linker("Netflix".to_string(), url.to_string()))
+                    Some(linker("Netflix", url))
                 } else if url.contains("crunchyroll") {
-                    Some(linker("Crunchyroll".to_string(), url.to_string()))
+                    Some(linker("Crunchyroll", url))
                 } else {
                     None
                 }
@@ -284,9 +284,8 @@ impl Transformers for Anime {
         match &self.trailer {
             None => String::from("None"),
             Some(trailer) => {
-                let url: String =
-                    format!("https://www.{}.com/watch?v={}", trailer.site, trailer.id);
-                linker("YouTube".to_string(), url)
+                let url = format!("https://www.{}.com/watch?v={}", trailer.site, trailer.id);
+                linker("YouTube", &url)
             }
         }
     }

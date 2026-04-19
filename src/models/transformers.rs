@@ -143,10 +143,7 @@ pub trait Transformers {
         let url = self.transform_mal_id();
 
         match url {
-            Some(link) => format!(
-                "{description}\n\n**{}**",
-                linker("MyAnimeList".to_string(), link),
-            ),
+            Some(link) => format!("{description}\n\n**{}**", linker("MyAnimeList", &link)),
             None => description,
         }
     }

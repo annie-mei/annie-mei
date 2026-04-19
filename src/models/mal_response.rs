@@ -118,12 +118,7 @@ impl MalResponse {
 
             match &song.spotify_url {
                 Some(url) => {
-                    write!(
-                        line,
-                        "{}",
-                        linker(bold(song.song_name.clone()), url.clone())
-                    )
-                    .unwrap();
+                    write!(line, "{}", linker(&bold(song.song_name.clone()), url)).unwrap();
                 }
                 None => {
                     write!(line, "{}", song.song_name).unwrap();
@@ -228,7 +223,7 @@ impl MalResponse {
 
     pub fn transform_mal_link(&self) -> String {
         let link = format!("https://www.myanimelist.net/anime/{}", self.id);
-        linker("MyAnimeList".to_string(), link)
+        linker("MyAnimeList", &link)
     }
 
     pub fn transform_thumbnail(&self) -> String {

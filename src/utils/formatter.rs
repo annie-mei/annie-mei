@@ -17,7 +17,7 @@ pub fn strike(input: String) -> String {
     format!("~~{input}~~")
 }
 
-pub fn linker(text: String, link: String) -> String {
+pub fn linker(text: &str, link: &str) -> String {
     format!("[{text}]({link})")
 }
 
