@@ -1,5 +1,5 @@
 use crate::{
-    models::{media_type::MediaType, transformers::Transformers},
+    models::{anilist_common::TitleVariant, media_type::MediaType, transformers::Transformers},
     utils::fuzzy::{fuzzy_matcher, fuzzy_matcher_synonyms},
 };
 
@@ -63,7 +63,11 @@ impl<T: Transformers + std::clone::Clone> FetchResponse<T> {
             .collect()
     }
 
-    pub fn fuzzy_match(&self, user_input: &str, media_type: MediaType) -> Option<T> {
+    pub fn fuzzy_match(
+        &self,
+        user_input: &str,
+        media_type: MediaType,
+    ) -> Option<(T, TitleVariant)> {
         let no_result = &self.no_results();
 
         if *no_result {
@@ -100,10 +104,14 @@ impl<T: Transformers + std::clone::Clone> FetchResponse<T> {
 
         let english_score = top_english_title_match.result.similarity;
         let romaji_score = top_romaji_title_match.result.similarity;
-        let top_match = if english_score < romaji_score {
-            top_romaji_title_match
+        // On exact ties (including the common case where both variants share
+        // the same string for the same entry), prefer English. AniList lists
+        // English first in its UI, so this matches user expectations and keeps
+        // the prior default behaviour.
+        let (top_match, top_variant) = if english_score < romaji_score {
+            (top_romaji_title_match, TitleVariant::Romaji)
         } else {
-            top_english_title_match
+            (top_english_title_match, TitleVariant::English)
         };
 
         if !need_to_match_synonyms {
@@ -112,7 +120,7 @@ impl<T: Transformers + std::clone::Clone> FetchResponse<T> {
                 media_list[top_match.index].get_english_title(),
                 top_match.index
             );
-            Some(media_list[top_match.index].clone())
+            Some((media_list[top_match.index].clone(), top_variant))
         } else {
             let synonyms: Vec<Vec<String>> = media_list
                 .iter()
@@ -125,10 +133,12 @@ impl<T: Transformers + std::clone::Clone> FetchResponse<T> {
                         if media_list.is_empty() {
                             None
                         } else {
-                            Some(media_list[0].clone())
+                            // No clean variant signal — preserve current default
+                            // (Romaji as primary title) for ambiguous fallbacks.
+                            Some((media_list[0].clone(), TitleVariant::Romaji))
                         }
                     }
-                    _ => Some(media_list[top_match.index].clone()),
+                    _ => Some((media_list[top_match.index].clone(), top_variant)),
                 }
             } else {
                 info!(
@@ -136,8 +146,85 @@ impl<T: Transformers + std::clone::Clone> FetchResponse<T> {
                     media_list[top_synonym_match.index].get_romaji_title(),
                     top_synonym_match.index
                 );
-                Some(media_list[top_synonym_match.index].clone())
+                Some((
+                    media_list[top_synonym_match.index].clone(),
+                    TitleVariant::Romaji,
+                ))
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::models::anilist_anime::Anime;
+
+    fn anime_response_json(english: &str, romaji: &str) -> serde_json::Value {
+        serde_json::json!({
+            "data": {
+                "Page": {
+                    "media": [{
+                        "type": "ANIME",
+                        "id": 1,
+                        "idMal": 1,
+                        "isAdult": false,
+                        "title": {
+                            "romaji": romaji,
+                            "english": english,
+                            "native": "ネイティブ"
+                        },
+                        "synonyms": [],
+                        "season": "FALL",
+                        "seasonYear": 2024,
+                        "format": "TV",
+                        "status": "RELEASING",
+                        "episodes": null,
+                        "duration": 24,
+                        "genres": [],
+                        "source": "MANGA",
+                        "coverImage": {
+                            "extraLarge": "https://example.com/cover.jpg",
+                            "large": null,
+                            "medium": null,
+                            "color": "#000000"
+                        },
+                        "averageScore": 80,
+                        "studios": { "edges": [], "nodes": [] },
+                        "siteUrl": "https://anilist.co/anime/1",
+                        "externalLinks": [],
+                        "trailer": null,
+                        "description": "",
+                        "tags": []
+                    }]
+                }
+            }
+        })
+    }
+
+    #[test]
+    fn fuzzy_match_returns_english_variant_when_user_types_english_title() {
+        let payload = anime_response_json("Attack on Titan", "Shingeki no Kyojin");
+        let response: FetchResponse<Anime> =
+            serde_json::from_value(payload).expect("payload deserializes");
+
+        let (_, variant) = response
+            .fuzzy_match("Attack on Titan", MediaType::Anime)
+            .expect("expected a match");
+
+        assert_eq!(variant, TitleVariant::English);
+    }
+
+    #[test]
+    fn fuzzy_match_returns_romaji_variant_when_user_types_romaji_title() {
+        let payload = anime_response_json("Attack on Titan", "Shingeki no Kyojin");
+        let response: FetchResponse<Anime> =
+            serde_json::from_value(payload).expect("payload deserializes");
+
+        let (_, variant) = response
+            .fuzzy_match("Shingeki no Kyojin", MediaType::Anime)
+            .expect("expected a match");
+
+        assert_eq!(variant, TitleVariant::Romaji);
     }
 }

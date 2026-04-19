@@ -5,7 +5,10 @@ use crate::{
         response::CommandResponse,
         traits::{AniListSource, MediaDataSource},
     },
-    models::{anilist_manga::Manga, transformers::Transformers, user_media_list::MediaListData},
+    models::{
+        anilist_common::TitleVariant, anilist_manga::Manga, transformers::Transformers,
+        user_media_list::MediaListData,
+    },
     utils::{
         channel::is_nsfw_channel,
         guild::{get_current_guild_members, get_guild_data_for_media},
@@ -50,11 +53,12 @@ pub fn register() -> CreateCommand {
 pub fn handle_manga(
     manga: Option<Manga>,
     guild_members_data: Option<HashMap<i64, MediaListData>>,
+    title_variant: Option<TitleVariant>,
 ) -> CommandResponse {
     match manga {
         None => CommandResponse::Content(NOT_FOUND_MANGA.to_string()),
         Some(manga_response) => {
-            let embed = manga_response.transform_response_embed(guild_members_data);
+            let embed = manga_response.transform_response_embed(guild_members_data, title_variant);
             CommandResponse::Embed(Box::new(embed))
         }
     }
@@ -84,7 +88,11 @@ pub async fn run(ctx: &Context, interaction: &mut CommandInteraction) {
 
     info!("Got command 'manga' with search_term: {search_term}");
 
-    let manga_result: Option<Manga> = AniListSource.fetch_manga(&search_term).await;
+    let fetch_result: Option<(Manga, TitleVariant)> = AniListSource.fetch_manga(&search_term).await;
+    let (manga_result, title_variant): (Option<Manga>, Option<TitleVariant>) = match fetch_result {
+        Some((manga, variant)) => (Some(manga), Some(variant)),
+        None => (None, None),
+    };
 
     // Block adult content in non-NSFW channels.
     if let Some(ref manga) = manga_result
@@ -114,7 +122,7 @@ pub async fn run(ctx: &Context, interaction: &mut CommandInteraction) {
     };
 
     // Delegate to the transport-agnostic core logic.
-    let response = handle_manga(manga_result, guild_members_data);
+    let response = handle_manga(manga_result, guild_members_data, title_variant);
 
     // Map the CommandResponse to the appropriate Discord API call.
     let _result = match response {
@@ -181,7 +189,7 @@ mod tests {
 
     #[test]
     fn manga_not_found_returns_content_with_message() {
-        let response = handle_manga(None, None);
+        let response = handle_manga(None, None, None);
 
         assert!(response.is_content(), "expected Content variant");
         assert_eq!(response.unwrap_content(), NOT_FOUND_MANGA);
@@ -189,7 +197,7 @@ mod tests {
 
     #[test]
     fn manga_success_returns_embed() {
-        let response = handle_manga(Some(sample_manga()), None);
+        let response = handle_manga(Some(sample_manga()), None, None);
 
         assert!(
             response.is_embed(),
@@ -200,7 +208,7 @@ mod tests {
 
     #[test]
     fn manga_success_with_no_guild_data_still_returns_embed() {
-        let response = handle_manga(Some(sample_manga()), None);
+        let response = handle_manga(Some(sample_manga()), None, None);
 
         assert!(response.is_embed());
     }

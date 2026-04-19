@@ -1,4 +1,5 @@
 use crate::models::{
+    anilist_common::TitleVariant,
     fetcher::{AnimeConfig, Argument, MangaConfig, Response, fetch},
     media_type::MediaType as Type,
     transformers::Transformers,
@@ -36,7 +37,7 @@ pub async fn fetcher<
 >(
     media_type: Type,
     arg: CommandDataOptionValue,
-) -> Option<T> {
+) -> Option<(T, TitleVariant)> {
     info!("Fetcher found arg: {:#?}", arg);
     let argument = return_argument(arg)?;
 

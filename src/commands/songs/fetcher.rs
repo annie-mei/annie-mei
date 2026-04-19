@@ -18,8 +18,8 @@ pub enum SongFetchResult {
 
 #[instrument(name = "command.songs.fetcher", skip(args))]
 pub async fn fetcher(args: CommandDataOptionValue) -> SongFetchResult {
-    let anime_response: Option<Anime> = anime_fetcher(Type::Anime, args).await;
-    let Some(anime) = anime_response else {
+    let anime_response = anime_fetcher::<Anime>(Type::Anime, args).await;
+    let Some((anime, _variant)) = anime_response else {
         return SongFetchResult::AnimeNotFound;
     };
 

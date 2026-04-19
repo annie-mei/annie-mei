@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use crate::{
     models::{
-        anilist_common::{CoverImage, Tag},
+        anilist_common::{CoverImage, Tag, TitleVariant},
         user_media_list::MediaListData,
     },
     utils::{formatter::*, statics::EMPTY_STR},
@@ -64,6 +64,17 @@ pub trait Transformers {
             },
         };
         titlecase(&return_title)
+    }
+    fn transform_native_title(&self) -> String {
+        // Native titles are typically Japanese, so titlecase would be wrong.
+        // Fall back to romaji → english when native is missing.
+        match self.get_native_title() {
+            Some(title) => title,
+            None => match self.get_romaji_title() {
+                Some(title) => titlecase(&title),
+                None => titlecase(&self.get_english_title().unwrap_or_default()),
+            },
+        }
     }
 
     fn transform_format(&self) -> String {
@@ -168,16 +179,39 @@ pub trait Transformers {
     fn transform_response_embed(
         &self,
         guild_members_data: Option<HashMap<i64, MediaListData>>,
+        title_variant: Option<TitleVariant>,
     ) -> CreateEmbed {
         let is_anime = self.get_type() == "anime";
+
+        // Surface whichever variant the user typed as the primary title;
+        // park the other one in the footer. Default (no signal) keeps the
+        // long-standing Romaji-as-title behaviour.
+        let (primary_title, footer_title) = match title_variant {
+            Some(TitleVariant::English) => (
+                self.transform_english_title(),
+                self.transform_romaji_title(),
+            ),
+            // Native primary pairs with Romaji in the footer: Romaji is the
+            // direct transliteration, so it acts as a pronunciation aid for
+            // the Native script. English is intentionally omitted here — it
+            // is the variant least related to a native-script search.
+            Some(TitleVariant::Native) => {
+                (self.transform_native_title(), self.transform_romaji_title())
+            }
+            Some(TitleVariant::Romaji) | None => (
+                self.transform_romaji_title(),
+                self.transform_english_title(),
+            ),
+        };
+
         let mut embed = CreateEmbed::new()
             // General Embed Fields
             .color(self.transform_color())
-            .title(self.transform_romaji_title())
+            .title(primary_title)
             .description(self.transform_description_and_mal_link())
             .url(self.transform_anilist())
             .thumbnail(self.transform_thumbnail())
-            .footer(CreateEmbedFooter::new(self.transform_english_title()))
+            .footer(CreateEmbedFooter::new(footer_title))
             // self Data Fields
             // First line after MAL link
             .fields(vec![

@@ -5,7 +5,10 @@ use crate::{
         response::CommandResponse,
         traits::{AniListSource, MediaDataSource},
     },
-    models::{anilist_anime::Anime, transformers::Transformers, user_media_list::MediaListData},
+    models::{
+        anilist_anime::Anime, anilist_common::TitleVariant, transformers::Transformers,
+        user_media_list::MediaListData,
+    },
     utils::{
         channel::is_nsfw_channel,
         guild::{get_current_guild_members, get_guild_data_for_media},
@@ -50,11 +53,12 @@ pub fn register() -> CreateCommand {
 pub fn handle_anime(
     anime: Option<Anime>,
     guild_members_data: Option<HashMap<i64, MediaListData>>,
+    title_variant: Option<TitleVariant>,
 ) -> CommandResponse {
     match anime {
         None => CommandResponse::Content(NOT_FOUND_ANIME.to_string()),
         Some(anime_response) => {
-            let embed = anime_response.transform_response_embed(guild_members_data);
+            let embed = anime_response.transform_response_embed(guild_members_data, title_variant);
             CommandResponse::Embed(Box::new(embed))
         }
     }
@@ -84,7 +88,11 @@ pub async fn run(ctx: &Context, interaction: &mut CommandInteraction) {
 
     info!("Got command 'anime' with search_term: {search_term}");
 
-    let anime_result: Option<Anime> = AniListSource.fetch_anime(&search_term).await;
+    let fetch_result: Option<(Anime, TitleVariant)> = AniListSource.fetch_anime(&search_term).await;
+    let (anime_result, title_variant): (Option<Anime>, Option<TitleVariant>) = match fetch_result {
+        Some((anime, variant)) => (Some(anime), Some(variant)),
+        None => (None, None),
+    };
 
     // Block adult content in non-NSFW channels.
     if let Some(ref anime) = anime_result
@@ -114,7 +122,7 @@ pub async fn run(ctx: &Context, interaction: &mut CommandInteraction) {
     };
 
     // Delegate to the transport-agnostic core logic.
-    let response = handle_anime(anime_result, guild_members_data);
+    let response = handle_anime(anime_result, guild_members_data, title_variant);
 
     // Map the CommandResponse to the appropriate Discord API call.
     let _result = match response {
@@ -184,7 +192,7 @@ mod tests {
 
     #[test]
     fn anime_not_found_returns_content_with_message() {
-        let response = handle_anime(None, None);
+        let response = handle_anime(None, None, None);
 
         assert!(response.is_content(), "expected Content variant");
         assert_eq!(response.unwrap_content(), NOT_FOUND_ANIME);
@@ -192,7 +200,7 @@ mod tests {
 
     #[test]
     fn anime_success_returns_embed() {
-        let response = handle_anime(Some(sample_anime()), None);
+        let response = handle_anime(Some(sample_anime()), None, None);
 
         assert!(
             response.is_embed(),
@@ -205,8 +213,93 @@ mod tests {
 
     #[test]
     fn anime_success_with_no_guild_data_still_returns_embed() {
-        let response = handle_anime(Some(sample_anime()), None);
+        let response = handle_anime(Some(sample_anime()), None, None);
 
         assert!(response.is_embed());
+    }
+
+    /// Helper: build an `Anime` whose title fields are visibly distinct so
+    /// title/footer swaps can be observed in the embed JSON.
+    fn anime_with_distinct_titles() -> Anime {
+        serde_json::from_value(serde_json::json!({
+            "type": "ANIME",
+            "id": 16498,
+            "idMal": 16498,
+            "isAdult": false,
+            "title": {
+                "romaji": "Shingeki no Kyojin",
+                "english": "Attack on Titan",
+                "native": "進撃の巨人"
+            },
+            "synonyms": [],
+            "season": "SPRING",
+            "seasonYear": 2013,
+            "format": "TV",
+            "status": "FINISHED",
+            "episodes": 25,
+            "duration": 24,
+            "genres": ["Action"],
+            "source": "MANGA",
+            "coverImage": {
+                "extraLarge": "https://example.com/cover.jpg",
+                "large": null,
+                "medium": null,
+                "color": "#000000"
+            },
+            "averageScore": 84,
+            "studios": { "edges": [], "nodes": [] },
+            "siteUrl": "https://anilist.co/anime/16498",
+            "externalLinks": [],
+            "trailer": null,
+            "description": "",
+            "tags": []
+        }))
+        .expect("sample anime JSON should deserialize")
+    }
+
+    fn embed_title_and_footer(response: CommandResponse) -> (String, String) {
+        let embed = response.unwrap_embed();
+        let value = serde_json::to_value(&embed).expect("embed serializes");
+        let title = value["title"].as_str().unwrap_or_default().to_string();
+        let footer = value["footer"]["text"]
+            .as_str()
+            .unwrap_or_default()
+            .to_string();
+        (title, footer)
+    }
+
+    #[test]
+    fn english_variant_puts_english_title_in_embed_and_romaji_in_footer() {
+        let response = handle_anime(
+            Some(anime_with_distinct_titles()),
+            None,
+            Some(TitleVariant::English),
+        );
+
+        let (title, footer) = embed_title_and_footer(response);
+        assert_eq!(title, "Attack on Titan");
+        assert_eq!(footer, "Shingeki No Kyojin");
+    }
+
+    #[test]
+    fn romaji_variant_puts_romaji_title_in_embed_and_english_in_footer() {
+        let response = handle_anime(
+            Some(anime_with_distinct_titles()),
+            None,
+            Some(TitleVariant::Romaji),
+        );
+
+        let (title, footer) = embed_title_and_footer(response);
+        assert_eq!(title, "Shingeki No Kyojin");
+        assert_eq!(footer, "Attack on Titan");
+    }
+
+    #[test]
+    fn no_variant_signal_preserves_legacy_romaji_title_english_footer() {
+        let response = handle_anime(Some(anime_with_distinct_titles()), None, None);
+
+        let (title, footer) = embed_title_and_footer(response);
+        assert_eq!(title, "Shingeki No Kyojin");
+        assert_eq!(footer, "Attack on Titan");
     }
 }
