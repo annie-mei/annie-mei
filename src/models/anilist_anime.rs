@@ -120,41 +120,40 @@ impl Anime {
     }
 
     pub fn transform_studios(&self) -> String {
-        if self.studios.is_none() {
+        let Some(studios) = self.studios.as_ref() else {
             return EMPTY_STR.to_string();
-        }
-
-        let studios = &self.studios.as_ref().unwrap();
+        };
 
         if studios.edges.is_empty() || studios.nodes.is_empty() {
             return EMPTY_STR.to_string();
         }
 
-        let mut main_studio_indices: Vec<usize> = Vec::new();
-
-        for (index, edge) in studios.edges.iter().enumerate() {
-            if edge.is_main {
-                main_studio_indices.push(index);
-            }
-        }
+        let mut main_studio_indices: Vec<usize> = studios
+            .edges
+            .iter()
+            .enumerate()
+            .filter_map(|(index, edge)| edge.is_main.then_some(index))
+            .collect();
 
         if main_studio_indices.is_empty() {
-            main_studio_indices.push(0_usize);
+            main_studio_indices.push(0);
         }
 
-        let mut main_studios: Vec<String> = Vec::new();
-
-        for main_studio_index in main_studio_indices {
-            main_studios.push(studios.nodes[main_studio_index].name.to_string())
-        }
-
-        let main_studios = main_studios
-            .clone()
+        let joined = main_studio_indices
             .into_iter()
-            .map(|studio| code(titlecase(&studio)))
-            .collect::<Vec<String>>();
+            .filter_map(|index| studios.nodes.get(index))
+            .map(|node| code(&titlecase(&node.name)))
+            .collect::<Vec<String>>()
+            .join(" x ");
 
-        main_studios.join(" x ")
+        // If every main-studio index was out of range (mismatched edges/nodes
+        // from AniList), `joined` is empty. Fall back to `EMPTY_STR` so the
+        // embed field keeps a valid non-empty value.
+        if joined.is_empty() {
+            EMPTY_STR.to_string()
+        } else {
+            joined
+        }
     }
 }
 
@@ -163,8 +162,16 @@ impl Transformers for Anime {
         self.id
     }
 
-    fn get_type(&self) -> String {
-        self.media_type.as_ref().unwrap().to_string().to_lowercase()
+    fn get_type(&self) -> &str {
+        // AniList returns the media type as "ANIME" / "MANGA". Downstream
+        // code compares against lower-case constants, so map the known
+        // values to static lower-case strings to avoid per-call allocations.
+        match self.media_type.as_deref() {
+            Some("ANIME") | Some("anime") => "anime",
+            Some("MANGA") | Some("manga") => "manga",
+            Some(other) => other,
+            None => "",
+        }
     }
 
     fn is_adult(&self) -> bool {
@@ -175,56 +182,56 @@ impl Transformers for Anime {
         self.id_mal
     }
 
-    fn get_english_title(&self) -> Option<String> {
-        self.title.english.to_owned()
+    fn get_english_title(&self) -> Option<&str> {
+        self.title.english.as_deref()
     }
 
-    fn get_romaji_title(&self) -> Option<String> {
-        self.title.romaji.to_owned()
+    fn get_romaji_title(&self) -> Option<&str> {
+        self.title.romaji.as_deref()
     }
 
-    fn get_native_title(&self) -> Option<String> {
-        self.title.native.to_owned()
+    fn get_native_title(&self) -> Option<&str> {
+        self.title.native.as_deref()
     }
 
-    fn get_synonyms(&self) -> Option<Vec<String>> {
-        self.synonyms.to_owned()
+    fn get_synonyms(&self) -> Option<&[String]> {
+        self.synonyms.as_deref()
     }
 
-    fn get_format(&self) -> Option<String> {
-        self.format.to_owned()
+    fn get_format(&self) -> Option<&str> {
+        self.format.as_deref()
     }
 
-    fn get_status(&self) -> Option<String> {
-        self.status.to_owned()
+    fn get_status(&self) -> Option<&str> {
+        self.status.as_deref()
     }
 
-    fn get_genres(&self) -> Vec<String> {
-        self.genres.to_owned()
+    fn get_genres(&self) -> &[String] {
+        &self.genres
     }
 
-    fn get_source(&self) -> Option<String> {
-        self.source.to_owned()
+    fn get_source(&self) -> Option<&str> {
+        self.source.as_deref()
     }
 
-    fn get_cover_image(&self) -> CoverImage {
-        self.cover_image.to_owned()
+    fn get_cover_image(&self) -> &CoverImage {
+        &self.cover_image
     }
 
     fn get_average_score(&self) -> Option<u32> {
-        self.average_score.to_owned()
+        self.average_score
     }
 
-    fn get_site_url(&self) -> String {
-        self.site_url.to_owned()
+    fn get_site_url(&self) -> &str {
+        &self.site_url
     }
 
-    fn get_description(&self) -> Option<String> {
-        self.description.to_owned()
+    fn get_description(&self) -> Option<&str> {
+        self.description.as_deref()
     }
 
-    fn get_tags(&self) -> Vec<Tag> {
-        self.tags.to_owned()
+    fn get_tags(&self) -> &[Tag] {
+        &self.tags
     }
 
     fn transform_mal_id(&self) -> Option<String> {
@@ -261,13 +268,13 @@ impl Transformers for Anime {
             .iter()
             .filter(|link| link.url_type.to_lowercase() == "streaming")
             .filter_map(|link| {
-                let url = &link.url;
+                let url = link.url.as_str();
                 if url.contains("hbo") {
-                    Some(linker("HBO".to_string(), url.to_string()))
+                    Some(linker("HBO", url))
                 } else if url.contains("netflix") {
-                    Some(linker("Netflix".to_string(), url.to_string()))
+                    Some(linker("Netflix", url))
                 } else if url.contains("crunchyroll") {
-                    Some(linker("Crunchyroll".to_string(), url.to_string()))
+                    Some(linker("Crunchyroll", url))
                 } else {
                     None
                 }
@@ -286,9 +293,8 @@ impl Transformers for Anime {
         match &self.trailer {
             None => String::from("None"),
             Some(trailer) => {
-                let url: String =
-                    format!("https://www.{}.com/watch?v={}", trailer.site, trailer.id);
-                linker("YouTube".to_string(), url)
+                let url = format!("https://www.{}.com/watch?v={}", trailer.site, trailer.id);
+                linker("YouTube", &url)
             }
         }
     }
