@@ -47,7 +47,7 @@ jobs:
       - name: Determine Sentry release
         id: sentry-release-meta
         run: |
-          version="$(awk -F'"' '/^version = / { print $2; exit }' Cargo.toml)"
+          version="$(awk -F'"' '/^[[:space:]]*version[[:space:]]*=/ { print $2; exit }' Cargo.toml)"
           release="annie-mei@${version}"
 
           echo "version=${version}" >> "$GITHUB_OUTPUT"
@@ -57,13 +57,19 @@ jobs:
             echo "::error::Git tag ${GITHUB_REF_NAME} does not match Cargo.toml version ${version}"
             exit 1
           fi
+      - name: Install sentry-cli
+        env:
+          SENTRY_CLI_URL: https://github.com/getsentry/sentry-cli/releases/download/3.4.0/sentry-cli-Linux-aarch64
+          SENTRY_CLI_SHA256: 1273fe22639e394e0c8d2bd097da13b25139e75e977c5ce44c6f54130664ea45
+        run: |
+          curl -fsSL "$SENTRY_CLI_URL" -o /usr/local/bin/sentry-cli
+          echo "$SENTRY_CLI_SHA256  /usr/local/bin/sentry-cli" | sha256sum --check --strict
+          chmod +x /usr/local/bin/sentry-cli
       - name: Create Sentry release
         if: startsWith(github.ref, 'refs/tags/')
         id: sentry-release
         continue-on-error: true
         run: |
-          curl -sL https://sentry.io/get-cli/ | bash
-
           if ! sentry-cli releases info "$SENTRY_RELEASE" >/dev/null 2>&1; then
             sentry-cli releases new -p "$SENTRY_PROJECT" "$SENTRY_RELEASE"
           fi
@@ -81,9 +87,7 @@ jobs:
       - name: Upload debug symbols to Sentry
         id: sentry-upload
         continue-on-error: true
-        run: |
-          curl -sL https://sentry.io/get-cli/ | bash
-          sentry-cli debug-files upload --include-sources target/release/
+        run: sentry-cli debug-files upload --include-sources target/release/
         env:
           SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
           SENTRY_ORG: ${{ secrets.SENTRY_ORG }}
