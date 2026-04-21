@@ -28,6 +28,7 @@ jobs:
         uses: actions/checkout@v6
         with:
           ref: ${{ github.event_name == 'workflow_dispatch' && inputs.ref || github.ref }}
+          fetch-depth: 0
       - name: Install Rust
         run: |
           toolchain="$(awk -F'"' '/^[[:space:]]*channel[[:space:]]*=/ { print $2 }' rust-toolchain.toml)"
@@ -43,6 +44,40 @@ jobs:
           save-if: ${{ github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/') }}
       - name: Build
         run: cargo build --release
+      - name: Determine Sentry release
+        id: sentry-release-meta
+        run: |
+          version="$(awk -F'"' '/^version = / { print $2; exit }' Cargo.toml)"
+          release="annie-mei@${version}"
+
+          echo "version=${version}" >> "$GITHUB_OUTPUT"
+          echo "release=${release}" >> "$GITHUB_OUTPUT"
+
+          if [[ "${GITHUB_REF}" == refs/tags/* && "${GITHUB_REF_NAME#v}" != "$version" ]]; then
+            echo "::error::Git tag ${GITHUB_REF_NAME} does not match Cargo.toml version ${version}"
+            exit 1
+          fi
+      - name: Create Sentry release
+        if: startsWith(github.ref, 'refs/tags/')
+        id: sentry-release
+        continue-on-error: true
+        run: |
+          curl -sL https://sentry.io/get-cli/ | bash
+
+          if ! sentry-cli releases info "$SENTRY_RELEASE" >/dev/null 2>&1; then
+            sentry-cli releases new -p "$SENTRY_PROJECT" "$SENTRY_RELEASE"
+          fi
+
+          sentry-cli releases set-commits "$SENTRY_RELEASE" --auto --ignore-missing
+          sentry-cli releases finalize "$SENTRY_RELEASE"
+        env:
+          SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
+          SENTRY_ORG: ${{ secrets.SENTRY_ORG }}
+          SENTRY_PROJECT: ${{ secrets.SENTRY_PROJECT }}
+          SENTRY_RELEASE: ${{ steps.sentry-release-meta.outputs.release }}
+      - name: Warn on Sentry release failure
+        if: steps.sentry-release.outcome == 'failure'
+        run: echo "::warning::Sentry release creation failed — commit tracking and release resolution may be incomplete"
       - name: Upload debug symbols to Sentry
         id: sentry-upload
         continue-on-error: true
