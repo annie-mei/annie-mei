@@ -25,9 +25,11 @@ pub fn create_pool() -> DbPool {
     let manager = ConnectionManager::<PgConnection>::new(database_url.clone());
 
     Pool::builder()
+        .max_size(2)
+        .min_idle(Some(0))
         .test_on_check_out(true)
         .max_lifetime(Some(Duration::from_secs(20 * 60)))
-        .idle_timeout(Some(Duration::from_secs(10 * 60)))
+        .idle_timeout(Some(Duration::from_secs(60)))
         .build(manager)
         .unwrap_or_else(|error| {
             let redacted_url = redact_database_url(&database_url);
