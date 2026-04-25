@@ -70,6 +70,7 @@ fn build_health_response(redis_ok: bool, db_ok: Option<bool>) -> (StatusCode, Js
     (status, Json(body))
 }
 
+#[instrument(name = "http.healthz.redis_result", skip_all)]
 fn evaluate_redis_health(
     redis_result: &Result<redis::RedisResult<()>, tokio::task::JoinError>,
 ) -> bool {
@@ -86,6 +87,7 @@ fn evaluate_redis_health(
     }
 }
 
+#[instrument(name = "http.healthz.database_result", skip_all)]
 fn evaluate_database_health(
     db_result: &Result<Result<(), diesel::result::Error>, tokio::task::JoinError>,
 ) -> bool {
