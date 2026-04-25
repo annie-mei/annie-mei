@@ -40,8 +40,6 @@ fn log_health_request(endpoint: &str, headers: &HeaderMap) {
         endpoint,
         user_agent = header_value(headers, "user-agent"),
         cf_ray = header_value(headers, "cf-ray"),
-        cf_connecting_ip = header_value(headers, "cf-connecting-ip"),
-        x_forwarded_for = header_value(headers, "x-forwarded-for"),
         "Health endpoint requested"
     );
 }
