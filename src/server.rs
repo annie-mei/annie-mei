@@ -22,12 +22,18 @@ fn run_database_health_check(
     crate::utils::database::ping(database_pool)
 }
 
-fn build_healthz_response(redis_ok: bool, db_ok: bool) -> (StatusCode, Json<Value>) {
-    let all_healthy = redis_ok && db_ok;
+fn build_health_response(redis_ok: bool, db_ok: Option<bool>) -> (StatusCode, Json<Value>) {
+    let all_healthy = redis_ok && db_ok.unwrap_or(true);
     let status = if all_healthy {
         StatusCode::OK
     } else {
         StatusCode::SERVICE_UNAVAILABLE
+    };
+
+    let database_status = match db_ok {
+        Some(true) => "up",
+        Some(false) => "down",
+        None => "not_checked",
     };
 
     let body = json!({
@@ -35,24 +41,17 @@ fn build_healthz_response(redis_ok: bool, db_ok: bool) -> (StatusCode, Json<Valu
         "version": VERSION,
         "services": {
             "redis": if redis_ok { "up" } else { "down" },
-            "database": if db_ok { "up" } else { "down" },
+            "database": database_status,
         }
     });
 
     (status, Json(body))
 }
 
-#[instrument(name = "http.healthz", skip_all)]
-async fn healthz(
-    State(database_pool): State<crate::utils::database::DbPool>,
-) -> (StatusCode, Json<Value>) {
-    let health_check_pool = database_pool.clone();
-    let (redis_result, db_result) = tokio::join!(
-        tokio::task::spawn_blocking(run_redis_health_check),
-        tokio::task::spawn_blocking(move || run_database_health_check(&health_check_pool)),
-    );
-
-    let redis_ok = match &redis_result {
+fn evaluate_redis_health(
+    redis_result: &Result<redis::RedisResult<()>, tokio::task::JoinError>,
+) -> bool {
+    match redis_result {
         Ok(Ok(())) => true,
         Ok(Err(e)) => {
             error!(error = %e, "Redis health check failed");
@@ -62,9 +61,13 @@ async fn healthz(
             error!(error = %e, "Redis health check task panicked");
             false
         }
-    };
+    }
+}
 
-    let db_ok = match &db_result {
+fn evaluate_database_health(
+    db_result: &Result<Result<(), diesel::result::Error>, tokio::task::JoinError>,
+) -> bool {
+    match db_result {
         Ok(Ok(())) => true,
         Ok(Err(e)) => {
             error!(error = %e, "Database health check failed");
@@ -74,9 +77,31 @@ async fn healthz(
             error!(error = %e, "Database health check task panicked");
             false
         }
-    };
+    }
+}
 
-    build_healthz_response(redis_ok, db_ok)
+#[instrument(name = "http.healthz", skip_all)]
+async fn healthz() -> (StatusCode, Json<Value>) {
+    let redis_result = tokio::task::spawn_blocking(run_redis_health_check).await;
+    let redis_ok = evaluate_redis_health(&redis_result);
+
+    build_health_response(redis_ok, None)
+}
+
+#[instrument(name = "http.readyz", skip_all)]
+async fn readyz(
+    State(database_pool): State<crate::utils::database::DbPool>,
+) -> (StatusCode, Json<Value>) {
+    let health_check_pool = database_pool.clone();
+    let (redis_result, db_result) = tokio::join!(
+        tokio::task::spawn_blocking(run_redis_health_check),
+        tokio::task::spawn_blocking(move || run_database_health_check(&health_check_pool)),
+    );
+
+    let redis_ok = evaluate_redis_health(&redis_result);
+    let db_ok = evaluate_database_health(&db_result);
+
+    build_health_response(redis_ok, Some(db_ok))
 }
 
 #[instrument(name = "http.server", skip_all)]
@@ -91,6 +116,7 @@ pub async fn run(
 
     let app = Router::new()
         .route("/healthz", get(healthz))
+        .route("/readyz", get(readyz))
         .with_state(database_pool);
 
     let addr = SocketAddr::from(([127, 0, 0, 1], port));
@@ -112,29 +138,39 @@ mod tests {
     use super::*;
 
     #[test]
-    fn healthz_response_reports_healthy_when_all_services_are_up() {
-        let (status, Json(body)) = build_healthz_response(true, true);
+    fn healthz_response_reports_healthy_when_redis_is_up_and_database_is_not_checked() {
+        let (status, Json(body)) = build_health_response(true, None);
 
         assert_eq!(status, StatusCode::OK);
         assert_eq!(body["status"], "healthy");
         assert_eq!(body["services"]["redis"], "up");
-        assert_eq!(body["services"]["database"], "up");
+        assert_eq!(body["services"]["database"], "not_checked");
         assert_eq!(body["version"], VERSION);
     }
 
     #[test]
     fn healthz_response_reports_unhealthy_when_redis_is_down() {
-        let (status, Json(body)) = build_healthz_response(false, true);
+        let (status, Json(body)) = build_health_response(false, None);
 
         assert_eq!(status, StatusCode::SERVICE_UNAVAILABLE);
         assert_eq!(body["status"], "unhealthy");
         assert_eq!(body["services"]["redis"], "down");
+        assert_eq!(body["services"]["database"], "not_checked");
+    }
+
+    #[test]
+    fn readyz_response_reports_healthy_when_all_services_are_up() {
+        let (status, Json(body)) = build_health_response(true, Some(true));
+
+        assert_eq!(status, StatusCode::OK);
+        assert_eq!(body["status"], "healthy");
+        assert_eq!(body["services"]["redis"], "up");
         assert_eq!(body["services"]["database"], "up");
     }
 
     #[test]
-    fn healthz_response_reports_unhealthy_when_database_is_down() {
-        let (status, Json(body)) = build_healthz_response(true, false);
+    fn readyz_response_reports_unhealthy_when_database_is_down() {
+        let (status, Json(body)) = build_health_response(true, Some(false));
 
         assert_eq!(status, StatusCode::SERVICE_UNAVAILABLE);
         assert_eq!(body["status"], "unhealthy");
