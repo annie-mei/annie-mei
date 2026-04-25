@@ -1,7 +1,12 @@
 use std::env;
 use std::net::SocketAddr;
 
-use axum::{Json, Router, extract::State, http::StatusCode, routing::get};
+use axum::{
+    Json, Router,
+    extract::State,
+    http::{HeaderMap, StatusCode},
+    routing::get,
+};
 use serde_json::{Value, json};
 use tokio::net::TcpListener;
 use tracing::{error, info, instrument};
@@ -20,6 +25,25 @@ fn run_database_health_check(
     database_pool: &crate::utils::database::DbPool,
 ) -> Result<(), diesel::result::Error> {
     crate::utils::database::ping(database_pool)
+}
+
+fn header_value<'a>(headers: &'a HeaderMap, name: &str) -> &'a str {
+    headers
+        .get(name)
+        .and_then(|value| value.to_str().ok())
+        .unwrap_or("unknown")
+}
+
+#[instrument(name = "http.healthz.metadata", skip_all)]
+fn log_health_request(endpoint: &str, headers: &HeaderMap) {
+    info!(
+        endpoint,
+        user_agent = header_value(headers, "user-agent"),
+        cf_ray = header_value(headers, "cf-ray"),
+        cf_connecting_ip = header_value(headers, "cf-connecting-ip"),
+        x_forwarded_for = header_value(headers, "x-forwarded-for"),
+        "Health endpoint requested"
+    );
 }
 
 fn build_health_response(redis_ok: bool, db_ok: Option<bool>) -> (StatusCode, Json<Value>) {
@@ -81,7 +105,9 @@ fn evaluate_database_health(
 }
 
 #[instrument(name = "http.healthz", skip_all)]
-async fn healthz() -> (StatusCode, Json<Value>) {
+async fn healthz(headers: HeaderMap) -> (StatusCode, Json<Value>) {
+    log_health_request("/healthz", &headers);
+
     let redis_result = tokio::task::spawn_blocking(run_redis_health_check).await;
     let redis_ok = evaluate_redis_health(&redis_result);
 
@@ -91,7 +117,10 @@ async fn healthz() -> (StatusCode, Json<Value>) {
 #[instrument(name = "http.readyz", skip_all)]
 async fn readyz(
     State(database_pool): State<crate::utils::database::DbPool>,
+    headers: HeaderMap,
 ) -> (StatusCode, Json<Value>) {
+    log_health_request("/readyz", &headers);
+
     let health_check_pool = database_pool.clone();
     let (redis_result, db_result) = tokio::join!(
         tokio::task::spawn_blocking(run_redis_health_check),
