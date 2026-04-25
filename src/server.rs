@@ -45,6 +45,7 @@ fn log_health_request(endpoint: &str, headers: &HeaderMap) {
     );
 }
 
+#[instrument(name = "http.healthz.build_response", skip_all)]
 fn build_health_response(redis_ok: bool, db_ok: Option<bool>) -> (StatusCode, Json<Value>) {
     let all_healthy = redis_ok && db_ok.unwrap_or(true);
     let status = if all_healthy {
