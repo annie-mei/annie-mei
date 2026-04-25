@@ -27,6 +27,7 @@ fn run_database_health_check(
     crate::utils::database::ping(database_pool)
 }
 
+#[instrument(name = "http.healthz.header_value", skip_all)]
 fn header_value<'a>(headers: &'a HeaderMap, name: &str) -> &'a str {
     headers
         .get(name)
