@@ -20,7 +20,10 @@
 
 use std::future::Future;
 
-use crate::models::{anilist_anime::Anime, anilist_common::TitleVariant, anilist_manga::Manga};
+use crate::models::{
+    anilist_anime::Anime, anilist_character::Character, anilist_common::TitleVariant,
+    anilist_manga::Manga,
+};
 
 /// Abstraction over media-data retrieval (AniList today, pluggable tomorrow).
 ///
@@ -49,6 +52,13 @@ pub trait MediaDataSource: Send + Sync {
     ) -> impl Future<Output = Option<(Manga, TitleVariant)>> + Send;
 }
 
+pub trait CharacterDataSource: Send + Sync {
+    /// Fetch character data for the given search term (name **or** numeric ID).
+    ///
+    /// Returns `None` when no matching character is found.
+    fn fetch_character(&self, search_term: &str) -> impl Future<Output = Option<Character>> + Send;
+}
+
 /// Production [`MediaDataSource`] backed by the AniList GraphQL API.
 ///
 /// This delegates to the existing [`crate::utils::response_fetcher::fetcher`]
@@ -72,5 +82,15 @@ impl MediaDataSource for AniListSource {
 
         let arg = CommandDataOptionValue::String(search_term.to_string());
         fetcher::<Manga>(MediaType::Manga, arg).await
+    }
+}
+
+impl CharacterDataSource for AniListSource {
+    async fn fetch_character(&self, search_term: &str) -> Option<Character> {
+        use crate::utils::response_fetcher::character_fetcher;
+        use serenity::all::CommandDataOptionValue;
+
+        let arg = CommandDataOptionValue::String(search_term.to_string());
+        character_fetcher(arg).await
     }
 }

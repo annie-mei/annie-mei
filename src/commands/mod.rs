@@ -1,4 +1,5 @@
 pub mod anime;
+pub mod character;
 pub mod help;
 pub mod input_validation;
 pub mod manga;
