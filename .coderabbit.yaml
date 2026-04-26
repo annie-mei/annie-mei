@@ -33,7 +33,7 @@ reviews:
         - Long-running Discord command handlers should defer before expensive work.
         - Use `tracing` and `#[instrument]` where they provide useful observability.
         - Avoid exposing secrets, credential-bearing URLs, or raw Discord user IDs.
-          Prefer the privacy helpers in `src/utils/privacy.rs`.
+          Prefer the privacy helpers in `src/utils/privacy/mod.rs`.
         - Prefer `?` and explicit error handling over `unwrap()` in production code.
         - Keep shared embed construction in model/transformer code when possible.
 

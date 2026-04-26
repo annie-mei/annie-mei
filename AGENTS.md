@@ -171,7 +171,7 @@ Notes:
 - `src/commands/response.rs` and `src/commands/traits.rs` - testable command patterns
 - `src/models/transformers.rs` - shared embed construction
 - `src/utils/requests/*.rs` - upstream API clients
-- `src/utils/privacy.rs` - hashed IDs and URL redaction
+- `src/utils/privacy/mod.rs` - hashed IDs and URL redaction
 
 ## Environment Requirements
 
