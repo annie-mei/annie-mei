@@ -27,20 +27,19 @@ fn run_database_health_check(
     crate::utils::database::ping(database_pool)
 }
 
-#[instrument(name = "http.healthz.header_value", skip_all)]
-fn header_value<'a>(headers: &'a HeaderMap, name: &str) -> &'a str {
-    headers
-        .get(name)
-        .and_then(|value| value.to_str().ok())
-        .unwrap_or("unknown")
-}
-
 #[instrument(name = "http.healthz.metadata", skip_all)]
 fn log_health_request(endpoint: &str, headers: &HeaderMap) {
+    let header_value = |name: &str| {
+        headers
+            .get(name)
+            .and_then(|value| value.to_str().ok())
+            .unwrap_or("unknown")
+    };
+
     info!(
         endpoint,
-        user_agent = header_value(headers, "user-agent"),
-        cf_ray = header_value(headers, "cf-ray"),
+        user_agent = header_value("user-agent"),
+        cf_ray = header_value("cf-ray"),
         "Health endpoint requested"
     );
 }
