@@ -25,7 +25,7 @@ pub fn create_pool() -> DbPool {
     let manager = ConnectionManager::<PgConnection>::new(database_url.clone());
 
     Pool::builder()
-        .max_size(2)
+        .max_size(10)
         .min_idle(Some(0))
         .test_on_check_out(true)
         .max_lifetime(Some(Duration::from_secs(20 * 60)))
