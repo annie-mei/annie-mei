@@ -4,7 +4,11 @@ use crate::{
         traits::{AniListSource, CharacterDataSource},
     },
     models::anilist_character::Character,
-    utils::{privacy::configure_sentry_scope, statics::NOT_FOUND_CHARACTER},
+    utils::{
+        channel::is_nsfw_channel,
+        privacy::configure_sentry_scope,
+        statics::{NOT_FOUND_CHARACTER, NSFW_NOT_ALLOWED},
+    },
 };
 
 use serde_json::json;
@@ -60,6 +64,16 @@ pub async fn run(ctx: &Context, interaction: &mut CommandInteraction) {
     info!("Got command 'character' with search_term: {search_term}");
 
     let character_result = AniListSource.fetch_character(&search_term).await;
+
+    if let Some(ref character) = character_result
+        && character.media_is_all_adult()
+        && !is_nsfw_channel(ctx, interaction.channel_id).await
+    {
+        let builder = EditInteractionResponse::new().content(NSFW_NOT_ALLOWED);
+        let _ = interaction.edit_response(&ctx.http, builder).await;
+        return;
+    }
+
     let response = handle_character(character_result);
 
     let _result = match response {

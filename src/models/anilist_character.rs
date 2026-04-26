@@ -115,8 +115,7 @@ impl Character {
             .as_deref()
             .or(self.name.full.as_deref())
             .or(self.name.native.as_deref())
-            .map(titlecase)
-            .unwrap_or_else(|| EMPTY_STR.to_string())
+            .map_or_else(|| EMPTY_STR.to_string(), titlecase)
     }
 
     pub fn transform_footer_name(&self) -> String {
@@ -154,8 +153,7 @@ impl Character {
     pub fn transform_gender(&self) -> String {
         self.gender
             .as_deref()
-            .map(titlecase)
-            .unwrap_or_else(|| EMPTY_STR.to_string())
+            .map_or_else(|| EMPTY_STR.to_string(), titlecase)
     }
 
     pub fn transform_birthday(&self) -> String {
@@ -183,9 +181,18 @@ impl Character {
     }
 
     pub fn transform_favourites(&self) -> String {
-        self.favourites
-            .map(|favourites| favourites.to_string())
-            .unwrap_or_else(|| EMPTY_STR.to_string())
+        self.favourites.map_or_else(
+            || EMPTY_STR.to_string(),
+            |favourites| favourites.to_string(),
+        )
+    }
+
+    pub fn media_is_all_adult(&self) -> bool {
+        let Some(nodes) = self.media.as_ref().and_then(|media| media.nodes.as_ref()) else {
+            return false;
+        };
+
+        !nodes.is_empty() && nodes.iter().all(|media| media.is_adult.unwrap_or(false))
     }
 
     pub fn transform_media(&self) -> String {
@@ -209,8 +216,7 @@ impl Character {
                 let media_type = media
                     .media_type
                     .as_deref()
-                    .map(titlecase)
-                    .unwrap_or_else(|| EMPTY_STR.to_string());
+                    .map_or_else(|| EMPTY_STR.to_string(), titlecase);
 
                 match media.site_url.as_deref() {
                     Some(url) => Some(format!(
@@ -308,6 +314,39 @@ mod tests {
 
         assert!(appearances.contains("Code Geass: Lelouch of the Rebellion"));
         assert!(appearances.contains("https://anilist.co/anime/1575"));
+    }
+
+    #[test]
+    fn media_is_all_adult_requires_only_adult_appearances() {
+        let character: Character = serde_json::from_value(serde_json::json!({
+            "id": 1,
+            "name": {
+                "full": "Adult Character",
+                "native": null,
+                "alternative": [],
+                "userPreferred": "Adult Character"
+            },
+            "image": null,
+            "description": null,
+            "gender": null,
+            "dateOfBirth": null,
+            "age": null,
+            "bloodType": null,
+            "favourites": null,
+            "siteUrl": "https://anilist.co/character/1",
+            "media": {
+                "nodes": [{
+                    "id": 1,
+                    "type": "MANGA",
+                    "title": { "romaji": "Adult Manga", "english": null },
+                    "siteUrl": "https://anilist.co/manga/1",
+                    "isAdult": true
+                }]
+            }
+        }))
+        .expect("sample character JSON should deserialize");
+
+        assert!(character.media_is_all_adult());
     }
 
     #[test]
