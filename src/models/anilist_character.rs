@@ -7,6 +7,9 @@ use html2md::parse_html;
 use serde::Deserialize;
 use serenity::all::{CreateEmbed, CreateEmbedFooter};
 
+const DISCORD_EMBED_DESCRIPTION_LIMIT: usize = 4096;
+const DESCRIPTION_ELLIPSIS: &str = "...";
+
 #[derive(Deserialize, Debug, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct Character {
@@ -143,11 +146,21 @@ impl Character {
     }
 
     pub fn transform_description(&self) -> String {
-        parse_html(
+        let description = parse_html(
             self.description
                 .as_deref()
                 .unwrap_or("<i>No Description Yet</i>"),
-        )
+        );
+
+        if description.chars().count() <= DISCORD_EMBED_DESCRIPTION_LIMIT {
+            return description;
+        }
+
+        description
+            .chars()
+            .take(DISCORD_EMBED_DESCRIPTION_LIMIT - DESCRIPTION_ELLIPSIS.len())
+            .chain(DESCRIPTION_ELLIPSIS.chars())
+            .collect()
     }
 
     pub fn transform_gender(&self) -> String {
@@ -195,7 +208,14 @@ impl Character {
         !nodes.is_empty() && nodes.iter().all(|media| media.is_adult.unwrap_or(false))
     }
 
-    pub fn transform_media(&self) -> String {
+    pub fn has_adult_media(&self) -> bool {
+        self.media
+            .as_ref()
+            .and_then(|media| media.nodes.as_ref())
+            .is_some_and(|nodes| nodes.iter().any(|media| media.is_adult.unwrap_or(false)))
+    }
+
+    pub fn transform_media(&self, allow_adult: bool) -> String {
         let Some(media) = &self.media else {
             return EMPTY_STR.to_string();
         };
@@ -205,7 +225,7 @@ impl Character {
 
         let appearances = nodes
             .iter()
-            .filter(|media| !media.is_adult.unwrap_or(false))
+            .filter(|media| allow_adult || !media.is_adult.unwrap_or(false))
             .filter_map(|media| {
                 let title = media
                     .title
@@ -237,7 +257,7 @@ impl Character {
         }
     }
 
-    pub fn transform_response_embed(&self) -> CreateEmbed {
+    pub fn transform_response_embed(&self, allow_adult_media: bool) -> CreateEmbed {
         CreateEmbed::new()
             .color(0x00_68_A8)
             .title(self.transform_name())
@@ -254,13 +274,13 @@ impl Character {
                 ("Blood Type", self.transform_blood_type(), true),
                 ("Favourites", self.transform_favourites(), true),
             ])
-            .field("Appears In", self.transform_media(), false)
+            .field("Appears In", self.transform_media(allow_adult_media), false)
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use super::Character;
+    use super::{Character, DESCRIPTION_ELLIPSIS, DISCORD_EMBED_DESCRIPTION_LIMIT, EMPTY_STR};
 
     fn sample_character() -> Character {
         serde_json::from_value(serde_json::json!({
@@ -310,7 +330,7 @@ mod tests {
 
     #[test]
     fn transforms_media_appearances() {
-        let appearances = sample_character().transform_media();
+        let appearances = sample_character().transform_media(false);
 
         assert!(appearances.contains("Code Geass: Lelouch of the Rebellion"));
         assert!(appearances.contains("https://anilist.co/anime/1575"));
@@ -350,8 +370,70 @@ mod tests {
     }
 
     #[test]
+    fn transform_media_includes_adult_appearances_when_allowed() {
+        let character: Character = serde_json::from_value(serde_json::json!({
+            "id": 1,
+            "name": {
+                "full": "Adult Character",
+                "native": null,
+                "alternative": [],
+                "userPreferred": "Adult Character"
+            },
+            "image": null,
+            "description": null,
+            "gender": null,
+            "dateOfBirth": null,
+            "age": null,
+            "bloodType": null,
+            "favourites": null,
+            "siteUrl": "https://anilist.co/character/1",
+            "media": {
+                "nodes": [{
+                    "id": 1,
+                    "type": "MANGA",
+                    "title": { "romaji": "Adult Manga", "english": null },
+                    "siteUrl": "https://anilist.co/manga/1",
+                    "isAdult": true
+                }]
+            }
+        }))
+        .expect("sample character JSON should deserialize");
+
+        assert_eq!(character.transform_media(false), EMPTY_STR);
+        assert!(character.transform_media(true).contains("Adult Manga"));
+    }
+
+    #[test]
+    fn transform_description_respects_discord_embed_limit() {
+        let character: Character = serde_json::from_value(serde_json::json!({
+            "id": 1,
+            "name": {
+                "full": "Long Bio",
+                "native": null,
+                "alternative": [],
+                "userPreferred": "Long Bio"
+            },
+            "image": null,
+            "description": "a".repeat(5000),
+            "gender": null,
+            "dateOfBirth": null,
+            "age": null,
+            "bloodType": null,
+            "favourites": null,
+            "siteUrl": "https://anilist.co/character/1",
+            "media": { "nodes": [] }
+        }))
+        .expect("sample character JSON should deserialize");
+
+        let description = character.transform_description();
+
+        assert_eq!(description.chars().count(), DISCORD_EMBED_DESCRIPTION_LIMIT);
+        assert!(description.ends_with(DESCRIPTION_ELLIPSIS));
+    }
+
+    #[test]
     fn success_embed_serializes() {
-        let embed = sample_character().transform_response_embed();
+        let embed = sample_character().transform_response_embed(false);
         let value = serde_json::to_value(&embed).expect("embed serializes");
 
         assert_eq!(value["title"], "Lelouch Lamperouge");

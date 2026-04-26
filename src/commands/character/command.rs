@@ -33,12 +33,12 @@ pub fn register() -> CreateCommand {
         )
 }
 
-pub fn handle_character(character: Option<Character>) -> CommandResponse {
+pub fn handle_character(character: Option<Character>, allow_adult_media: bool) -> CommandResponse {
     match character {
         None => CommandResponse::Content(NOT_FOUND_CHARACTER.to_string()),
-        Some(character_response) => {
-            CommandResponse::Embed(Box::new(character_response.transform_response_embed()))
-        }
+        Some(character_response) => CommandResponse::Embed(Box::new(
+            character_response.transform_response_embed(allow_adult_media),
+        )),
     }
 }
 
@@ -64,17 +64,25 @@ pub async fn run(ctx: &Context, interaction: &mut CommandInteraction) {
     info!("Got command 'character' with search_term: {search_term}");
 
     let character_result = AniListSource.fetch_character(&search_term).await;
+    let allow_adult_media = if character_result
+        .as_ref()
+        .is_some_and(Character::has_adult_media)
+    {
+        is_nsfw_channel(ctx, interaction.channel_id).await
+    } else {
+        false
+    };
 
     if let Some(ref character) = character_result
         && character.media_is_all_adult()
-        && !is_nsfw_channel(ctx, interaction.channel_id).await
+        && !allow_adult_media
     {
         let builder = EditInteractionResponse::new().content(NSFW_NOT_ALLOWED);
         let _ = interaction.edit_response(&ctx.http, builder).await;
         return;
     }
 
-    let response = handle_character(character_result);
+    let response = handle_character(character_result, allow_adult_media);
 
     let _result = match response {
         CommandResponse::Content(text) => {
@@ -123,7 +131,7 @@ mod tests {
 
     #[test]
     fn character_not_found_returns_content_with_message() {
-        let response = handle_character(None);
+        let response = handle_character(None, false);
 
         assert!(response.is_content(), "expected Content variant");
         assert_eq!(response.unwrap_content(), NOT_FOUND_CHARACTER);
@@ -131,7 +139,7 @@ mod tests {
 
     #[test]
     fn character_success_returns_embed() {
-        let response = handle_character(Some(sample_character()));
+        let response = handle_character(Some(sample_character()), false);
 
         assert!(
             response.is_embed(),
