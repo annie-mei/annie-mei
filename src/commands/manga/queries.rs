@@ -48,10 +48,6 @@ query ($id: Int) {
       }
     }
     siteUrl
-    externalLinks {
-      url
-      type
-    }
     description
     tags {
       name
@@ -118,10 +114,6 @@ query ($page: Int, $perPage: Int, $search: String) {
         }
       }
       siteUrl
-      externalLinks {
-        url
-        type
-      }
       description
       tags {
         name

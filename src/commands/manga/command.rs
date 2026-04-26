@@ -179,7 +179,6 @@ mod tests {
                 "nodes": [{ "name": { "full": "Eiichiro Oda" } }]
             },
             "siteUrl": "https://anilist.co/manga/30013",
-            "externalLinks": [],
             "description": "<p>Gol D. Roger was known as the Pirate King.</p>",
             "tags": [{ "name": "Shounen" }]
         }))

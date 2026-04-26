@@ -1,6 +1,6 @@
 use crate::{
     models::{
-        anilist_common::{CoverImage, ExternalLinks, Tag, Title},
+        anilist_common::{CoverImage, Tag, Title},
         transformers::Transformers,
     },
     utils::{
@@ -36,8 +36,6 @@ pub struct Manga {
     average_score: Option<u32>,
     staff: Option<Staff>,
     site_url: String,
-    #[allow(dead_code)]
-    external_links: Option<Vec<ExternalLinks>>,
     description: Option<String>,
     tags: Vec<Tag>,
 }
@@ -357,7 +355,6 @@ mod tests {
             "averageScore": null,
             "staff": null,
             "siteUrl": "https://anilist.co/manga/1",
-            "externalLinks": null,
             "description": null,
             "tags": []
         }))
