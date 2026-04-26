@@ -136,7 +136,8 @@ Notes:
 
 ## Testing
 
-- Unit tests go in the same file as the code being tested
+- Unit tests go in the same file as the code being tested by default
+- For oversized pure-utility modules where inline unit tests materially hurt readability, prefer a directory-backed module with a sibling `tests.rs` file so the tests stay unit-scoped without overwhelming the implementation file
 - Integration tests go in `tests/` directory
 - Mock external APIs in tests
 - Run `cargo test` to execute all tests
@@ -170,7 +171,7 @@ Notes:
 - `src/commands/response.rs` and `src/commands/traits.rs` - testable command patterns
 - `src/models/transformers.rs` - shared embed construction
 - `src/utils/requests/*.rs` - upstream API clients
-- `src/utils/privacy.rs` - hashed IDs and URL redaction
+- `src/utils/privacy/mod.rs` - hashed IDs and URL redaction
 
 ## Environment Requirements
 
