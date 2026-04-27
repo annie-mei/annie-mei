@@ -23,7 +23,6 @@ use serenity::{
 };
 use tracing::{info, instrument};
 
-const LOOKUP_SUBCOMMAND: &str = "lookup";
 const SEARCH_OPTION: &str = "search";
 const SPOILERS_OPTION: &str = "spoilers";
 const ALLOW_SPOILERS: &str = "allow";
@@ -34,64 +33,45 @@ pub fn register() -> CreateCommand {
         .description("Fetches the details for an AniList character")
         .add_option(
             CreateCommandOption::new(
-                CommandOptionType::SubCommand,
-                LOOKUP_SUBCOMMAND,
-                "Look up a character",
+                CommandOptionType::String,
+                SEARCH_OPTION,
+                "AniList character ID or search term",
             )
-            .add_sub_option(
-                CreateCommandOption::new(
-                    CommandOptionType::String,
-                    SEARCH_OPTION,
-                    "AniList character ID or search term",
-                )
-                .required(true),
+            .required(true),
+        )
+        .add_option(
+            CreateCommandOption::new(
+                CommandOptionType::String,
+                SPOILERS_OPTION,
+                "Whether to include spoiler aliases and spoiler description content",
             )
-            .add_sub_option(
-                CreateCommandOption::new(
-                    CommandOptionType::String,
-                    SPOILERS_OPTION,
-                    "Whether to include spoiler aliases and spoiler description content",
-                )
-                .add_string_choice("Allow", ALLOW_SPOILERS)
-                .add_string_choice("Disallow", DISALLOW_SPOILERS)
-                .required(true),
-            ),
+            .add_string_choice("Allow", ALLOW_SPOILERS)
+            .add_string_choice("Disallow", DISALLOW_SPOILERS)
+            .required(true),
         )
 }
 
 fn parse_character_options(options: &[CommandDataOption]) -> Option<(String, bool)> {
-    let option = options.first()?;
+    let search_term = options
+        .iter()
+        .find(|option| option.name == SEARCH_OPTION)
+        .and_then(|option| match &option.value {
+            CommandDataOptionValue::String(search_term) => Some(search_term.clone()),
+            _ => None,
+        })?;
+    let allow_spoilers = options
+        .iter()
+        .find(|option| option.name == SPOILERS_OPTION)
+        .and_then(|option| match &option.value {
+            CommandDataOptionValue::String(value) => match value.as_str() {
+                ALLOW_SPOILERS => Some(true),
+                DISALLOW_SPOILERS => Some(false),
+                _ => None,
+            },
+            _ => None,
+        })?;
 
-    match &option.value {
-        CommandDataOptionValue::SubCommand(sub_options) => {
-            if option.name != LOOKUP_SUBCOMMAND {
-                return None;
-            }
-
-            let search_term = sub_options
-                .iter()
-                .find(|sub_option| sub_option.name == SEARCH_OPTION)
-                .and_then(|sub_option| match &sub_option.value {
-                    CommandDataOptionValue::String(search_term) => Some(search_term.clone()),
-                    _ => None,
-                })?;
-            let allow_spoilers = sub_options
-                .iter()
-                .find(|sub_option| sub_option.name == SPOILERS_OPTION)
-                .and_then(|sub_option| match &sub_option.value {
-                    CommandDataOptionValue::String(value) => match value.as_str() {
-                        ALLOW_SPOILERS => Some(true),
-                        DISALLOW_SPOILERS => Some(false),
-                        _ => None,
-                    },
-                    _ => None,
-                })?;
-
-            Some((search_term, allow_spoilers))
-        }
-        CommandDataOptionValue::String(search_term) => Some((search_term.clone(), false)),
-        _ => None,
-    }
+    Some((search_term, allow_spoilers))
 }
 
 pub fn handle_character(
@@ -216,19 +196,15 @@ mod tests {
     }
 
     #[test]
-    fn parses_lookup_with_disallowed_spoilers() {
+    fn parses_disallowed_spoilers_option() {
         let options: Vec<CommandDataOption> = serde_json::from_value(serde_json::json!([{
-            "name": "lookup",
-            "type": 1,
-            "options": [{
-                "name": "search",
-                "type": 3,
-                "value": "Lust"
-            }, {
-                "name": "spoilers",
-                "type": 3,
-                "value": "disallow"
-            }]
+            "name": "search",
+            "type": 3,
+            "value": "Lust"
+        }, {
+            "name": "spoilers",
+            "type": 3,
+            "value": "disallow"
         }]))
         .expect("options deserialize");
 
@@ -239,19 +215,15 @@ mod tests {
     }
 
     #[test]
-    fn parses_lookup_with_allowed_spoilers() {
+    fn parses_allowed_spoilers_option() {
         let options: Vec<CommandDataOption> = serde_json::from_value(serde_json::json!([{
-            "name": "lookup",
-            "type": 1,
-            "options": [{
-                "name": "search",
-                "type": 3,
-                "value": "Joy Boy"
-            }, {
-                "name": "spoilers",
-                "type": 3,
-                "value": "allow"
-            }]
+            "name": "search",
+            "type": 3,
+            "value": "Joy Boy"
+        }, {
+            "name": "spoilers",
+            "type": 3,
+            "value": "allow"
         }]))
         .expect("options deserialize");
 
