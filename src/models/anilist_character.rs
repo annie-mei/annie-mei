@@ -137,12 +137,12 @@ impl Character {
             .unwrap_or_else(|| EMPTY_STR.to_string())
     }
 
-    pub fn transform_thumbnail(&self) -> String {
+    pub fn transform_thumbnail(&self) -> Option<String> {
         self.image
             .as_ref()
             .and_then(|image| image.large.as_deref().or(image.medium.as_deref()))
-            .unwrap_or_default()
-            .to_string()
+            .filter(|url| !url.trim().is_empty())
+            .map(ToString::to_string)
     }
 
     pub fn transform_description(&self) -> String {
@@ -258,12 +258,11 @@ impl Character {
     }
 
     pub fn transform_response_embed(&self, allow_adult_media: bool) -> CreateEmbed {
-        CreateEmbed::new()
+        let embed = CreateEmbed::new()
             .color(0x00_68_A8)
             .title(self.transform_name())
             .description(self.transform_description())
             .url(&self.site_url)
-            .thumbnail(self.transform_thumbnail())
             .footer(CreateEmbedFooter::new(self.transform_footer_name()))
             .fields(vec![
                 ("Gender", self.transform_gender(), true),
@@ -274,7 +273,12 @@ impl Character {
                 ("Blood Type", self.transform_blood_type(), true),
                 ("Favourites", self.transform_favourites(), true),
             ])
-            .field("Appears In", self.transform_media(allow_adult_media), false)
+            .field("Appears In", self.transform_media(allow_adult_media), false);
+
+        match self.transform_thumbnail() {
+            Some(thumbnail) => embed.thumbnail(thumbnail),
+            None => embed,
+        }
     }
 }
 
@@ -432,11 +436,41 @@ mod tests {
     }
 
     #[test]
+    fn transform_thumbnail_ignores_missing_image_urls() {
+        let character: Character = serde_json::from_value(serde_json::json!({
+            "id": 1,
+            "name": {
+                "full": "No Image",
+                "native": null,
+                "alternative": [],
+                "userPreferred": "No Image"
+            },
+            "image": { "large": "", "medium": null },
+            "description": null,
+            "gender": null,
+            "dateOfBirth": null,
+            "age": null,
+            "bloodType": null,
+            "favourites": null,
+            "siteUrl": "https://anilist.co/character/1",
+            "media": { "nodes": [] }
+        }))
+        .expect("sample character JSON should deserialize");
+
+        let embed = character.transform_response_embed(false);
+        let value = serde_json::to_value(&embed).expect("embed serializes");
+
+        assert!(character.transform_thumbnail().is_none());
+        assert!(value.get("thumbnail").is_none());
+    }
+
+    #[test]
     fn success_embed_serializes() {
         let embed = sample_character().transform_response_embed(false);
         let value = serde_json::to_value(&embed).expect("embed serializes");
 
         assert_eq!(value["title"], "Lelouch Lamperouge");
         assert_eq!(value["url"], "https://anilist.co/character/40");
+        assert_eq!(value["thumbnail"]["url"], "https://example.com/large.jpg");
     }
 }
