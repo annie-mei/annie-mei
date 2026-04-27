@@ -308,7 +308,7 @@ impl Character {
 }
 
 fn strip_spoiler_html(html: &str) -> String {
-    let mut output = String::new();
+    let mut output = String::default();
     let mut remaining = html;
 
     while let Some(class_index) = remaining.find(MARKDOWN_SPOILER_CLASS) {
