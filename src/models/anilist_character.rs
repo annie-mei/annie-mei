@@ -9,6 +9,9 @@ use serenity::all::{CreateEmbed, CreateEmbedFooter};
 
 const DISCORD_EMBED_DESCRIPTION_LIMIT: usize = 4096;
 const DESCRIPTION_ELLIPSIS: &str = "...";
+const MARKDOWN_SPOILER_CLASS: &str = "markdown_spoiler";
+const SPAN_OPEN: &str = "<span";
+const SPAN_CLOSE: &str = "</span>";
 
 #[derive(Deserialize, Debug, Clone)]
 #[serde(rename_all = "camelCase")]
@@ -153,17 +156,22 @@ impl Character {
     pub fn transform_thumbnail(&self) -> Option<String> {
         self.image
             .as_ref()
-            .and_then(|image| image.large.as_deref().or(image.medium.as_deref()))
+            .and_then(|image| image.medium.as_deref().or(image.large.as_deref()))
             .filter(|url| !url.trim().is_empty())
             .map(ToString::to_string)
     }
 
-    pub fn transform_description(&self) -> String {
-        let description = parse_html(
-            self.description
-                .as_deref()
-                .unwrap_or("<i>No Description Yet</i>"),
-        );
+    pub fn transform_description(&self, allow_spoilers: bool) -> String {
+        let description_html = self
+            .description
+            .as_deref()
+            .unwrap_or("<i>No Description Yet</i>");
+        let filtered_description = if allow_spoilers {
+            description_html.to_string()
+        } else {
+            strip_spoiler_html(description_html)
+        };
+        let description = parse_html(&filtered_description);
 
         if description.chars().count() <= DISCORD_EMBED_DESCRIPTION_LIMIT {
             return description;
@@ -270,11 +278,15 @@ impl Character {
         }
     }
 
-    pub fn transform_response_embed(&self, allow_adult_media: bool) -> CreateEmbed {
+    pub fn transform_response_embed(
+        &self,
+        allow_adult_media: bool,
+        allow_spoilers: bool,
+    ) -> CreateEmbed {
         let embed = CreateEmbed::new()
             .color(0x00_68_A8)
             .title(self.transform_name())
-            .description(self.transform_description())
+            .description(self.transform_description(allow_spoilers))
             .url(&self.site_url)
             .footer(CreateEmbedFooter::new(self.transform_footer_name()))
             .fields(vec![
@@ -293,6 +305,56 @@ impl Character {
             None => embed,
         }
     }
+}
+
+fn strip_spoiler_html(html: &str) -> String {
+    let mut output = String::new();
+    let mut remaining = html;
+
+    while let Some(class_index) = remaining.find(MARKDOWN_SPOILER_CLASS) {
+        let Some(open_start) = remaining[..class_index].rfind(SPAN_OPEN) else {
+            output.push_str(&remaining[..class_index + MARKDOWN_SPOILER_CLASS.len()]);
+            remaining = &remaining[class_index + MARKDOWN_SPOILER_CLASS.len()..];
+            continue;
+        };
+
+        output.push_str(&remaining[..open_start]);
+
+        let Some(open_end_offset) = remaining[class_index..].find('>') else {
+            break;
+        };
+        let mut cursor = class_index + open_end_offset + 1;
+        let mut span_depth = 1;
+
+        while span_depth > 0 {
+            let next_open = remaining[cursor..]
+                .find(SPAN_OPEN)
+                .map(|offset| cursor + offset);
+            let next_close = remaining[cursor..]
+                .find(SPAN_CLOSE)
+                .map(|offset| cursor + offset);
+
+            match (next_open, next_close) {
+                (Some(open), Some(close)) if open < close => {
+                    span_depth += 1;
+                    cursor = open + SPAN_OPEN.len();
+                }
+                (_, Some(close)) => {
+                    span_depth -= 1;
+                    cursor = close + SPAN_CLOSE.len();
+                }
+                _ => {
+                    cursor = remaining.len();
+                    break;
+                }
+            }
+        }
+
+        remaining = &remaining[cursor..];
+    }
+
+    output.push_str(remaining);
+    output
 }
 
 #[cfg(test)]
@@ -459,10 +521,41 @@ mod tests {
         }))
         .expect("sample character JSON should deserialize");
 
-        let description = character.transform_description();
+        let description = character.transform_description(true);
 
         assert_eq!(description.chars().count(), DISCORD_EMBED_DESCRIPTION_LIMIT);
         assert!(description.ends_with(DESCRIPTION_ELLIPSIS));
+    }
+
+    #[test]
+    fn transform_description_filters_spoiler_html_when_disallowed() {
+        let character: Character = serde_json::from_value(serde_json::json!({
+            "id": 650,
+            "name": {
+                "full": "Lust",
+                "native": null,
+                "alternative": [],
+                "alternativeSpoiler": [],
+                "userPreferred": "Lust"
+            },
+            "image": null,
+            "description": "<p>Visible text.</p><p><span class='markdown_spoiler'><span>Hidden spoiler.</span></span></p>",
+            "gender": null,
+            "dateOfBirth": null,
+            "age": null,
+            "bloodType": null,
+            "favourites": null,
+            "siteUrl": "https://anilist.co/character/650",
+            "media": { "nodes": [] }
+        }))
+        .expect("sample character JSON should deserialize");
+
+        let disallowed = character.transform_description(false);
+        let allowed = character.transform_description(true);
+
+        assert!(disallowed.contains("Visible text."));
+        assert!(!disallowed.contains("Hidden spoiler."));
+        assert!(allowed.contains("Hidden spoiler."));
     }
 
     #[test]
@@ -487,7 +580,7 @@ mod tests {
         }))
         .expect("sample character JSON should deserialize");
 
-        let embed = character.transform_response_embed(false);
+        let embed = character.transform_response_embed(false, false);
         let value = serde_json::to_value(&embed).expect("embed serializes");
 
         assert!(character.transform_thumbnail().is_none());
@@ -496,11 +589,11 @@ mod tests {
 
     #[test]
     fn success_embed_serializes() {
-        let embed = sample_character().transform_response_embed(false);
+        let embed = sample_character().transform_response_embed(false, false);
         let value = serde_json::to_value(&embed).expect("embed serializes");
 
         assert_eq!(value["title"], "Lelouch Lamperouge");
         assert_eq!(value["url"], "https://anilist.co/character/40");
-        assert_eq!(value["thumbnail"]["url"], "https://example.com/large.jpg");
+        assert_eq!(value["thumbnail"]["url"], "https://example.com/medium.jpg");
     }
 }

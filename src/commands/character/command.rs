@@ -23,9 +23,11 @@ use serenity::{
 };
 use tracing::{info, instrument};
 
-const ALLOW_SPOILERS_SUBCOMMAND: &str = "allow";
-const DISALLOW_SPOILERS_SUBCOMMAND: &str = "disallow";
+const LOOKUP_SUBCOMMAND: &str = "lookup";
 const SEARCH_OPTION: &str = "search";
+const SPOILERS_OPTION: &str = "spoilers";
+const ALLOW_SPOILERS: &str = "allow";
+const DISALLOW_SPOILERS: &str = "disallow";
 
 pub fn register() -> CreateCommand {
     CreateCommand::new("character")
@@ -33,8 +35,8 @@ pub fn register() -> CreateCommand {
         .add_option(
             CreateCommandOption::new(
                 CommandOptionType::SubCommand,
-                DISALLOW_SPOILERS_SUBCOMMAND,
-                "Search without matching spoiler aliases",
+                LOOKUP_SUBCOMMAND,
+                "Look up a character",
             )
             .add_sub_option(
                 CreateCommandOption::new(
@@ -43,20 +45,15 @@ pub fn register() -> CreateCommand {
                     "AniList character ID or search term",
                 )
                 .required(true),
-            ),
-        )
-        .add_option(
-            CreateCommandOption::new(
-                CommandOptionType::SubCommand,
-                ALLOW_SPOILERS_SUBCOMMAND,
-                "Search and allow matching spoiler aliases",
             )
             .add_sub_option(
                 CreateCommandOption::new(
                     CommandOptionType::String,
-                    SEARCH_OPTION,
-                    "AniList character ID or search term",
+                    SPOILERS_OPTION,
+                    "Whether to include spoiler aliases and spoiler description content",
                 )
+                .add_string_choice("Allow", ALLOW_SPOILERS)
+                .add_string_choice("Disallow", DISALLOW_SPOILERS)
                 .required(true),
             ),
         )
@@ -67,16 +64,26 @@ fn parse_character_options(options: &[CommandDataOption]) -> Option<(String, boo
 
     match &option.value {
         CommandDataOptionValue::SubCommand(sub_options) => {
-            let allow_spoilers = match option.name.as_str() {
-                ALLOW_SPOILERS_SUBCOMMAND => true,
-                DISALLOW_SPOILERS_SUBCOMMAND => false,
-                _ => return None,
-            };
+            if option.name != LOOKUP_SUBCOMMAND {
+                return None;
+            }
+
             let search_term = sub_options
                 .iter()
                 .find(|sub_option| sub_option.name == SEARCH_OPTION)
                 .and_then(|sub_option| match &sub_option.value {
                     CommandDataOptionValue::String(search_term) => Some(search_term.clone()),
+                    _ => None,
+                })?;
+            let allow_spoilers = sub_options
+                .iter()
+                .find(|sub_option| sub_option.name == SPOILERS_OPTION)
+                .and_then(|sub_option| match &sub_option.value {
+                    CommandDataOptionValue::String(value) => match value.as_str() {
+                        ALLOW_SPOILERS => Some(true),
+                        DISALLOW_SPOILERS => Some(false),
+                        _ => None,
+                    },
                     _ => None,
                 })?;
 
@@ -87,11 +94,15 @@ fn parse_character_options(options: &[CommandDataOption]) -> Option<(String, boo
     }
 }
 
-pub fn handle_character(character: Option<Character>, allow_adult_media: bool) -> CommandResponse {
+pub fn handle_character(
+    character: Option<Character>,
+    allow_adult_media: bool,
+    allow_spoilers: bool,
+) -> CommandResponse {
     match character {
         None => CommandResponse::Content(NOT_FOUND_CHARACTER.to_string()),
         Some(character_response) => CommandResponse::Embed(Box::new(
-            character_response.transform_response_embed(allow_adult_media),
+            character_response.transform_response_embed(allow_adult_media, allow_spoilers),
         )),
     }
 }
@@ -138,7 +149,7 @@ pub async fn run(ctx: &Context, interaction: &mut CommandInteraction) {
         return;
     }
 
-    let response = handle_character(character_result, allow_adult_media);
+    let response = handle_character(character_result, allow_adult_media, allow_spoilers);
 
     let _result = match response {
         CommandResponse::Content(text) => {
@@ -187,7 +198,7 @@ mod tests {
 
     #[test]
     fn character_not_found_returns_content_with_message() {
-        let response = handle_character(None, false);
+        let response = handle_character(None, false, false);
 
         assert!(response.is_content(), "expected Content variant");
         assert_eq!(response.unwrap_content(), NOT_FOUND_CHARACTER);
@@ -195,7 +206,7 @@ mod tests {
 
     #[test]
     fn character_success_returns_embed() {
-        let response = handle_character(Some(sample_character()), false);
+        let response = handle_character(Some(sample_character()), false, false);
 
         assert!(
             response.is_embed(),
@@ -205,14 +216,18 @@ mod tests {
     }
 
     #[test]
-    fn parses_disallow_spoilers_subcommand() {
+    fn parses_lookup_with_disallowed_spoilers() {
         let options: Vec<CommandDataOption> = serde_json::from_value(serde_json::json!([{
-            "name": "disallow",
+            "name": "lookup",
             "type": 1,
             "options": [{
                 "name": "search",
                 "type": 3,
                 "value": "Lust"
+            }, {
+                "name": "spoilers",
+                "type": 3,
+                "value": "disallow"
             }]
         }]))
         .expect("options deserialize");
@@ -224,14 +239,18 @@ mod tests {
     }
 
     #[test]
-    fn parses_allow_spoilers_subcommand() {
+    fn parses_lookup_with_allowed_spoilers() {
         let options: Vec<CommandDataOption> = serde_json::from_value(serde_json::json!([{
-            "name": "allow",
+            "name": "lookup",
             "type": 1,
             "options": [{
                 "name": "search",
                 "type": 3,
                 "value": "Joy Boy"
+            }, {
+                "name": "spoilers",
+                "type": 3,
+                "value": "allow"
             }]
         }]))
         .expect("options deserialize");
