@@ -101,8 +101,7 @@ pub async fn run(ctx: &Context, interaction: &mut CommandInteraction) {
         return;
     };
 
-    let arg_str = format!("{:?}", search_term);
-    configure_sentry_scope("Character", user.id.get(), Some(json!(arg_str)));
+    configure_sentry_scope("Character", user.id.get(), Some(json!(search_term.clone())));
 
     info!(
         "Got command 'character' with search_term: {search_term}, allow_spoilers: {allow_spoilers}"
