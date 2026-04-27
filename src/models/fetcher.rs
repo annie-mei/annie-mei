@@ -12,7 +12,7 @@ use crate::{
         media_type::MediaType as Type, transformers::Transformers,
     },
     utils::{
-        fetch_by_arguments::{fetch_by_id, fetch_by_name},
+        fetch_by_arguments::{fetch_by_id, fetch_by_name, fetch_by_raw_name},
         redis::{check_cache, try_to_cache_response},
     },
 };
@@ -65,6 +65,37 @@ async fn fetch_from_network_and_cache(
         Ok(data) => data,
         Err(err) => {
             error!(error = %err, "Failed to fetch AniList data by name");
+            return None;
+        }
+    };
+
+    let cache_key_for_write = cache_key.clone();
+    let response_to_cache = response.clone();
+    if let Err(err) = task::spawn_blocking(move || {
+        write_cached_anilist_response(cache_key_for_write, response_to_cache)
+    })
+    .await
+    {
+        error!(error = %err, cache_key = %cache_key, "Failed to cache AniList response");
+    }
+
+    Some(response)
+}
+
+#[instrument(
+    name = "anilist.fetch_raw_from_network_and_cache",
+    skip(search_query),
+    fields(cache_key = %cache_key, lookup_len = lookup_value.len())
+)]
+async fn fetch_raw_from_network_and_cache(
+    search_query: String,
+    lookup_value: String,
+    cache_key: String,
+) -> Option<String> {
+    let response = match fetch_by_raw_name(search_query, lookup_value).await {
+        Ok(data) => data,
+        Err(err) => {
+            error!(error = %err, "Failed to fetch AniList data by raw name");
             return None;
         }
     };
@@ -211,7 +242,7 @@ pub async fn fetch_character(
                 }
                 Ok(Err(err)) => {
                     info!("Cache miss for {:#?} with error {:#?}", cache_key, err);
-                    fetch_from_network_and_cache(
+                    fetch_raw_from_network_and_cache(
                         search_query.clone(),
                         lookup_value.clone(),
                         cache_key.clone(),
@@ -220,7 +251,7 @@ pub async fn fetch_character(
                 }
                 Err(err) => {
                     error!(error = %err, "Failed to read AniList character cache");
-                    fetch_from_network_and_cache(search_query, lookup_value, cache_key.clone())
+                    fetch_raw_from_network_and_cache(search_query, lookup_value, cache_key.clone())
                         .await?
                 }
             };
