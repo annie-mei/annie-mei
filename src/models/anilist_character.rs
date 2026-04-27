@@ -33,6 +33,7 @@ pub struct CharacterName {
     pub full: Option<String>,
     pub native: Option<String>,
     pub alternative: Option<Vec<String>>,
+    pub alternative_spoiler: Option<Vec<String>>,
     pub user_preferred: Option<String>,
 }
 
@@ -82,7 +83,7 @@ impl CharacterName {
             .to_string()
     }
 
-    pub fn search_aliases(&self) -> Vec<String> {
+    pub fn search_aliases(&self, allow_spoilers: bool) -> Vec<String> {
         let mut aliases = Vec::new();
 
         if let Some(full) = &self.full {
@@ -97,13 +98,25 @@ impl CharacterName {
             aliases.extend(alternative.clone());
         }
 
+        if allow_spoilers && let Some(alternative_spoiler) = &self.alternative_spoiler {
+            aliases.extend(alternative_spoiler.clone());
+        }
+
         aliases
     }
 
-    pub fn has_alias(&self, alias: &str) -> bool {
-        self.search_aliases()
+    pub fn has_alias(&self, alias: &str, allow_spoilers: bool) -> bool {
+        self.search_aliases(allow_spoilers)
             .iter()
             .any(|candidate| candidate.eq_ignore_ascii_case(alias))
+    }
+
+    pub fn has_spoiler_alias(&self, alias: &str) -> bool {
+        self.alternative_spoiler.as_ref().is_some_and(|aliases| {
+            aliases
+                .iter()
+                .any(|candidate| candidate.eq_ignore_ascii_case(alias))
+        })
     }
 }
 
@@ -293,6 +306,7 @@ mod tests {
                 "full": "Lelouch Lamperouge",
                 "native": "ルルーシュ・ランペルージ",
                 "alternative": ["Lelouch vi Britannia"],
+                "alternativeSpoiler": ["Lelouch vi Britannia the 99th Emperor"],
                 "userPreferred": "Lelouch Lamperouge"
             },
             "image": {
@@ -338,6 +352,22 @@ mod tests {
 
         assert!(appearances.contains("Code Geass: Lelouch of the Rebellion"));
         assert!(appearances.contains("https://anilist.co/anime/1575"));
+    }
+
+    #[test]
+    fn spoiler_aliases_require_explicit_allowance() {
+        let character = sample_character();
+
+        assert!(
+            !character
+                .name()
+                .has_alias("Lelouch vi Britannia the 99th Emperor", false)
+        );
+        assert!(
+            character
+                .name()
+                .has_alias("Lelouch vi Britannia the 99th Emperor", true)
+        );
     }
 
     #[test]

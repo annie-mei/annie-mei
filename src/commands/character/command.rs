@@ -13,24 +13,78 @@ use crate::{
 
 use serde_json::json;
 use serenity::{
-    all::{CommandInteraction, CreateCommandOption, EditInteractionResponse},
+    all::{
+        CommandDataOption, CommandDataOptionValue, CommandInteraction, CreateCommandOption,
+        EditInteractionResponse,
+    },
     builder::CreateCommand,
     client::Context,
     model::application::CommandOptionType,
 };
 use tracing::{info, instrument};
 
+const ALLOW_SPOILERS_SUBCOMMAND: &str = "allow";
+const DISALLOW_SPOILERS_SUBCOMMAND: &str = "disallow";
+const SEARCH_OPTION: &str = "search";
+
 pub fn register() -> CreateCommand {
     CreateCommand::new("character")
         .description("Fetches the details for an AniList character")
         .add_option(
             CreateCommandOption::new(
-                CommandOptionType::String,
-                "search",
-                "AniList character ID or search term",
+                CommandOptionType::SubCommand,
+                DISALLOW_SPOILERS_SUBCOMMAND,
+                "Search without matching spoiler aliases",
             )
-            .required(true),
+            .add_sub_option(
+                CreateCommandOption::new(
+                    CommandOptionType::String,
+                    SEARCH_OPTION,
+                    "AniList character ID or search term",
+                )
+                .required(true),
+            ),
         )
+        .add_option(
+            CreateCommandOption::new(
+                CommandOptionType::SubCommand,
+                ALLOW_SPOILERS_SUBCOMMAND,
+                "Search and allow matching spoiler aliases",
+            )
+            .add_sub_option(
+                CreateCommandOption::new(
+                    CommandOptionType::String,
+                    SEARCH_OPTION,
+                    "AniList character ID or search term",
+                )
+                .required(true),
+            ),
+        )
+}
+
+fn parse_character_options(options: &[CommandDataOption]) -> Option<(String, bool)> {
+    let option = options.first()?;
+
+    match &option.value {
+        CommandDataOptionValue::SubCommand(sub_options) => {
+            let allow_spoilers = match option.name.as_str() {
+                ALLOW_SPOILERS_SUBCOMMAND => true,
+                DISALLOW_SPOILERS_SUBCOMMAND => false,
+                _ => return None,
+            };
+            let search_term = sub_options
+                .iter()
+                .find(|sub_option| sub_option.name == SEARCH_OPTION)
+                .and_then(|sub_option| match &sub_option.value {
+                    CommandDataOptionValue::String(search_term) => Some(search_term.clone()),
+                    _ => None,
+                })?;
+
+            Some((search_term, allow_spoilers))
+        }
+        CommandDataOptionValue::String(search_term) => Some((search_term.clone(), false)),
+        _ => None,
+    }
 }
 
 pub fn handle_character(character: Option<Character>, allow_adult_media: bool) -> CommandResponse {
@@ -48,22 +102,24 @@ pub async fn run(ctx: &Context, interaction: &mut CommandInteraction) {
 
     let user = &interaction.user;
 
-    let Some(serenity::all::CommandDataOptionValue::String(search_term)) =
-        interaction.data.options.first().map(|opt| &opt.value)
+    let Some((search_term, allow_spoilers)) = parse_character_options(&interaction.data.options)
     else {
         let builder = EditInteractionResponse::new()
             .content("Missing or invalid `search` option — please provide a character name or ID.");
         let _ = interaction.edit_response(&ctx.http, builder).await;
         return;
     };
-    let search_term = search_term.clone();
 
     let arg_str = format!("{:?}", search_term);
     configure_sentry_scope("Character", user.id.get(), Some(json!(arg_str)));
 
-    info!("Got command 'character' with search_term: {search_term}");
+    info!(
+        "Got command 'character' with search_term: {search_term}, allow_spoilers: {allow_spoilers}"
+    );
 
-    let character_result = AniListSource.fetch_character(&search_term).await;
+    let character_result = AniListSource
+        .fetch_character(&search_term, allow_spoilers)
+        .await;
     let allow_adult_media = if character_result
         .as_ref()
         .is_some_and(Character::has_adult_media)
@@ -146,5 +202,43 @@ mod tests {
             "expected Embed variant for a successful lookup"
         );
         let _embed = response.unwrap_embed();
+    }
+
+    #[test]
+    fn parses_disallow_spoilers_subcommand() {
+        let options: Vec<CommandDataOption> = serde_json::from_value(serde_json::json!([{
+            "name": "disallow",
+            "type": 1,
+            "options": [{
+                "name": "search",
+                "type": 3,
+                "value": "Lust"
+            }]
+        }]))
+        .expect("options deserialize");
+
+        assert_eq!(
+            parse_character_options(&options),
+            Some(("Lust".to_string(), false))
+        );
+    }
+
+    #[test]
+    fn parses_allow_spoilers_subcommand() {
+        let options: Vec<CommandDataOption> = serde_json::from_value(serde_json::json!([{
+            "name": "allow",
+            "type": 1,
+            "options": [{
+                "name": "search",
+                "type": 3,
+                "value": "Joy Boy"
+            }]
+        }]))
+        .expect("options deserialize");
+
+        assert_eq!(
+            parse_character_options(&options),
+            Some(("Joy Boy".to_string(), true))
+        );
     }
 }

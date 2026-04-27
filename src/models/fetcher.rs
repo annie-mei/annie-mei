@@ -170,7 +170,10 @@ pub async fn fetch<
 }
 
 #[instrument(name = "anilist.fetch_character", skip(response_config))]
-pub async fn fetch_character(response_config: &impl Response) -> Option<Character> {
+pub async fn fetch_character(
+    response_config: &impl Response,
+    allow_spoilers: bool,
+) -> Option<Character> {
     match response_config.get_argument() {
         Argument::Id(value) => {
             let fetched_data = match fetch_by_id(response_config.get_id_query(), *value).await {
@@ -192,7 +195,7 @@ pub async fn fetch_character(response_config: &impl Response) -> Option<Characte
             fetch_response.data.and_then(|data| data.character)
         }
         Argument::Search(value) => {
-            let cache_key = format!("character:{value}");
+            let cache_key = format!("character:v2:{value}");
             let cache_key_for_lookup = cache_key.clone();
             let search_query = response_config.get_search_query();
             let lookup_value = value.to_string();
@@ -232,7 +235,7 @@ pub async fn fetch_character(response_config: &impl Response) -> Option<Characte
                 "Deserialized character search response: {:#?}",
                 fetch_response
             );
-            fetch_response.fuzzy_match(value)
+            fetch_response.fuzzy_match(value, allow_spoilers)
         }
     }
 }

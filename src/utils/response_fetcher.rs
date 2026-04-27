@@ -57,9 +57,12 @@ pub async fn fetcher<
 }
 
 #[instrument(name = "fetcher.fetch_character", skip(arg))]
-pub async fn character_fetcher(arg: CommandDataOptionValue) -> Option<Character> {
+pub async fn character_fetcher(
+    arg: CommandDataOptionValue,
+    allow_spoilers: bool,
+) -> Option<Character> {
     info!("Character fetcher found arg: {:#?}", arg);
     let argument = return_argument(arg)?;
     let character_response: CharacterConfig = Response::new(argument);
-    fetch_character(&character_response).await
+    fetch_character(&character_response, allow_spoilers).await
 }

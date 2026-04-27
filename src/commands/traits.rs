@@ -56,7 +56,11 @@ pub trait CharacterDataSource: Send + Sync {
     /// Fetch character data for the given search term (name **or** numeric ID).
     ///
     /// Returns `None` when no matching character is found.
-    fn fetch_character(&self, search_term: &str) -> impl Future<Output = Option<Character>> + Send;
+    fn fetch_character(
+        &self,
+        search_term: &str,
+        allow_spoilers: bool,
+    ) -> impl Future<Output = Option<Character>> + Send;
 }
 
 /// Production [`MediaDataSource`] backed by the AniList GraphQL API.
@@ -86,11 +90,11 @@ impl MediaDataSource for AniListSource {
 }
 
 impl CharacterDataSource for AniListSource {
-    async fn fetch_character(&self, search_term: &str) -> Option<Character> {
+    async fn fetch_character(&self, search_term: &str, allow_spoilers: bool) -> Option<Character> {
         use crate::utils::response_fetcher::character_fetcher;
         use serenity::all::CommandDataOptionValue;
 
         let arg = CommandDataOptionValue::String(search_term.to_string());
-        character_fetcher(arg).await
+        character_fetcher(arg, allow_spoilers).await
     }
 }

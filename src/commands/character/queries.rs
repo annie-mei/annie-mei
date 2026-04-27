@@ -6,6 +6,7 @@ query ($id: Int) {
       full
       native
       alternative
+      alternativeSpoiler
       userPreferred
     }
     image {
@@ -48,6 +49,7 @@ query ($search: String) {
         full
         native
         alternative
+        alternativeSpoiler
         userPreferred
       }
       image {
