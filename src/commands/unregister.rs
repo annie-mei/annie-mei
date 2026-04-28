@@ -30,7 +30,10 @@ const DELETE_OAUTH_SESSIONS_SQL: &str = "DELETE FROM oauth_sessions WHERE discor
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum UnregisterOutcome {
-    Unlinked { username: String },
+    Unlinked {
+        username: String,
+        auth_records_deleted: bool,
+    },
     AuthCredentialsUnlinked,
     NotLinked,
     Cancelled,
@@ -77,9 +80,19 @@ fn parse_unregister_confirmation(options: &[CommandDataOption]) -> Option<bool> 
 #[instrument(name = "command.unregister.handle", skip(outcome))]
 pub fn handle_unregister(outcome: UnregisterOutcome) -> CommandResponse {
     match outcome {
-        UnregisterOutcome::Unlinked { username } => CommandResponse::Content(format!(
-            "Your AniList account **{username}** has been unlinked from Annie Mei, and stored OAuth credentials have been deleted."
-        )),
+        UnregisterOutcome::Unlinked {
+            username,
+            auth_records_deleted,
+        } => {
+            let auth_cleanup_message = if auth_records_deleted {
+                ", and stored OAuth credentials have been deleted"
+            } else {
+                ""
+            };
+            CommandResponse::Content(format!(
+                "Your AniList account **{username}** has been unlinked from Annie Mei{auth_cleanup_message}."
+            ))
+        }
         UnregisterOutcome::AuthCredentialsUnlinked => CommandResponse::Content(
             "Your stored AniList OAuth credentials have been deleted. You do not have a bot profile link."
                 .to_string(),
@@ -144,6 +157,8 @@ fn outcome_from_deletions(deletions: DeletedRegistrations) -> UnregisterOutcome 
     if let Some(deleted_user) = deletions.bot_user {
         return UnregisterOutcome::Unlinked {
             username: deleted_user.anilist_username,
+            auth_records_deleted: deletions.oauth_credentials_deleted > 0
+                || deletions.oauth_sessions_deleted > 0,
         };
     }
 
@@ -226,6 +241,7 @@ mod tests {
     fn handle_unregister_with_linked_account_confirms_unlink() {
         let response = handle_unregister(UnregisterOutcome::Unlinked {
             username: "annie".to_string(),
+            auth_records_deleted: true,
         });
 
         assert!(response.is_content(), "expected Content variant");
@@ -233,6 +249,20 @@ mod tests {
         assert!(content.contains("has been unlinked"));
         assert!(content.contains("**annie**"));
         assert!(content.contains("OAuth credentials have been deleted"));
+    }
+
+    #[test]
+    fn handle_unregister_with_legacy_link_does_not_claim_auth_cleanup() {
+        let response = handle_unregister(UnregisterOutcome::Unlinked {
+            username: "annie".to_string(),
+            auth_records_deleted: false,
+        });
+
+        assert!(response.is_content(), "expected Content variant");
+        let content = response.unwrap_content();
+        assert!(content.contains("has been unlinked"));
+        assert!(content.contains("**annie**"));
+        assert!(!content.contains("OAuth credentials have been deleted"));
     }
 
     #[test]
@@ -274,7 +304,29 @@ mod tests {
         assert_eq!(
             outcome,
             UnregisterOutcome::Unlinked {
-                username: "annie".to_string()
+                username: "annie".to_string(),
+                auth_records_deleted: true,
+            }
+        );
+    }
+
+    #[test]
+    fn deletion_outcome_handles_legacy_bot_only_cleanup() {
+        let outcome = outcome_from_deletions(DeletedRegistrations {
+            bot_user: Some(User {
+                discord_id: 123,
+                anilist_id: 456,
+                anilist_username: "annie".to_string(),
+            }),
+            oauth_credentials_deleted: 0,
+            oauth_sessions_deleted: 0,
+        });
+
+        assert_eq!(
+            outcome,
+            UnregisterOutcome::Unlinked {
+                username: "annie".to_string(),
+                auth_records_deleted: false,
             }
         );
     }
