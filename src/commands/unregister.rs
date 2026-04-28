@@ -46,6 +46,7 @@ pub fn register() -> CreateCommand {
         )
 }
 
+#[instrument(name = "command.unregister.parse_confirmation", skip(options))]
 fn parse_unregister_confirmation(options: &[CommandDataOption]) -> Option<bool> {
     options
         .iter()
@@ -60,7 +61,7 @@ fn parse_unregister_confirmation(options: &[CommandDataOption]) -> Option<bool> 
         })
 }
 
-#[instrument(name = "command.unregister.handle")]
+#[instrument(name = "command.unregister.handle", skip(outcome))]
 pub fn handle_unregister(outcome: UnregisterOutcome) -> CommandResponse {
     match outcome {
         UnregisterOutcome::Unlinked { username } => CommandResponse::Content(format!(
