@@ -25,7 +25,7 @@ You agree not to:
 
 ## Account linking
 
-AniList account linking is optional. If you link an AniList account, Annie Mei's auth service stores the information needed to maintain that link and perform authorized AniList requests. You may revoke Annie Mei's access from AniList where supported, and you may request deletion of stored link data as described in the Privacy Policy.
+AniList account linking is optional. If you link an AniList account, Annie Mei's auth service stores the information needed to maintain that link and perform authorized AniList requests. You may use `/unregister confirmation:Confirm unlink` in Discord to unlink your AniList account from Annie Mei's bot features, revoke Annie Mei's access from AniList where supported, and request deletion of remaining stored link data as described in the Privacy Policy.
 
 ## Third-party services and content
 
