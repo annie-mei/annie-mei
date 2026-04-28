@@ -68,9 +68,9 @@ Annie Mei does not sell personal information. Information is shared only as need
 
 ## Your choices and deletion requests
 
-You can avoid optional AniList account processing by not using `/register`. If you have linked an AniList account, you may revoke access from AniList where supported.
+You can avoid optional AniList account processing by not using `/register`. If you have linked an AniList account, you can use `/unregister confirmation:Confirm unlink` in Discord to unlink your AniList account from Annie Mei's bot features. You may also revoke Annie Mei's access from AniList where supported.
 
-To request deletion of stored Annie Mei account-link data, open an issue at:
+Unlinking in Discord may not remove every record held by the companion auth service, such as OAuth credential records or operational backups. To request deletion of any remaining stored Annie Mei account-link data, open an issue at:
 
 https://github.com/annie-mei/annie-mei/issues
 
