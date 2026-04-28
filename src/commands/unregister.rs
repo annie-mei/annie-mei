@@ -8,6 +8,7 @@ use crate::{
 };
 
 use diesel::prelude::*;
+use diesel::result::{DatabaseErrorKind, Error as DieselError};
 use diesel::sql_types::Text;
 use serenity::{
     all::{
@@ -27,6 +28,8 @@ const CANCEL_UNREGISTER: &str = "cancel";
 const DELETE_OAUTH_CREDENTIALS_SQL: &str =
     "DELETE FROM oauth_credentials WHERE discord_user_id = $1";
 const DELETE_OAUTH_SESSIONS_SQL: &str = "DELETE FROM oauth_sessions WHERE discord_user_id = $1";
+const OAUTH_CREDENTIALS_TABLE: &str = "oauth_credentials";
+const OAUTH_SESSIONS_TABLE: &str = "oauth_sessions";
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum UnregisterOutcome {
@@ -128,10 +131,18 @@ fn delete_user_registration_in_transaction(
     conn.transaction(|conn| {
         let bot_user = User::delete_user_by_discord_id(discord_id, conn)?;
         let discord_id = discord_id.to_string();
-        let oauth_credentials_deleted =
-            delete_auth_records(DELETE_OAUTH_CREDENTIALS_SQL, &discord_id, conn)?;
-        let oauth_sessions_deleted =
-            delete_auth_records(DELETE_OAUTH_SESSIONS_SQL, &discord_id, conn)?;
+        let oauth_credentials_deleted = delete_auth_records(
+            OAUTH_CREDENTIALS_TABLE,
+            DELETE_OAUTH_CREDENTIALS_SQL,
+            &discord_id,
+            conn,
+        )?;
+        let oauth_sessions_deleted = delete_auth_records(
+            OAUTH_SESSIONS_TABLE,
+            DELETE_OAUTH_SESSIONS_SQL,
+            &discord_id,
+            conn,
+        )?;
 
         Ok(DeletedRegistrations {
             bot_user,
@@ -141,15 +152,31 @@ fn delete_user_registration_in_transaction(
     })
 }
 
-#[instrument(name = "unregister.delete_auth_records", skip(conn, sql, discord_id))]
+#[instrument(name = "unregister.delete_auth_records", skip(conn, sql, discord_id), fields(table = table))]
 fn delete_auth_records(
+    table: &str,
     sql: &str,
     discord_id: &str,
     conn: &mut PgConnection,
 ) -> Result<usize, diesel::result::Error> {
-    diesel::sql_query(sql)
+    match diesel::sql_query(sql)
         .bind::<Text, _>(discord_id)
         .execute(conn)
+    {
+        Ok(deleted) => Ok(deleted),
+        Err(error) if is_missing_auth_table_error(&error, table) => Ok(0),
+        Err(error) => Err(error),
+    }
+}
+
+#[instrument(name = "unregister.is_missing_auth_table_error", skip(error))]
+fn is_missing_auth_table_error(error: &DieselError, table: &str) -> bool {
+    match error {
+        DieselError::DatabaseError(DatabaseErrorKind::Unknown, info) => info
+            .message()
+            .contains(&format!("relation \"{table}\" does not exist")),
+        _ => false,
+    }
 }
 
 #[instrument(name = "command.unregister.outcome_from_deletions", skip(deletions))]
