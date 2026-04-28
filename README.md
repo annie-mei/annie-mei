@@ -40,6 +40,11 @@ A Discord bot written in Rust that fetches anime and manga information from AniL
 
 | Component | Service |
 |-----------|---------|
-| Database | Neon (PostgreSQL) |
+| Database | Supabase (PostgreSQL) |
 | Cache | Upstash (Redis) |
 | Secrets | Doppler |
+
+## Legal
+
+- [Terms of Service](TERMS_OF_SERVICE.md)
+- [Privacy Policy](PRIVACY_POLICY.md)
