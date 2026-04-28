@@ -27,7 +27,7 @@ AniList linking is optional. Commands that do not require an AniList link can st
 
 ### Logs, diagnostics, and error reports
 
-Annie Mei may collect operational logs, diagnostics, and error reports to keep the service reliable and investigate failures. Where practical, Discord user IDs are hashed or fingerprinted before being sent to logs or Sentry. Error reports may include command names, high-level execution context, and sanitized error details. Secrets and credential-bearing URLs are intended to be redacted before logging.
+Annie Mei may collect operational logs, diagnostics, and error reports to keep the service reliable and investigate failures. Discord user IDs are hashed or fingerprinted before being attached to application logs or Sentry diagnostics. Error reports may include command names, high-level execution context, and sanitized error details. Credential-bearing URLs are redacted before being sent to application logs or Sentry.
 
 ### Cache and infrastructure data
 
@@ -74,11 +74,11 @@ To request deletion of stored Annie Mei account-link data, open an issue at:
 
 https://github.com/annie-mei/annie-mei/issues
 
-Include enough information to identify the Discord account or server involved. Do not post secrets, OAuth tokens, or other sensitive information in public issues.
+Do not include your numeric Discord ID, OAuth tokens, secrets, or other sensitive information in a public issue. Ask for private deletion support and the maintainer will coordinate a private way to verify the account involved.
 
 ## Security
 
-Annie Mei uses technical measures intended to protect stored data, including secret-managed OAuth configuration, hashed or fingerprinted identifiers in diagnostics where practical, and redaction of credential-bearing URLs. No system is perfectly secure, and Annie Mei cannot guarantee absolute security.
+Annie Mei uses technical measures intended to protect stored data, including secret-managed OAuth configuration, hashed or fingerprinted identifiers in diagnostics, and redaction of credential-bearing URLs before application logging or Sentry reporting. No system is perfectly secure, and Annie Mei cannot guarantee absolute security.
 
 ## Children's privacy
 
