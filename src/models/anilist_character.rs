@@ -321,6 +321,7 @@ fn strip_spoiler_html(html: &str) -> String {
         output.push_str(&remaining[..open_start]);
 
         let Some(open_end_offset) = remaining[class_index..].find('>') else {
+            remaining = &remaining[open_start..];
             break;
         };
         let mut cursor = class_index + open_end_offset + 1;
@@ -556,6 +557,35 @@ mod tests {
         assert!(disallowed.contains("Visible text."));
         assert!(!disallowed.contains("Hidden spoiler."));
         assert!(allowed.contains("Hidden spoiler."));
+    }
+
+    #[test]
+    fn transform_description_does_not_duplicate_malformed_spoiler_prefix() {
+        let character: Character = serde_json::from_value(serde_json::json!({
+            "id": 650,
+            "name": {
+                "full": "Lust",
+                "native": null,
+                "alternative": [],
+                "alternativeSpoiler": [],
+                "userPreferred": "Lust"
+            },
+            "image": null,
+            "description": "Visible <span class='markdown_spoiler'",
+            "gender": null,
+            "dateOfBirth": null,
+            "age": null,
+            "bloodType": null,
+            "favourites": null,
+            "siteUrl": "https://anilist.co/character/650",
+            "media": { "nodes": [] }
+        }))
+        .expect("sample character JSON should deserialize");
+
+        let description = character.transform_description(false);
+
+        assert!(description.starts_with("Visible"));
+        assert!(!description.contains("Visible Visible"));
     }
 
     #[test]
