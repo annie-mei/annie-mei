@@ -8,7 +8,6 @@ use crate::{
 };
 
 use diesel::prelude::*;
-use diesel::result::{DatabaseErrorKind, Error as DieselError};
 use diesel::sql_types::Text;
 use serenity::{
     all::{
@@ -159,24 +158,9 @@ fn delete_auth_records(
     discord_id: &str,
     conn: &mut PgConnection,
 ) -> Result<usize, diesel::result::Error> {
-    match diesel::sql_query(sql)
+    diesel::sql_query(sql)
         .bind::<Text, _>(discord_id)
         .execute(conn)
-    {
-        Ok(deleted) => Ok(deleted),
-        Err(error) if is_missing_auth_table_error(&error, table) => Ok(0),
-        Err(error) => Err(error),
-    }
-}
-
-#[instrument(name = "unregister.is_missing_auth_table_error", skip(error))]
-fn is_missing_auth_table_error(error: &DieselError, table: &str) -> bool {
-    match error {
-        DieselError::DatabaseError(DatabaseErrorKind::Unknown, info) => info
-            .message()
-            .contains(&format!("relation \"{table}\" does not exist")),
-        _ => false,
-    }
 }
 
 #[instrument(name = "command.unregister.outcome_from_deletions", skip(deletions))]
