@@ -8,22 +8,56 @@ use crate::{
 };
 
 use serenity::{
-    all::{CommandInteraction, EditInteractionResponse},
+    all::{
+        CommandDataOption, CommandDataOptionValue, CommandInteraction, CreateCommandOption,
+        EditInteractionResponse,
+    },
     builder::CreateCommand,
     client::Context,
+    model::application::CommandOptionType,
 };
 use tokio::task;
 use tracing::{error, instrument};
+
+const CONFIRMATION_OPTION: &str = "confirmation";
+const CONFIRM_UNREGISTER: &str = "confirm";
+const CANCEL_UNREGISTER: &str = "cancel";
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum UnregisterOutcome {
     Unlinked { username: String },
     NotLinked,
+    Cancelled,
     Failed,
 }
 
 pub fn register() -> CreateCommand {
-    CreateCommand::new("unregister").description("Unlink your AniList account from Annie Mei")
+    CreateCommand::new("unregister")
+        .description("Unlink your AniList account from Annie Mei")
+        .add_option(
+            CreateCommandOption::new(
+                CommandOptionType::String,
+                CONFIRMATION_OPTION,
+                "Confirm whether to unlink your AniList account",
+            )
+            .add_string_choice("Confirm unlink", CONFIRM_UNREGISTER)
+            .add_string_choice("Cancel", CANCEL_UNREGISTER)
+            .required(true),
+        )
+}
+
+fn parse_unregister_confirmation(options: &[CommandDataOption]) -> Option<bool> {
+    options
+        .iter()
+        .find(|option| option.name == CONFIRMATION_OPTION)
+        .and_then(|option| match &option.value {
+            CommandDataOptionValue::String(value) => match value.as_str() {
+                CONFIRM_UNREGISTER => Some(true),
+                CANCEL_UNREGISTER => Some(false),
+                _ => None,
+            },
+            _ => None,
+        })
 }
 
 #[instrument(name = "command.unregister.handle")]
@@ -35,6 +69,9 @@ pub fn handle_unregister(outcome: UnregisterOutcome) -> CommandResponse {
         UnregisterOutcome::NotLinked => CommandResponse::Content(
             "You do not have a linked AniList account. Run `/register` if you want to link one."
                 .to_string(),
+        ),
+        UnregisterOutcome::Cancelled => CommandResponse::Content(
+            "Cancelled. Your AniList account link was not changed.".to_string(),
         ),
         UnregisterOutcome::Failed => CommandResponse::Content(
             "I hit an internal error while unlinking your AniList account. Please try again later."
@@ -58,6 +95,23 @@ pub async fn run(ctx: &Context, interaction: &mut CommandInteraction) {
 
     let user = &interaction.user;
     configure_sentry_scope("Unregister", user.id.get(), None);
+
+    let Some(confirmed) = parse_unregister_confirmation(&interaction.data.options) else {
+        let builder = EditInteractionResponse::new()
+            .content("Missing or invalid `confirmation` option — choose `Confirm unlink` to unlink your AniList account.");
+        let _ = interaction.edit_response(&ctx.http, builder).await;
+        return;
+    };
+
+    if !confirmed {
+        let builder = match handle_unregister(UnregisterOutcome::Cancelled) {
+            CommandResponse::Content(content) => EditInteractionResponse::new().content(content),
+            CommandResponse::Embed(embed) => EditInteractionResponse::new().embed(*embed),
+            CommandResponse::Message(content) => EditInteractionResponse::new().content(content),
+        };
+        let _ = interaction.edit_response(&ctx.http, builder).await;
+        return;
+    }
 
     let Some(database_pool) = database::get_pool_from_context(ctx).await else {
         let builder = EditInteractionResponse::new()
@@ -136,5 +190,39 @@ mod tests {
         let content = response.unwrap_content();
         assert!(content.contains("internal error"));
         assert!(content.contains("try again later"));
+    }
+
+    #[test]
+    fn handle_unregister_cancelled_confirms_no_change() {
+        let response = handle_unregister(UnregisterOutcome::Cancelled);
+
+        assert!(response.is_content(), "expected Content variant");
+        let content = response.unwrap_content();
+        assert!(content.contains("Cancelled"));
+        assert!(content.contains("not changed"));
+    }
+
+    #[test]
+    fn parses_confirmed_unregister_option() {
+        let options: Vec<CommandDataOption> = serde_json::from_value(serde_json::json!([{
+            "name": "confirmation",
+            "type": 3,
+            "value": "confirm"
+        }]))
+        .expect("options deserialize");
+
+        assert_eq!(parse_unregister_confirmation(&options), Some(true));
+    }
+
+    #[test]
+    fn parses_cancelled_unregister_option() {
+        let options: Vec<CommandDataOption> = serde_json::from_value(serde_json::json!([{
+            "name": "confirmation",
+            "type": 3,
+            "value": "cancel"
+        }]))
+        .expect("options deserialize");
+
+        assert_eq!(parse_unregister_confirmation(&options), Some(false));
     }
 }

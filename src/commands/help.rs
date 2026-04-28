@@ -28,17 +28,17 @@ pub async fn run(ctx: &Context, interaction: &CommandInteraction) {
         )
         .field(
             "Get started",
-            "1. Run `/register` and click the secure AniList link button\n2. Finish the AniList authorization in your browser, then return to Discord\n3. Use `/anime`, `/manga`, or `/character` with an AniList ID or search term\n4. Use `/songs` to fetch openings/endings and links\n5. If your AniList connection ever expires later, run `/register` again to relink it, or `/unregister` to unlink it",
+            "1. Run `/register` and click the secure AniList link button\n2. Finish the AniList authorization in your browser, then return to Discord\n3. Use `/anime`, `/manga`, or `/character` with an AniList ID or search term\n4. Use `/songs` to fetch openings/endings and links\n5. If your AniList connection ever expires later, run `/register` again to relink it, or `/unregister confirmation:Confirm unlink` to unlink it",
             false,
         )
         .field(
             "Commands",
-            "`/anime search:<term or id>` - anime details\n`/manga search:<term or id>` - manga details\n`/character search:<term or id> spoilers:<allow|disallow>` - character details\n`/songs search:<term or id>` - OP/ED songs + links\n`/register` - open the AniList OAuth link or relink flow\n`/unregister` - unlink your AniList account\n`/whoami` - show your linked AniList username and profile link\n`/ping` - bot health check\n`/help` - show this guide",
+            "`/anime search:<term or id>` - anime details\n`/manga search:<term or id>` - manga details\n`/character search:<term or id> spoilers:<allow|disallow>` - character details\n`/songs search:<term or id>` - OP/ED songs + links\n`/register` - open the AniList OAuth link or relink flow\n`/unregister confirmation:<confirm|cancel>` - unlink your AniList account after confirmation\n`/whoami` - show your linked AniList username and profile link\n`/ping` - bot health check\n`/help` - show this guide",
             false,
         )
         .field(
             "Tips",
-            "You can search with full names, short names, or AniList IDs. If the AniList link page expires or fails, or if you need to reconnect your AniList account later, run `/register` again to get a fresh secure link. Use `/unregister` when you want Annie Mei to forget your linked AniList account.",
+            "You can search with full names, short names, or AniList IDs. If the AniList link page expires or fails, or if you need to reconnect your AniList account later, run `/register` again to get a fresh secure link. Use `/unregister confirmation:Confirm unlink` when you want Annie Mei to forget your linked AniList account.",
             false,
         )
         .footer(CreateEmbedFooter::new("Annie Mei"))

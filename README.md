@@ -23,7 +23,7 @@ A Discord bot written in Rust that fetches anime and manga information from AniL
 | `/help` | Shows available commands |
 | `/ping` | Bot health check |
 | `/register` | Start or refresh the secure AniList OAuth linking flow |
-| `/unregister` | Unlink your AniList account |
+| `/unregister confirmation:<confirm\|cancel>` | Unlink your AniList account after confirmation |
 | `/whoami` | Show your linked AniList username and profile link |
 | `/anime <search>` | Look up anime by name or AniList ID |
 | `/manga <search>` | Look up manga by name or AniList ID |
