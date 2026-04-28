@@ -1,0 +1,135 @@
+use crate::{
+    commands::response::CommandResponse,
+    models::db::user::User,
+    utils::{
+        database,
+        privacy::{configure_sentry_scope, hash_user_id},
+    },
+};
+
+use serenity::{
+    all::{CommandInteraction, EditInteractionResponse},
+    builder::CreateCommand,
+    client::Context,
+};
+use tokio::task;
+use tracing::{error, instrument};
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum UnregisterOutcome {
+    Unlinked,
+    NotLinked,
+    Failed,
+}
+
+pub fn register() -> CreateCommand {
+    CreateCommand::new("unregister").description("Unlink your AniList account from Annie Mei")
+}
+
+#[instrument(name = "command.unregister.handle")]
+pub fn handle_unregister(outcome: UnregisterOutcome) -> CommandResponse {
+    match outcome {
+        UnregisterOutcome::Unlinked => CommandResponse::Content(
+            "Your AniList account has been unlinked from Annie Mei.".to_string(),
+        ),
+        UnregisterOutcome::NotLinked => CommandResponse::Content(
+            "You do not have a linked AniList account. Run `/register` if you want to link one."
+                .to_string(),
+        ),
+        UnregisterOutcome::Failed => CommandResponse::Content(
+            "I hit an internal error while unlinking your AniList account. Please try again later."
+                .to_string(),
+        ),
+    }
+}
+
+#[instrument(name = "unregister.delete_profile_blocking", skip(database_pool, discord_id), fields(discord_user_id = %hash_user_id(discord_id as u64)))]
+fn delete_unregistered_profile(
+    database_pool: crate::utils::database::DbPool,
+    discord_id: i64,
+) -> Result<usize, diesel::result::Error> {
+    let mut connection = database::get_connection(&database_pool);
+    User::delete_user_by_discord_id(discord_id, &mut connection)
+}
+
+#[instrument(name = "command.unregister.run", skip(ctx, interaction))]
+pub async fn run(ctx: &Context, interaction: &mut CommandInteraction) {
+    let _ = interaction.defer_ephemeral(&ctx.http).await;
+
+    let user = &interaction.user;
+    configure_sentry_scope("Unregister", user.id.get(), None);
+
+    let Some(database_pool) = database::get_pool_from_context(ctx).await else {
+        let builder = EditInteractionResponse::new()
+            .content("Database is not initialized. Please try again later.");
+        let _ = interaction.edit_response(&ctx.http, builder).await;
+        return;
+    };
+
+    let discord_id = user.id.get() as i64;
+    let db_result =
+        task::spawn_blocking(move || delete_unregistered_profile(database_pool, discord_id)).await;
+
+    let outcome = match db_result {
+        Ok(Ok(deleted_count)) if deleted_count > 0 => UnregisterOutcome::Unlinked,
+        Ok(Ok(_)) => UnregisterOutcome::NotLinked,
+        Ok(Err(err)) => {
+            error!(
+                error = %err,
+                discord_user_id = %hash_user_id(discord_id as u64),
+                "Failed to delete AniList profile link from database"
+            );
+            UnregisterOutcome::Failed
+        }
+        Err(err) => {
+            error!(
+                error = %err,
+                discord_user_id = %hash_user_id(discord_id as u64),
+                "Failed to join unregister database task"
+            );
+            UnregisterOutcome::Failed
+        }
+    };
+
+    let builder = match handle_unregister(outcome) {
+        CommandResponse::Content(content) => EditInteractionResponse::new().content(content),
+        CommandResponse::Embed(embed) => EditInteractionResponse::new().embed(*embed),
+        CommandResponse::Message(content) => EditInteractionResponse::new().content(content),
+    };
+
+    let _ = interaction.edit_response(&ctx.http, builder).await;
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn handle_unregister_with_linked_account_confirms_unlink() {
+        let response = handle_unregister(UnregisterOutcome::Unlinked);
+
+        assert!(response.is_content(), "expected Content variant");
+        let content = response.unwrap_content();
+        assert!(content.contains("has been unlinked"));
+    }
+
+    #[test]
+    fn handle_unregister_without_linked_account_is_user_friendly() {
+        let response = handle_unregister(UnregisterOutcome::NotLinked);
+
+        assert!(response.is_content(), "expected Content variant");
+        let content = response.unwrap_content();
+        assert!(content.contains("do not have a linked AniList account"));
+        assert!(content.contains("/register"));
+    }
+
+    #[test]
+    fn handle_unregister_failure_returns_retry_message() {
+        let response = handle_unregister(UnregisterOutcome::Failed);
+
+        assert!(response.is_content(), "expected Content variant");
+        let content = response.unwrap_content();
+        assert!(content.contains("internal error"));
+        assert!(content.contains("try again later"));
+    }
+}

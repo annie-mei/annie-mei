@@ -8,4 +8,5 @@ pub mod register;
 pub mod response;
 pub mod songs;
 pub mod traits;
+pub mod unregister;
 pub mod whoami;

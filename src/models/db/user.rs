@@ -38,4 +38,14 @@ impl User {
             .load::<User>(conn)
             .ok()
     }
+
+    #[instrument(name = "db.user.delete_by_discord_id", skip(conn, user_discord_id), fields(discord_user_id = %hash_user_id(user_discord_id as u64)))]
+    pub fn delete_user_by_discord_id(
+        user_discord_id: i64,
+        conn: &mut PgConnection,
+    ) -> Result<usize, diesel::result::Error> {
+        use crate::schema::users::dsl::*;
+
+        diesel::delete(users.filter(discord_id.eq(user_discord_id))).execute(conn)
+    }
 }

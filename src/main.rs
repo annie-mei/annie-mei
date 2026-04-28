@@ -72,6 +72,7 @@ impl EventHandler for Handler {
                     "anime" => commands::anime::command::run(&ctx, &mut command).await,
                     "character" => commands::character::command::run(&ctx, &mut command).await,
                     "register" => commands::register::command::run(&ctx, &command).await,
+                    "unregister" => commands::unregister::run(&ctx, &mut command).await,
                     "whoami" => commands::whoami::run(&ctx, &mut command).await,
                     _ => {
                         let embed = CreateEmbed::new()
@@ -101,6 +102,7 @@ impl EventHandler for Handler {
             commands::anime::command::register(),
             commands::character::command::register(),
             commands::register::command::register(),
+            commands::unregister::register(),
             commands::whoami::register(),
         ];
 
