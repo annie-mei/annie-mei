@@ -46,17 +46,8 @@ impl User {
     ) -> Result<Option<User>, diesel::result::Error> {
         use crate::schema::users::dsl::*;
 
-        conn.transaction(|conn| {
-            let existing_user = users
-                .filter(discord_id.eq(user_discord_id))
-                .first::<User>(conn)
-                .optional()?;
-
-            if existing_user.is_some() {
-                diesel::delete(users.filter(discord_id.eq(user_discord_id))).execute(conn)?;
-            }
-
-            Ok(existing_user)
-        })
+        diesel::delete(users.filter(discord_id.eq(user_discord_id)))
+            .get_result::<User>(conn)
+            .optional()
     }
 }
