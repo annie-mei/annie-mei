@@ -1,6 +1,9 @@
 use crate::models::{
+    anilist_character::Character,
     anilist_common::TitleVariant,
-    fetcher::{AnimeConfig, Argument, MangaConfig, Response, fetch},
+    fetcher::{
+        AnimeConfig, Argument, CharacterConfig, MangaConfig, Response, fetch, fetch_character,
+    },
     media_type::MediaType as Type,
     transformers::Transformers,
 };
@@ -51,4 +54,15 @@ pub async fn fetcher<
             fetch::<T>(&manga_response, media_type).await
         }
     }
+}
+
+#[instrument(name = "fetcher.fetch_character", skip(arg))]
+pub async fn character_fetcher(
+    arg: CommandDataOptionValue,
+    allow_spoilers: bool,
+) -> Option<Character> {
+    info!("Character fetcher found arg: {:#?}", arg);
+    let argument = return_argument(arg)?;
+    let character_response: CharacterConfig = Response::new(argument);
+    fetch_character(&character_response, allow_spoilers).await
 }

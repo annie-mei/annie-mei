@@ -28,3 +28,13 @@ pub async fn fetch_by_name(query: String, name: String) -> Result<String, AniLis
 
     Ok(result)
 }
+
+#[instrument(name = "anilist.fetch_by_raw_name", skip(query), fields(name_len = name.len()))]
+pub async fn fetch_by_raw_name(query: String, name: String) -> Result<String, AniListRequestError> {
+    let json = json!({"query": query, "variables": {"search": name}});
+    let result = send_request(json).await?;
+
+    info!("Fetched By Raw Name");
+
+    Ok(result)
+}

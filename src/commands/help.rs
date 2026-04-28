@@ -24,16 +24,16 @@ pub async fn run(ctx: &Context, interaction: &CommandInteraction) {
         .colour(0x00ff00)
         .title(format!("{} • Annie Mei Help", user.name))
         .description(
-            "I can help you look up anime and manga details, theme songs, and show what guild members are watching or reading.",
+            "I can help you look up anime, manga, and character details, theme songs, and show what guild members are watching or reading.",
         )
         .field(
             "Get started",
-            "1. Run `/register` and click the secure AniList link button\n2. Finish the AniList authorization in your browser, then return to Discord\n3. Use `/anime` or `/manga` with an AniList ID or search term\n4. Use `/songs` to fetch openings/endings and links\n5. If your AniList connection ever expires later, run `/register` again to relink it",
+            "1. Run `/register` and click the secure AniList link button\n2. Finish the AniList authorization in your browser, then return to Discord\n3. Use `/anime`, `/manga`, or `/character` with an AniList ID or search term\n4. Use `/songs` to fetch openings/endings and links\n5. If your AniList connection ever expires later, run `/register` again to relink it",
             false,
         )
         .field(
             "Commands",
-            "`/anime search:<term or id>` - anime details\n`/manga search:<term or id>` - manga details\n`/songs search:<term or id>` - OP/ED songs + links\n`/register` - open the AniList OAuth link or relink flow\n`/whoami` - show your linked AniList username and profile link\n`/ping` - bot health check\n`/help` - show this guide",
+            "`/anime search:<term or id>` - anime details\n`/manga search:<term or id>` - manga details\n`/character search:<term or id> spoilers:<allow|disallow>` - character details\n`/songs search:<term or id>` - OP/ED songs + links\n`/register` - open the AniList OAuth link or relink flow\n`/whoami` - show your linked AniList username and profile link\n`/ping` - bot health check\n`/help` - show this guide",
             false,
         )
         .field(
