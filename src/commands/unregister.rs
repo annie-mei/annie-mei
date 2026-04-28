@@ -43,8 +43,8 @@ pub fn handle_unregister(outcome: UnregisterOutcome) -> CommandResponse {
     }
 }
 
-#[instrument(name = "unregister.delete_profile_blocking", skip(database_pool, discord_id), fields(discord_user_id = %hash_user_id(discord_id as u64)))]
-fn delete_unregistered_profile(
+#[instrument(name = "unregister.delete_user_registration_blocking", skip(database_pool, discord_id), fields(discord_user_id = %hash_user_id(discord_id as u64)))]
+fn delete_user_registration(
     database_pool: crate::utils::database::DbPool,
     discord_id: i64,
 ) -> Result<usize, diesel::result::Error> {
@@ -68,7 +68,7 @@ pub async fn run(ctx: &Context, interaction: &mut CommandInteraction) {
 
     let discord_id = user.id.get() as i64;
     let db_result =
-        task::spawn_blocking(move || delete_unregistered_profile(database_pool, discord_id)).await;
+        task::spawn_blocking(move || delete_user_registration(database_pool, discord_id)).await;
 
     let outcome = match db_result {
         Ok(Ok(deleted_count)) if deleted_count > 0 => UnregisterOutcome::Unlinked,
