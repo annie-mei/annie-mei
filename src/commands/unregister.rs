@@ -15,9 +15,9 @@ use serenity::{
 use tokio::task;
 use tracing::{error, instrument};
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum UnregisterOutcome {
-    Unlinked,
+    Unlinked { username: String },
     NotLinked,
     Failed,
 }
@@ -29,9 +29,9 @@ pub fn register() -> CreateCommand {
 #[instrument(name = "command.unregister.handle")]
 pub fn handle_unregister(outcome: UnregisterOutcome) -> CommandResponse {
     match outcome {
-        UnregisterOutcome::Unlinked => CommandResponse::Content(
-            "Your AniList account has been unlinked from Annie Mei.".to_string(),
-        ),
+        UnregisterOutcome::Unlinked { username } => CommandResponse::Content(format!(
+            "Your AniList account **{username}** has been unlinked from Annie Mei."
+        )),
         UnregisterOutcome::NotLinked => CommandResponse::Content(
             "You do not have a linked AniList account. Run `/register` if you want to link one."
                 .to_string(),
@@ -47,7 +47,7 @@ pub fn handle_unregister(outcome: UnregisterOutcome) -> CommandResponse {
 fn delete_user_registration(
     database_pool: crate::utils::database::DbPool,
     discord_id: i64,
-) -> Result<usize, diesel::result::Error> {
+) -> Result<Option<User>, diesel::result::Error> {
     let mut connection = database::get_connection(&database_pool);
     User::delete_user_by_discord_id(discord_id, &mut connection)
 }
@@ -71,8 +71,10 @@ pub async fn run(ctx: &Context, interaction: &mut CommandInteraction) {
         task::spawn_blocking(move || delete_user_registration(database_pool, discord_id)).await;
 
     let outcome = match db_result {
-        Ok(Ok(deleted_count)) if deleted_count > 0 => UnregisterOutcome::Unlinked,
-        Ok(Ok(_)) => UnregisterOutcome::NotLinked,
+        Ok(Ok(Some(deleted_user))) => UnregisterOutcome::Unlinked {
+            username: deleted_user.anilist_username,
+        },
+        Ok(Ok(None)) => UnregisterOutcome::NotLinked,
         Ok(Err(err)) => {
             error!(
                 error = %err,
@@ -106,11 +108,14 @@ mod tests {
 
     #[test]
     fn handle_unregister_with_linked_account_confirms_unlink() {
-        let response = handle_unregister(UnregisterOutcome::Unlinked);
+        let response = handle_unregister(UnregisterOutcome::Unlinked {
+            username: "annie".to_string(),
+        });
 
         assert!(response.is_content(), "expected Content variant");
         let content = response.unwrap_content();
         assert!(content.contains("has been unlinked"));
+        assert!(content.contains("**annie**"));
     }
 
     #[test]

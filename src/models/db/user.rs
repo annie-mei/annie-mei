@@ -43,9 +43,20 @@ impl User {
     pub fn delete_user_by_discord_id(
         user_discord_id: i64,
         conn: &mut PgConnection,
-    ) -> Result<usize, diesel::result::Error> {
+    ) -> Result<Option<User>, diesel::result::Error> {
         use crate::schema::users::dsl::*;
 
-        diesel::delete(users.filter(discord_id.eq(user_discord_id))).execute(conn)
+        conn.transaction(|conn| {
+            let existing_user = users
+                .filter(discord_id.eq(user_discord_id))
+                .first::<User>(conn)
+                .optional()?;
+
+            if existing_user.is_some() {
+                diesel::delete(users.filter(discord_id.eq(user_discord_id))).execute(conn)?;
+            }
+
+            Ok(existing_user)
+        })
     }
 }
