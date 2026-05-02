@@ -19,7 +19,7 @@ split-debuginfo = "packed"
 [dependencies]
 axum = "0.8"
 base64 = "0.22"
-blake3 = "1.8"
+blake3 = "1.8.5"
 chrono = "0.4.44"
 clap = { version = "4", features = ["derive"] }
 diesel = { version = "2.3.9", features = ["postgres", "r2d2"] }
