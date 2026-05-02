@@ -56,3 +56,5 @@ These terms may be updated from time to time. Continued use of Annie Mei after c
 For questions, support, or data requests, open an issue at:
 
 https://github.com/annie-mei/annie-mei/issues
+
+Do not include your numeric Discord ID, OAuth tokens, secrets, or other sensitive information in a public issue. Ask for private support when a request requires account-specific verification.
