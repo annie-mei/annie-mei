@@ -3,7 +3,7 @@ use diesel::prelude::*;
 use serenity::model::prelude::UserId;
 use tracing::instrument;
 
-#[derive(Queryable)]
+#[derive(Debug, Clone, PartialEq, Eq, Queryable)]
 #[allow(dead_code)]
 pub struct User {
     pub discord_id: i64,
