@@ -85,7 +85,7 @@ pub async fn get_guild_data_for_media<T: Transformers>(
     ctx: &Context,
     media: &T,
     guild_members: Vec<UserId>,
-) -> HashMap<i64, MediaListData> {
+) -> HashMap<u64, MediaListData> {
     let Some(database_pool) = get_pool_from_context(ctx).await else {
         error!("Database pool is not available in Serenity context");
         return HashMap::new();
@@ -124,19 +124,19 @@ async fn get_guild_anilist_data(
     guild_members: Vec<OAuthCredential>,
     media_id: u32,
     media_type: String,
-) -> HashMap<i64, MediaListData> {
+) -> HashMap<u64, MediaListData> {
     if guild_members.is_empty() {
         return HashMap::new();
     }
 
-    // Skip credentials whose stored discord_user_id is not a valid i64; we
-    // index back into the per-guild HashMap by Discord snowflake (i64).
-    let discord_ids_by_media_alias: HashMap<String, i64> = guild_members
+    // Skip credentials whose stored discord_user_id is not a valid u64; we
+    // index back into the per-guild HashMap by Discord snowflake (u64).
+    let discord_ids_by_media_alias: HashMap<String, u64> = guild_members
         .iter()
         .enumerate()
         .filter_map(|(index, credential)| {
             credential
-                .discord_id_i64()
+                .discord_id_u64()
                 .map(|discord_id| (media_alias(index), discord_id))
         })
         .collect();
@@ -172,7 +172,7 @@ async fn get_guild_anilist_data(
             }
         };
 
-    let mut guild_members_data: HashMap<i64, MediaListData> = HashMap::new();
+    let mut guild_members_data: HashMap<u64, MediaListData> = HashMap::new();
     if let Some(media_lookup_data) = user_media_list_response.data {
         for (media_alias, media_list_data) in media_lookup_data {
             if let (Some(discord_id), Some(data)) = (

@@ -159,7 +159,7 @@ pub trait Transformers {
 
     fn transform_response_embed(
         &self,
-        guild_members_data: Option<HashMap<i64, MediaListData>>,
+        guild_members_data: Option<HashMap<u64, MediaListData>>,
         title_variant: Option<TitleVariant>,
     ) -> CreateEmbed {
         let is_anime = self.get_type() == "anime";

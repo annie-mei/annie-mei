@@ -80,9 +80,12 @@ impl OAuthCredential {
             .get_results::<OAuthCredential>(conn)
     }
 
-    /// Parse the stored snowflake back to an `i64` for downstream Discord APIs.
-    pub fn discord_id_i64(&self) -> Option<i64> {
-        self.discord_user_id.parse::<i64>().ok()
+    /// Parse the stored snowflake back to a `u64` for downstream Discord APIs.
+    ///
+    /// Discord snowflakes are unsigned 64-bit integers; parsing as `u64`
+    /// avoids silently dropping rows whose snowflake has the high bit set.
+    pub fn discord_id_u64(&self) -> Option<u64> {
+        self.discord_user_id.parse::<u64>().ok()
     }
 }
 
@@ -91,20 +94,32 @@ mod tests {
     use super::*;
 
     #[test]
-    fn discord_id_i64_parses_valid_snowflake() {
+    fn discord_id_u64_parses_valid_snowflake() {
         let credential = OAuthCredential {
             discord_user_id: "987654321".to_string(),
             anilist_id: 1,
         };
-        assert_eq!(credential.discord_id_i64(), Some(987654321));
+        assert_eq!(credential.discord_id_u64(), Some(987654321));
     }
 
     #[test]
-    fn discord_id_i64_returns_none_for_invalid_snowflake() {
+    fn discord_id_u64_parses_high_bit_snowflake() {
+        // Snowflakes near u64::MAX would overflow an i64 parse; u64 must
+        // round-trip them so guild-overlay lookups do not silently drop the
+        // user.
+        let credential = OAuthCredential {
+            discord_user_id: u64::MAX.to_string(),
+            anilist_id: 1,
+        };
+        assert_eq!(credential.discord_id_u64(), Some(u64::MAX));
+    }
+
+    #[test]
+    fn discord_id_u64_returns_none_for_invalid_snowflake() {
         let credential = OAuthCredential {
             discord_user_id: "not-a-number".to_string(),
             anilist_id: 1,
         };
-        assert_eq!(credential.discord_id_i64(), None);
+        assert_eq!(credential.discord_id_u64(), None);
     }
 }
