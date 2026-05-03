@@ -46,7 +46,7 @@ A Discord bot written in Rust that fetches anime and manga information from AniL
 
 ## Documentation
 
-- [OAuth data contract](docs/oauth-contract.md) — shared schema and payload contract with the [`auth`](../auth) repo
+- [OAuth data contract](docs/oauth-contract.md) — shared schema and payload contract with the [`auth`](https://github.com/annie-mei/auth) repo
 
 ## Legal
 

@@ -2,12 +2,13 @@
 
 This document describes the shared data contract between the
 [`annie-mei`](../) Discord bot and the companion auth-service in
-[`../auth`](../../auth) so future changes have an explicit reference to
-check against. Any change to the field names, types, or ID
-representation listed here must be coordinated in **both** repos.
+[`auth`](https://github.com/annie-mei/auth) so future changes have an
+explicit reference to check against. Any change to the field names,
+types, or ID representation listed here must be coordinated in
+**both** repos.
 
 The auth-service mirrors this document at
-[`../auth/docs/oauth-contract.md`](../../auth/docs/oauth-contract.md).
+[`auth/docs/oauth-contract.md`](https://github.com/annie-mei/auth/blob/main/docs/oauth-contract.md).
 
 ## Overview
 
