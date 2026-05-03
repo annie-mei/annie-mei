@@ -214,6 +214,38 @@ mod tests {
     }
 
     #[test]
+    fn already_linked_user_does_not_receive_oauth_link() {
+        let response = handle_already_linked(4567);
+
+        assert_eq!(response.oauth_url, None);
+        assert!(response.content.contains("already linked"));
+        assert!(response.content.contains("**4567**"));
+        assert!(response.content.contains("https://anilist.co/user/4567/"));
+        assert!(response.content.contains("/unregister"));
+        assert!(response.content.contains("/register"));
+    }
+
+    #[test]
+    fn unregistered_user_still_receives_oauth_link() {
+        let response = handle_register("https://auth.example.com/oauth/anilist/start?ctx=abc", 300);
+
+        assert_eq!(
+            response.oauth_url,
+            Some("https://auth.example.com/oauth/anilist/start?ctx=abc".to_string())
+        );
+        assert!(response.content.contains("link your AniList account"));
+    }
+
+    #[test]
+    fn lookup_failure_returns_retry_message_without_oauth_link() {
+        let response = handle_lookup_error();
+
+        assert_eq!(response.oauth_url, None);
+        assert!(response.content.contains("couldn't check"));
+        assert!(response.content.contains("try `/register` again"));
+    }
+
+    #[test]
     fn register_missing_config_returns_user_facing_message() {
         let response =
             handle_register_error(&OAuthContextError::MissingEnv("AUTH_SERVICE_BASE_URL"));
