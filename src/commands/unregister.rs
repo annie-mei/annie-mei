@@ -94,18 +94,18 @@ pub fn handle_unregister(outcome: UnregisterOutcome) -> CommandResponse {
     }
 }
 
-#[instrument(name = "unregister.delete_user_registration_blocking", skip(database_pool, discord_id), fields(discord_user_id = %hash_user_id(discord_id as u64)))]
+#[instrument(name = "unregister.delete_user_registration_blocking", skip(database_pool, discord_id), fields(discord_user_id = %hash_user_id(discord_id)))]
 fn delete_user_registration(
     database_pool: crate::utils::database::DbPool,
-    discord_id: i64,
+    discord_id: u64,
 ) -> Result<DeletedRegistrations, diesel::result::Error> {
     let mut connection = database::get_connection(&database_pool);
     delete_user_registration_in_transaction(discord_id, &mut connection)
 }
 
-#[instrument(name = "unregister.delete_user_registration_transaction", skip(conn, discord_id), fields(discord_user_id = %hash_user_id(discord_id as u64)))]
+#[instrument(name = "unregister.delete_user_registration_transaction", skip(conn, discord_id), fields(discord_user_id = %hash_user_id(discord_id)))]
 fn delete_user_registration_in_transaction(
-    discord_id: i64,
+    discord_id: u64,
     conn: &mut PgConnection,
 ) -> Result<DeletedRegistrations, diesel::result::Error> {
     conn.transaction(|conn| {
@@ -188,7 +188,7 @@ pub async fn run(ctx: &Context, interaction: &mut CommandInteraction) {
         return;
     };
 
-    let discord_id = user.id.get() as i64;
+    let discord_id = user.id.get();
     let db_result =
         task::spawn_blocking(move || delete_user_registration(database_pool, discord_id)).await;
 
@@ -197,7 +197,7 @@ pub async fn run(ctx: &Context, interaction: &mut CommandInteraction) {
         Ok(Err(err)) => {
             error!(
                 error = %err,
-                discord_user_id = %hash_user_id(discord_id as u64),
+                discord_user_id = %hash_user_id(discord_id),
                 "Failed to delete AniList profile link from database"
             );
             UnregisterOutcome::Failed
@@ -205,7 +205,7 @@ pub async fn run(ctx: &Context, interaction: &mut CommandInteraction) {
         Err(err) => {
             error!(
                 error = %err,
-                discord_user_id = %hash_user_id(discord_id as u64),
+                discord_user_id = %hash_user_id(discord_id),
                 "Failed to join unregister database task"
             );
             UnregisterOutcome::Failed
