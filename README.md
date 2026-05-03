@@ -24,7 +24,7 @@ A Discord bot written in Rust that fetches anime and manga information from AniL
 | `/ping` | Bot health check |
 | `/register` | Start or refresh the secure AniList OAuth linking flow |
 | `/unregister confirmation:<confirm\|cancel>` | Unlink your AniList account after confirmation |
-| `/whoami` | Show your linked AniList username and profile link |
+| `/whoami` | Show your linked AniList account ID and profile link |
 | `/anime <search>` | Look up anime by name or AniList ID |
 | `/manga <search>` | Look up manga by name or AniList ID |
 | `/character search:<term or id> spoilers:<allow\|disallow>` | Look up characters by name or AniList ID |
@@ -43,6 +43,10 @@ A Discord bot written in Rust that fetches anime and manga information from AniL
 | Database | Supabase (PostgreSQL) |
 | Cache | Upstash (Redis) |
 | Secrets | Doppler |
+
+## Documentation
+
+- [OAuth data contract](docs/oauth-contract.md) — shared schema and payload contract with the [`auth`](https://github.com/annie-mei/auth) repo
 
 ## Legal
 

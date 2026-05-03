@@ -1,1 +1,1 @@
-pub mod user;
+pub mod oauth_credential;

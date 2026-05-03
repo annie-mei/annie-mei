@@ -52,7 +52,7 @@ pub fn register() -> CreateCommand {
 /// fetches separately (it requires Discord cache access).
 pub fn handle_manga(
     manga: Option<Manga>,
-    guild_members_data: Option<HashMap<i64, MediaListData>>,
+    guild_members_data: Option<HashMap<u64, MediaListData>>,
     title_variant: Option<TitleVariant>,
 ) -> CommandResponse {
     match manga {
