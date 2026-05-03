@@ -23,8 +23,7 @@ use tracing::instrument;
 const SELECT_OAUTH_CREDENTIAL_BY_DISCORD_ID_SQL: &str =
     "SELECT discord_user_id, anilist_id FROM oauth_credentials WHERE discord_user_id = $1";
 
-const SELECT_OAUTH_CREDENTIALS_BY_DISCORD_IDS_SQL: &str =
-    "SELECT discord_user_id, anilist_id FROM oauth_credentials \
+const SELECT_OAUTH_CREDENTIALS_BY_DISCORD_IDS_SQL: &str = "SELECT discord_user_id, anilist_id FROM oauth_credentials \
      WHERE discord_user_id = ANY($1)";
 
 #[derive(Debug, Clone, PartialEq, Eq, QueryableByName)]
@@ -78,11 +77,6 @@ impl OAuthCredential {
             .get_results::<OAuthCredential>(conn)
     }
 
-    /// Convenience accessor that returns the canonical AniList profile URL.
-    pub fn profile_url(&self) -> String {
-        format!("https://anilist.co/user/{}/", self.anilist_id)
-    }
-
     /// Parse the stored snowflake back to an `i64` for downstream Discord APIs.
     pub fn discord_id_i64(&self) -> Option<i64> {
         self.discord_user_id.parse::<i64>().ok()
@@ -92,15 +86,6 @@ impl OAuthCredential {
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    #[test]
-    fn profile_url_uses_anilist_id() {
-        let credential = OAuthCredential {
-            discord_user_id: "123".to_string(),
-            anilist_id: 4567,
-        };
-        assert_eq!(credential.profile_url(), "https://anilist.co/user/4567/");
-    }
 
     #[test]
     fn discord_id_i64_parses_valid_snowflake() {
