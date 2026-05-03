@@ -136,3 +136,14 @@ spans, and Sentry telemetry must not include the raw snowflake.** Use
 `utils::observability::identifier_fingerprint` (auth-service) to emit
 a salted hash instead. Both helpers use the shared `USERID_HASH_SALT`
 environment variable so fingerprints correlate across repos.
+
+`oauth_credentials.access_token` and `oauth_credentials.refresh_token`
+are bearer credentials that grant full access to the linked AniList
+account. The bot's current `OAuthCredential` model intentionally only
+selects `discord_user_id` and `anilist_id`, but if a future change
+expands the projection to read either token column, **the values must
+never appear in logs, spans, breadcrumbs, error payloads, Sentry
+events, or any other observability sink — not in plain text and not
+as a fingerprint.** Move the secrets behind a wrapper type whose
+`Debug`/`Display` impls do not expose them, and never include
+`Authorization: Bearer …` headers in logged HTTP requests.
