@@ -43,12 +43,6 @@ struct DeletedRegistrations {
     oauth_sessions_deleted: usize,
 }
 
-impl DeletedRegistrations {
-    fn any_deleted(&self) -> bool {
-        self.oauth_credentials_deleted > 0 || self.oauth_sessions_deleted > 0
-    }
-}
-
 pub fn register() -> CreateCommand {
     CreateCommand::new("unregister")
         .description("Unlink your AniList account from Annie Mei")
@@ -150,7 +144,13 @@ fn delete_auth_records(
 
 #[instrument(name = "command.unregister.outcome_from_deletions", skip(deletions))]
 fn outcome_from_deletions(deletions: DeletedRegistrations) -> UnregisterOutcome {
-    if deletions.any_deleted() {
+    // An oauth_sessions row by itself only means the user started but never
+    // completed an OAuth flow — they were never actually linked. Reporting
+    // `Unlinked` in that case would tell them "your AniList account has been
+    // unlinked … and your stored OAuth credentials have been deleted", which
+    // is misleading. Only an oauth_credentials row counts as having been
+    // linked; orphaned sessions are silently cleaned up alongside.
+    if deletions.oauth_credentials_deleted > 0 {
         UnregisterOutcome::Unlinked
     } else {
         UnregisterOutcome::NotLinked
@@ -255,9 +255,21 @@ mod tests {
     }
 
     #[test]
-    fn deletion_outcome_reports_unlinked_when_only_sessions_were_deleted() {
+    fn deletion_outcome_reports_not_linked_when_only_in_flight_sessions_were_deleted() {
+        // An orphaned oauth_sessions row means the user started but never
+        // completed /register. Reporting Unlinked here would falsely claim
+        // they had a link in the first place — they didn't.
         let outcome = outcome_from_deletions(DeletedRegistrations {
             oauth_credentials_deleted: 0,
+            oauth_sessions_deleted: 1,
+        });
+        assert_eq!(outcome, UnregisterOutcome::NotLinked);
+    }
+
+    #[test]
+    fn deletion_outcome_reports_unlinked_when_credentials_and_sessions_were_deleted() {
+        let outcome = outcome_from_deletions(DeletedRegistrations {
+            oauth_credentials_deleted: 1,
             oauth_sessions_deleted: 1,
         });
         assert_eq!(outcome, UnregisterOutcome::Unlinked);
