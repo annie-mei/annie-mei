@@ -11,6 +11,7 @@ use serenity::{
     all::{CommandInteraction, EditInteractionResponse},
     builder::CreateCommand,
     client::Context,
+    model::prelude::UserId,
 };
 use tokio::task;
 use tracing::{error, instrument};
@@ -49,10 +50,10 @@ pub fn handle_whoami(profile: Option<LinkedAniListProfile>) -> CommandResponse {
 /// Reads from `oauth_credentials`, the auth-service-owned source of truth for
 /// AniList account links. The legacy bot-owned `users` table is no longer
 /// consulted — see ANNIE-156 and `docs/oauth-contract.md`.
-#[instrument(name = "whoami.fetch_profile_blocking", skip(database_pool, discord_id), fields(discord_user_id = %hash_user_id(discord_id as u64)))]
+#[instrument(name = "whoami.fetch_profile_blocking", skip(database_pool, discord_id), fields(discord_user_id = %hash_user_id(discord_id.get())))]
 fn fetch_whoami_profile(
     database_pool: crate::utils::database::DbPool,
-    discord_id: i64,
+    discord_id: UserId,
 ) -> Result<Option<OAuthCredential>, diesel::result::Error> {
     let mut connection = database::get_connection(&database_pool);
     OAuthCredential::get_by_discord_id(discord_id, &mut connection)
@@ -72,7 +73,7 @@ pub async fn run(ctx: &Context, interaction: &mut CommandInteraction) {
         return;
     };
 
-    let discord_id = user.id.get() as i64;
+    let discord_id = user.id;
     let db_result =
         task::spawn_blocking(move || fetch_whoami_profile(database_pool, discord_id)).await;
 
@@ -83,7 +84,7 @@ pub async fn run(ctx: &Context, interaction: &mut CommandInteraction) {
         Ok(Err(err)) => {
             error!(
                 error = %err,
-                discord_user_id = %hash_user_id(discord_id as u64),
+                discord_user_id = %hash_user_id(discord_id.get()),
                 "Failed to fetch whoami profile from database"
             );
             CommandResponse::Content(
@@ -94,7 +95,7 @@ pub async fn run(ctx: &Context, interaction: &mut CommandInteraction) {
         Err(err) => {
             error!(
                 error = %err,
-                discord_user_id = %hash_user_id(discord_id as u64),
+                discord_user_id = %hash_user_id(discord_id.get()),
                 "Failed to join whoami database task"
             );
             CommandResponse::Content(

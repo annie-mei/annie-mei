@@ -38,18 +38,21 @@ pub struct OAuthCredential {
 impl OAuthCredential {
     /// Look up an OAuth credential row for the given Discord snowflake.
     ///
-    /// Returns `Ok(None)` when no row exists for the user.
+    /// Returns `Ok(None)` when no row exists for the user. Takes the
+    /// snowflake as a `UserId` so callers do not have to perform a lossy
+    /// `u64 as i64` cast that would silently drop snowflakes with the high
+    /// bit set.
     #[instrument(
         name = "db.oauth_credential.get_by_discord_id",
         skip(conn, user_discord_id),
-        fields(discord_user_id = %hash_user_id(user_discord_id as u64))
+        fields(discord_user_id = %hash_user_id(user_discord_id.get()))
     )]
     pub fn get_by_discord_id(
-        user_discord_id: i64,
+        user_discord_id: UserId,
         conn: &mut PgConnection,
     ) -> Result<Option<OAuthCredential>, diesel::result::Error> {
         diesel::sql_query(SELECT_OAUTH_CREDENTIAL_BY_DISCORD_ID_SQL)
-            .bind::<Text, _>(user_discord_id.to_string())
+            .bind::<Text, _>(user_discord_id.get().to_string())
             .get_result::<OAuthCredential>(conn)
             .optional()
     }
