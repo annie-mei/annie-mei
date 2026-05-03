@@ -71,7 +71,7 @@ impl EventHandler for Handler {
                     "manga" => commands::manga::command::run(&ctx, &mut command).await,
                     "anime" => commands::anime::command::run(&ctx, &mut command).await,
                     "character" => commands::character::command::run(&ctx, &mut command).await,
-                    "register" => commands::register::command::run(&ctx, &command).await,
+                    "register" => commands::register::command::run(&ctx, &mut command).await,
                     "unregister" => commands::unregister::run(&ctx, &mut command).await,
                     "whoami" => commands::whoami::run(&ctx, &mut command).await,
                     _ => {
