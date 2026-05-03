@@ -40,10 +40,12 @@ jobs:
       - name: Determine release metadata
         id: release-meta
         shell: bash
+        env:
+          INPUT_REF: ${{ inputs.ref }}
         run: |
           version="$(awk -F'"' '/^[[:space:]]*version[[:space:]]*=/ { print $2; exit }' Cargo.toml)"
           release="annie-mei@${version}"
-          requested_ref="${{ inputs.ref }}"
+          requested_ref="${INPUT_REF}"
           tag_name=""
 
           if [[ "$requested_ref" =~ ^refs/tags/v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
