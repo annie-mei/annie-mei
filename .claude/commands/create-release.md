@@ -1,5 +1,7 @@
 Create a GitHub release for Annie Mei using trunk-based development. Follow every step below, confirming with the user before destructive actions (tagging, pushing).
 
+Releases are created by tagging commits on `main`, then manually running `build-release.yml` from `main` against the release tag so the build can reuse the Rust release cache warmed by normal `main` builds.
+
 ## Step 1: Verify State
 
 1. Confirm you are on the `main` branch and it is up to date with `origin/main` (run `git fetch origin` and compare).
@@ -27,23 +29,26 @@ git tag vX.X.X
 git push origin vX.X.X
 ```
 
-## Step 4: Create GitHub Release
+Pushing the tag does **not** trigger the release workflow. The workflow is dispatched manually from `main` in the next step to avoid cold tag-scoped Rust caches.
 
-Create the release with auto-generated notes:
+## Step 4: Run Release Build and Deploy
 
 ```bash
-gh release create vX.X.X --generate-notes
+gh workflow run build-release.yml --ref main -f ref=vX.X.X
+gh run watch
 ```
 
-The `build-release.yml` workflow will automatically:
-- Build the ARM64 binary
-- Upload debug symbols to Sentry
-- Attach the binary to the release
-- Deploy to Oracle Cloud
+The `build-release.yml` workflow will:
+- Check out the requested tag/ref
+- Restore the Rust release cache warmed by normal `main` builds
+- Validate that `vX.X.X` matches the `Cargo.toml` version
+- Create or update the GitHub release and attach assets
+- Create/upload Sentry release metadata and debug symbols
+- Deploy to Oracle Cloud only for release refs that resolve to a `vX.Y.Z` tag
 
 ## Step 5: Edit Release Notes
 
-Edit the release notes to organize them into these sections using `gh release edit`:
+Edit the generated release notes to organize them into these sections using `gh release edit`:
 
 ```markdown
 ## Breaking Changes
@@ -66,10 +71,16 @@ Remove any section that has no entries.
 
 ```bash
 gh release view vX.X.X
-gh run list --workflow=build-release.yml --limit=1
+gh run list --workflow=build-release.yml --limit=2
 ```
 
-Wait for the workflow to complete and report the result. If it fails, alert the user with the failure details.
+Wait for the workflow to complete and report the result. Verify:
+- The build logs show a Rust cache restore from the normal `main` build cache instead of `No cache found`
+- Release assets are attached correctly
+- Oracle deploy completed successfully
+- `/healthz` passed in the workflow logs
+
+If the workflow fails, alert the user with the failure details.
 
 ## Rollback (only if the user asks)
 
