@@ -1,6 +1,6 @@
 use crate::{
     commands::response::CommandResponse,
-    models::db::user::User,
+    models::db::oauth_credential::OAuthCredential,
     utils::{
         database,
         privacy::{configure_sentry_scope, hash_user_id},
@@ -17,12 +17,12 @@ use tracing::{error, instrument};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct LinkedAniListProfile {
-    pub username: String,
+    pub anilist_id: i64,
 }
 
 impl LinkedAniListProfile {
     fn profile_url(&self) -> String {
-        format!("https://anilist.co/user/{}", self.username)
+        format!("https://anilist.co/user/{}/", self.anilist_id)
     }
 }
 
@@ -34,8 +34,8 @@ pub fn register() -> CreateCommand {
 pub fn handle_whoami(profile: Option<LinkedAniListProfile>) -> CommandResponse {
     match profile {
         Some(profile) => CommandResponse::Content(format!(
-            "Your linked AniList account is **{}**.\nProfile: <{}>",
-            profile.username,
+            "Your linked AniList account ID is **{}**.\nProfile: <{}>",
+            profile.anilist_id,
             profile.profile_url()
         )),
         None => CommandResponse::Content(
@@ -44,13 +44,18 @@ pub fn handle_whoami(profile: Option<LinkedAniListProfile>) -> CommandResponse {
     }
 }
 
+/// Fetch the OAuth-linked AniList credential for a Discord user.
+///
+/// Reads from `oauth_credentials`, the auth-service-owned source of truth for
+/// AniList account links. The legacy bot-owned `users` table is no longer
+/// consulted — see ANNIE-156 and `docs/oauth-contract.md`.
 #[instrument(name = "whoami.fetch_profile_blocking", skip(database_pool, discord_id), fields(discord_user_id = %hash_user_id(discord_id as u64)))]
 fn fetch_whoami_profile(
     database_pool: crate::utils::database::DbPool,
     discord_id: i64,
-) -> Result<Option<User>, diesel::result::Error> {
+) -> Result<Option<OAuthCredential>, diesel::result::Error> {
     let mut connection = database::get_connection(&database_pool);
-    User::get_user_by_discord_id(discord_id, &mut connection)
+    OAuthCredential::get_by_discord_id(discord_id, &mut connection)
 }
 
 #[instrument(name = "command.whoami.run", skip(ctx, interaction))]
@@ -73,7 +78,7 @@ pub async fn run(ctx: &Context, interaction: &mut CommandInteraction) {
 
     let response = match db_result {
         Ok(Ok(profile)) => handle_whoami(profile.map(|entry| LinkedAniListProfile {
-            username: entry.anilist_username,
+            anilist_id: entry.anilist_id,
         })),
         Ok(Err(err)) => {
             error!(
@@ -113,19 +118,17 @@ mod tests {
     use super::*;
 
     #[test]
-    fn handle_whoami_with_linked_profile_returns_username_and_url() {
-        let response = handle_whoami(Some(LinkedAniListProfile {
-            username: "annie".to_string(),
-        }));
+    fn handle_whoami_with_linked_profile_returns_anilist_id_and_url() {
+        let response = handle_whoami(Some(LinkedAniListProfile { anilist_id: 4567 }));
 
         assert!(response.is_content(), "expected Content variant");
         let content = response.unwrap_content();
         assert!(
-            content.contains("**annie**"),
-            "expected username in response"
+            content.contains("**4567**"),
+            "expected AniList ID in response"
         );
         assert!(
-            content.contains("https://anilist.co/user/annie"),
+            content.contains("https://anilist.co/user/4567/"),
             "expected AniList profile URL in response"
         );
     }
