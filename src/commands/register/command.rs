@@ -48,7 +48,7 @@ fn handle_register(oauth_url: &str, ttl_seconds: i64) -> RegisterResponse {
     }
 }
 
-#[instrument(name = "command.register.handle_already_linked")]
+#[instrument(name = "command.register.handle_already_linked", skip(anilist_id))]
 fn handle_already_linked(anilist_id: i64) -> RegisterResponse {
     RegisterResponse {
         content: format!(
