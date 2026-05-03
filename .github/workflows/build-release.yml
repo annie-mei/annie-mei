@@ -152,6 +152,8 @@ jobs:
       TUNNEL_SERVICE_TOKEN_SECRET: ${{ secrets.CF_ACCESS_CLIENT_SECRET }}
     steps:
       - name: Download artifact
+        # upload-artifact latest is v7 while download-artifact latest is v8;
+        # download-artifact@v8 supports artifacts created by upload-artifact@v7.
         uses: actions/download-artifact@v8
         with:
           name: annie-mei-arm64
