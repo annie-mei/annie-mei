@@ -1,7 +1,10 @@
 use std::collections::HashMap;
 
 use crate::{
-    models::{db::user::User, transformers::Transformers, user_media_list::MediaListData},
+    models::{
+        db::oauth_credential::OAuthCredential, transformers::Transformers,
+        user_media_list::MediaListData,
+    },
     utils::{
         database::{get_connection, get_pool_from_context},
         requests::anilist::send_request,
@@ -32,15 +35,15 @@ fn media_alias(index: usize) -> String {
 }
 
 #[instrument(name = "guild.build_batch_media_list_query", skip(guild_members), fields(member_count = guild_members.len()))]
-fn build_batch_media_list_query(guild_members: &[User]) -> String {
+fn build_batch_media_list_query(guild_members: &[OAuthCredential]) -> String {
     let media_lookups = guild_members
         .iter()
         .enumerate()
-        .map(|(index, user)| {
+        .map(|(index, credential)| {
             format!(
                 "  {}: MediaList(userId: {}, type: $type, mediaId: $mediaId) {{\n    {}\n  }}",
                 media_alias(index),
-                user.anilist_id,
+                credential.anilist_id,
                 MEDIA_LIST_QUERY_FIELDS
             )
         })
@@ -93,10 +96,13 @@ pub async fn get_guild_data_for_media<T: Transformers>(
     })
     .await
     {
-        Ok(Some(users)) => users,
-        Ok(None) => return HashMap::new(),
-        Err(err) => {
+        Ok(Ok(users)) => users,
+        Ok(Err(err)) => {
             error!(error = %err, "Failed to fetch registered guild members from database");
+            return HashMap::new();
+        }
+        Err(err) => {
+            error!(error = %err, "Failed to join guild member fetch task");
             return HashMap::new();
         }
     };
@@ -108,14 +114,14 @@ pub async fn get_guild_data_for_media<T: Transformers>(
 fn fetch_guild_members_with_ids_blocking(
     database_pool: crate::utils::database::DbPool,
     guild_member_ids: Vec<UserId>,
-) -> Option<Vec<User>> {
+) -> Result<Vec<OAuthCredential>, diesel::result::Error> {
     let mut conn = get_connection(&database_pool);
-    User::get_users_by_discord_id(guild_member_ids, &mut conn)
+    OAuthCredential::get_by_discord_ids(guild_member_ids, &mut conn)
 }
 
 #[instrument(name = "guild.fetch_anilist_data", skip(guild_members, media_type), fields(member_count = guild_members.len(), media_id = media_id, media_type = %media_type))]
 async fn get_guild_anilist_data(
-    guild_members: Vec<User>,
+    guild_members: Vec<OAuthCredential>,
     media_id: u32,
     media_type: String,
 ) -> HashMap<i64, MediaListData> {
@@ -123,10 +129,16 @@ async fn get_guild_anilist_data(
         return HashMap::new();
     }
 
+    // Skip credentials whose stored discord_user_id is not a valid i64; we
+    // index back into the per-guild HashMap by Discord snowflake (i64).
     let discord_ids_by_media_alias: HashMap<String, i64> = guild_members
         .iter()
         .enumerate()
-        .map(|(index, user)| (media_alias(index), user.discord_id))
+        .filter_map(|(index, credential)| {
+            credential
+                .discord_id_i64()
+                .map(|discord_id| (media_alias(index), discord_id))
+        })
         .collect();
 
     let query = build_batch_media_list_query(&guild_members);
@@ -178,20 +190,18 @@ async fn get_guild_anilist_data(
 #[cfg(test)]
 mod tests {
     use super::build_batch_media_list_query;
-    use crate::models::db::user::User;
+    use crate::models::db::oauth_credential::OAuthCredential;
 
     #[test]
     fn build_batch_media_list_query_adds_one_lookup_per_user() {
         let guild_members = vec![
-            User {
-                discord_id: 1,
+            OAuthCredential {
+                discord_user_id: "1".to_string(),
                 anilist_id: 100,
-                anilist_username: "first".to_string(),
             },
-            User {
-                discord_id: 2,
+            OAuthCredential {
+                discord_user_id: "2".to_string(),
                 anilist_id: 200,
-                anilist_username: "second".to_string(),
             },
         ];
 
