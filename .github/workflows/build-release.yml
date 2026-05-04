@@ -2,14 +2,14 @@ on:
   workflow_dispatch:
     inputs:
       ref:
-        description: "Branch or SHA to deploy"
+        description: "Tag, branch, or SHA to build; deploys only when this resolves to a vX.Y.Z tag"
         required: true
         default: "main"
   push:
+    branches:
+      - "main"
     paths-ignore:
       - "**/README.md"
-    tags:
-      - "v[0-9]+.[0-9]+.[0-9]+"
 
 name: ARM64 build-release
 
@@ -21,6 +21,8 @@ jobs:
     name: Build ARM64
     runs-on: blacksmith-4vcpu-ubuntu-2404-arm
     container: rust:1-bullseye
+    outputs:
+      is_release: ${{ steps.release-meta.outputs.is_release }}
     env:
       CARGO_TERM_COLOR: always
     steps:
@@ -35,29 +37,47 @@ jobs:
           rustup toolchain install "$toolchain" --profile minimal
       - name: Install dependencies
         run: apt-get update && apt-get install -y libpq-dev
+      - name: Determine release metadata
+        id: release-meta
+        shell: bash
+        env:
+          INPUT_REF: ${{ inputs.ref }}
+        run: |
+          version="$(awk -F'"' '/^[[:space:]]*version[[:space:]]*=/ { print $2; exit }' Cargo.toml)"
+          release="annie-mei@${version}"
+          requested_ref="${INPUT_REF}"
+          tag_name=""
+
+          if [[ "$requested_ref" =~ ^refs/tags/v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            tag_name="${requested_ref#refs/tags/}"
+          elif [[ "$requested_ref" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            tag_name="$requested_ref"
+          fi
+
+          is_release="false"
+          if [[ -n "$tag_name" ]]; then
+            is_release="true"
+            if [[ "${tag_name#v}" != "$version" ]]; then
+              echo "::error::Git tag ${tag_name} does not match Cargo.toml version ${version}"
+              exit 1
+            fi
+          fi
+
+          echo "version=${version}" >> "$GITHUB_OUTPUT"
+          echo "release=${release}" >> "$GITHUB_OUTPUT"
+          echo "tag_name=${tag_name}" >> "$GITHUB_OUTPUT"
+          echo "is_release=${is_release}" >> "$GITHUB_OUTPUT"
       - name: Cache
         uses: Swatinem/rust-cache@v2.9.1
         with:
           cache-on-failure: "true"
           prefix-key: "annie-mei"
           shared-key: "cargo-release"
-          save-if: ${{ github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/') }}
+          save-if: ${{ steps.release-meta.outputs.is_release != 'true' }}
       - name: Build
         run: cargo build --release
-      - name: Determine Sentry release
-        id: sentry-release-meta
-        run: |
-          version="$(awk -F'"' '/^[[:space:]]*version[[:space:]]*=/ { print $2; exit }' Cargo.toml)"
-          release="annie-mei@${version}"
-
-          echo "version=${version}" >> "$GITHUB_OUTPUT"
-          echo "release=${release}" >> "$GITHUB_OUTPUT"
-
-          if [[ "${GITHUB_REF}" == refs/tags/* && "${GITHUB_REF_NAME#v}" != "$version" ]]; then
-            echo "::error::Git tag ${GITHUB_REF_NAME} does not match Cargo.toml version ${version}"
-            exit 1
-          fi
       - name: Install sentry-cli
+        if: steps.release-meta.outputs.is_release == 'true'
         env:
           SENTRY_CLI_URL: https://github.com/getsentry/sentry-cli/releases/download/3.4.0/sentry-cli-Linux-aarch64
           SENTRY_CLI_SHA256: 1273fe22639e394e0c8d2bd097da13b25139e75e977c5ce44c6f54130664ea45
@@ -66,7 +86,7 @@ jobs:
           echo "$SENTRY_CLI_SHA256  /usr/local/bin/sentry-cli" | sha256sum --check --strict
           chmod +x /usr/local/bin/sentry-cli
       - name: Create Sentry release
-        if: startsWith(github.ref, 'refs/tags/')
+        if: steps.release-meta.outputs.is_release == 'true'
         id: sentry-release
         continue-on-error: true
         uses: getsentry/action-release@5657c9e888b4e2cc85f4d29143ea4131fde4a73a # v3.6.0
@@ -75,7 +95,7 @@ jobs:
           SENTRY_ORG: ${{ secrets.SENTRY_ORG }}
           SENTRY_PROJECT: ${{ secrets.SENTRY_PROJECT }}
         with:
-          release: ${{ steps.sentry-release-meta.outputs.release }}
+          release: ${{ steps.release-meta.outputs.release }}
           set_commits: auto
           ignore_missing: true
           disable_telemetry: true
@@ -83,6 +103,7 @@ jobs:
         if: steps.sentry-release.outcome == 'failure'
         run: echo "::warning::Sentry release creation failed — commit tracking and release resolution may be incomplete"
       - name: Upload debug symbols to Sentry
+        if: steps.release-meta.outputs.is_release == 'true'
         id: sentry-upload
         continue-on-error: true
         run: sentry-cli debug-files upload --include-sources target/release/
@@ -94,10 +115,13 @@ jobs:
         if: steps.sentry-upload.outcome == 'failure'
         run: echo "::warning::Sentry debug symbol upload failed — stack traces may not be symbolicated"
       - name: Strip binary for deployment
+        if: steps.release-meta.outputs.is_release == 'true'
         run: strip target/release/annie-mei
       - name: Prepare artifact
+        if: steps.release-meta.outputs.is_release == 'true'
         run: cp target/release/annie-mei ./annie-mei
       - name: Upload artifact
+        if: steps.release-meta.outputs.is_release == 'true'
         uses: actions/upload-artifact@v7
         with:
           name: annie-mei-arm64
@@ -105,9 +129,11 @@ jobs:
             annie-mei
             mei.jpg
       - name: Release
-        if: startsWith(github.ref, 'refs/tags/')
+        if: steps.release-meta.outputs.is_release == 'true'
         uses: softprops/action-gh-release@v3
         with:
+          tag_name: ${{ steps.release-meta.outputs.tag_name }}
+          generate_release_notes: true
           files: |
             target/release/annie-mei
             LICENSE
@@ -117,12 +143,14 @@ jobs:
     name: Deploy to Oracle Cloud
     needs: build
     runs-on: blacksmith-4vcpu-ubuntu-2404
-    if: startsWith(github.ref, 'refs/tags/') || github.event_name == 'workflow_dispatch'
+    if: needs.build.outputs.is_release == 'true'
     env:
       TUNNEL_SERVICE_TOKEN_ID: ${{ secrets.CF_ACCESS_CLIENT_ID }}
       TUNNEL_SERVICE_TOKEN_SECRET: ${{ secrets.CF_ACCESS_CLIENT_SECRET }}
     steps:
       - name: Download artifact
+        # upload-artifact latest is v7 while download-artifact latest is v8;
+        # download-artifact@v8 supports artifacts created by upload-artifact@v7.
         uses: actions/download-artifact@v8
         with:
           name: annie-mei-arm64

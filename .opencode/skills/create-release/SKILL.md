@@ -10,7 +10,7 @@ metadata:
 
 ## Overview
 
-This skill guides you through creating a release for Annie Mei using trunk-based development. Releases are created by tagging commits on `main` and creating a GitHub release.
+This skill guides you through creating a release for Annie Mei using trunk-based development. Releases are created by tagging commits on `main`, then manually running `build-release.yml` from `main` against the release tag so the build can reuse the Rust release cache warmed by normal `main` builds.
 
 ## Prerequisites
 
@@ -56,26 +56,30 @@ Apply semantic versioning:
 # Create the tag (replace X.X.X with the version)
 git tag vX.X.X
 
-# Push the tag to trigger the release workflow
+# Push the tag so GitHub Releases can point to it
 git push origin vX.X.X
 ```
 
-### Step 4: Create GitHub Release
+Pushing the tag does **not** trigger the release workflow. The workflow is dispatched manually from `main` in the next step to avoid cold tag-scoped Rust caches.
 
-Create the release with auto-generated notes:
+### Step 4: Run Release Build and Deploy
 
 ```bash
-gh release create vX.X.X --generate-notes
+gh workflow run build-release.yml --ref main -f ref=vX.X.X
+gh run watch
 ```
 
-The `build-release.yml` workflow will automatically:
-- Build the ARM64 binary
-- Attach the binary to the release
-- Deploy to Oracle Cloud
+The `build-release.yml` workflow will:
+- Check out the requested tag/ref
+- Restore the main-scoped Rust release cache
+- Validate that `vX.X.X` matches the `Cargo.toml` version
+- Create or update the GitHub release and attach assets
+- Create/upload Sentry release metadata and debug symbols
+- Deploy to Oracle Cloud only for release refs that resolve to a `vX.Y.Z` tag
 
 ### Step 5: Edit Release Notes
 
-Edit the release notes to organize them into these sections:
+Edit the generated release notes to organize them into these sections:
 
 ```markdown
 ## Breaking Changes
@@ -101,8 +105,14 @@ You can edit via CLI or directly in the GitHub UI.
 gh release view vX.X.X
 
 # Verify the workflow completed
-gh run list --workflow=build-release.yml --limit=1
+gh run list --workflow=build-release.yml --limit=2
 ```
+
+Also verify:
+- The build logs show a Rust cache restore from the normal `main` build cache instead of `No cache found`
+- Release assets are attached correctly
+- Oracle deploy completed successfully
+- `/healthz` passed in the workflow logs
 
 ## Rollback Procedure
 
@@ -119,6 +129,8 @@ git tag -d vX.X.X
 
 ## Notes
 
-- The CI workflow triggers on tags matching `v[0-9]+.[0-9]+.[0-9]+`
+- `main` pushes run `build-release.yml` as a cache warmer and do not create a release or deploy
+- Releases are manual: `gh workflow run build-release.yml --ref main -f ref=vX.X.X`
 - Releases are built on ARM64 runners for Oracle Cloud deployment
+- Release runs restore cache but skip saving large caches on the critical deploy path
 - The binary is validated before deployment; if validation fails, the deploy auto-rolls back
