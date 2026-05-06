@@ -16,28 +16,17 @@ use serenity::{
 use tokio::task;
 use tracing::{error, instrument};
 
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct LinkedAniListProfile {
-    pub anilist_id: i64,
-}
-
-impl LinkedAniListProfile {
-    fn profile_url(&self) -> String {
-        format!("https://anilist.co/user/{}/", self.anilist_id)
-    }
-}
-
 pub fn register() -> CreateCommand {
     CreateCommand::new("whoami").description("Show your currently linked AniList account")
 }
 
 #[instrument(name = "command.whoami.handle", skip(profile))]
-pub fn handle_whoami(profile: Option<LinkedAniListProfile>) -> CommandResponse {
+pub fn handle_whoami(profile: Option<OAuthCredential>) -> CommandResponse {
     match profile {
         Some(profile) => CommandResponse::Content(format!(
-            "Your linked AniList account ID is **{}**.\nProfile: <{}>",
-            profile.anilist_id,
-            profile.profile_url()
+            "Your linked AniList account is **{}**.\nProfile: <{}>",
+            profile.anilist_display_name(),
+            profile.anilist_profile_url()
         )),
         None => CommandResponse::Content(
             "You have not linked an AniList account yet. Run `/register` first.".to_string(),
@@ -78,9 +67,7 @@ pub async fn run(ctx: &Context, interaction: &mut CommandInteraction) {
         task::spawn_blocking(move || fetch_whoami_profile(database_pool, discord_id)).await;
 
     let response = match db_result {
-        Ok(Ok(profile)) => handle_whoami(profile.map(|entry| LinkedAniListProfile {
-            anilist_id: entry.anilist_id,
-        })),
+        Ok(Ok(profile)) => handle_whoami(profile),
         Ok(Err(err)) => {
             error!(
                 error = %err,
@@ -118,19 +105,43 @@ pub async fn run(ctx: &Context, interaction: &mut CommandInteraction) {
 mod tests {
     use super::*;
 
+    fn oauth_credential(anilist_username: Option<&str>) -> OAuthCredential {
+        OAuthCredential {
+            discord_user_id: "123456789".to_string(),
+            anilist_id: 4567,
+            anilist_username: anilist_username.map(str::to_owned),
+        }
+    }
+
     #[test]
-    fn handle_whoami_with_linked_profile_returns_anilist_id_and_url() {
-        let response = handle_whoami(Some(LinkedAniListProfile { anilist_id: 4567 }));
+    fn handle_whoami_with_linked_profile_returns_anilist_username_and_url() {
+        let response = handle_whoami(Some(oauth_credential(Some("AniUser"))));
 
         assert!(response.is_content(), "expected Content variant");
         let content = response.unwrap_content();
         assert!(
-            content.contains("**4567**"),
-            "expected AniList ID in response"
+            content.contains("**AniUser**"),
+            "expected AniList username in response"
+        );
+        assert!(
+            content.contains("https://anilist.co/user/AniUser/"),
+            "expected AniList profile URL in response"
+        );
+    }
+
+    #[test]
+    fn handle_whoami_without_username_falls_back_to_anilist_id() {
+        let response = handle_whoami(Some(oauth_credential(None)));
+
+        assert!(response.is_content(), "expected Content variant");
+        let content = response.unwrap_content();
+        assert!(
+            content.contains("**AniList account ID 4567**"),
+            "expected AniList ID fallback in response"
         );
         assert!(
             content.contains("https://anilist.co/user/4567/"),
-            "expected AniList profile URL in response"
+            "expected numeric AniList profile URL fallback in response"
         );
     }
 

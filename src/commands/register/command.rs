@@ -48,11 +48,13 @@ fn handle_register(oauth_url: &str, ttl_seconds: i64) -> RegisterResponse {
     }
 }
 
-#[instrument(name = "command.register.handle_already_linked", skip(anilist_id))]
-fn handle_already_linked(anilist_id: i64) -> RegisterResponse {
+#[instrument(name = "command.register.handle_already_linked", skip(credential))]
+fn handle_already_linked(credential: &OAuthCredential) -> RegisterResponse {
     RegisterResponse {
         content: format!(
-            "You're already linked to AniList account ID **{anilist_id}**.\nProfile: <https://anilist.co/user/{anilist_id}/>\nIf you want to link a different AniList account, run `/unregister confirmation:Confirm unlink` first, then run `/register` again."
+            "You're already linked to AniList account **{}**.\nProfile: <{}>\nIf you want to link a different AniList account, run `/unregister confirmation:Confirm unlink` first, then run `/register` again.",
+            credential.anilist_display_name(),
+            credential.anilist_profile_url(),
         ),
         oauth_url: None,
     }
@@ -114,7 +116,7 @@ pub async fn run(ctx: &Context, interaction: &mut CommandInteraction) {
         task::spawn_blocking(move || fetch_existing_link(database_pool, discord_id)).await;
 
     let response = match linked_account {
-        Ok(Ok(Some(existing_link))) => handle_already_linked(existing_link.anilist_id),
+        Ok(Ok(Some(existing_link))) => handle_already_linked(&existing_link),
         Ok(Ok(None)) => match get_config_from_context(ctx).await {
             Some(config) => {
                 let guild_id = interaction.guild_id.map(|id| id.to_string());
@@ -190,6 +192,14 @@ mod tests {
 
     use crate::utils::oauth::OAuthContextError;
 
+    fn oauth_credential(anilist_username: Option<&str>) -> OAuthCredential {
+        OAuthCredential {
+            discord_user_id: "123456789".to_string(),
+            anilist_id: 4567,
+            anilist_username: anilist_username.map(str::to_owned),
+        }
+    }
+
     #[test]
     fn register_happy_path_returns_oauth_link() {
         let response = handle_register("https://auth.example.com/oauth/anilist/start?ctx=abc", 300);
@@ -215,14 +225,29 @@ mod tests {
 
     #[test]
     fn already_linked_user_does_not_receive_oauth_link() {
-        let response = handle_already_linked(4567);
+        let credential = oauth_credential(Some("AniUser"));
+        let response = handle_already_linked(&credential);
 
         assert_eq!(response.oauth_url, None);
         assert!(response.content.contains("already linked"));
-        assert!(response.content.contains("**4567**"));
-        assert!(response.content.contains("https://anilist.co/user/4567/"));
+        assert!(response.content.contains("**AniUser**"));
+        assert!(
+            response
+                .content
+                .contains("https://anilist.co/user/AniUser/")
+        );
         assert!(response.content.contains("/unregister"));
         assert!(response.content.contains("/register"));
+    }
+
+    #[test]
+    fn already_linked_user_without_username_falls_back_to_anilist_id() {
+        let credential = oauth_credential(None);
+        let response = handle_already_linked(&credential);
+
+        assert_eq!(response.oauth_url, None);
+        assert!(response.content.contains("**AniList account ID 4567**"));
+        assert!(response.content.contains("https://anilist.co/user/4567/"));
     }
 
     #[test]

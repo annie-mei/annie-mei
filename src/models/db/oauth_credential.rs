@@ -12,30 +12,68 @@
 //! `docs/oauth-contract.md`.
 //!
 //! `oauth_credentials.discord_user_id` is `TEXT` and contains the raw Discord
-//! snowflake string (`user.id.get().to_string()`); `anilist_id` is `BIGINT`.
+//! snowflake string (`user.id.get().to_string()`); `anilist_id` is `BIGINT` and
+//! `anilist_username` is nullable `TEXT`.
 
 use crate::utils::privacy::hash_user_id;
 use diesel::prelude::*;
-use diesel::sql_types::{BigInt, Text};
+use diesel::sql_types::{BigInt, Nullable, Text};
 use serenity::model::prelude::UserId;
+use std::fmt;
 use tracing::instrument;
 
-const SELECT_OAUTH_CREDENTIAL_BY_DISCORD_ID_SQL: &str =
-    "SELECT discord_user_id, anilist_id FROM oauth_credentials WHERE discord_user_id = $1";
+const SELECT_OAUTH_CREDENTIAL_BY_DISCORD_ID_SQL: &str = "SELECT discord_user_id, anilist_id, anilist_username FROM oauth_credentials WHERE discord_user_id = $1";
 
-const SELECT_OAUTH_CREDENTIALS_BY_DISCORD_IDS_SQL: &str = "SELECT discord_user_id, anilist_id FROM oauth_credentials \
+const SELECT_OAUTH_CREDENTIALS_BY_DISCORD_IDS_SQL: &str = "SELECT discord_user_id, anilist_id, anilist_username FROM oauth_credentials \
      WHERE discord_user_id = ANY($1)";
 
-#[derive(Debug, Clone, PartialEq, Eq, QueryableByName)]
+#[derive(Clone, PartialEq, Eq, QueryableByName)]
 pub struct OAuthCredential {
     /// Raw Discord snowflake stored as TEXT in the auth-service schema.
     #[diesel(sql_type = Text)]
     pub discord_user_id: String,
     #[diesel(sql_type = BigInt)]
     pub anilist_id: i64,
+    #[diesel(sql_type = Nullable<Text>)]
+    pub anilist_username: Option<String>,
+}
+
+impl fmt::Debug for OAuthCredential {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("OAuthCredential")
+            .field("discord_user_id", &"[REDACTED]")
+            .field("anilist_id", &"[REDACTED]")
+            .field(
+                "anilist_username",
+                &self.anilist_username.as_ref().map(|_| "[REDACTED]"),
+            )
+            .finish()
+    }
 }
 
 impl OAuthCredential {
+    /// Display label for the linked AniList account.
+    ///
+    /// Prefers the AniList username populated by the auth service, while
+    /// preserving the numeric ID fallback for older rows that do not have one.
+    pub fn anilist_display_name(&self) -> String {
+        self.anilist_username.as_deref().map_or_else(
+            || format!("AniList account ID {}", self.anilist_id),
+            str::to_owned,
+        )
+    }
+
+    /// Public AniList profile URL for the linked account.
+    ///
+    /// Uses the username URL when available and falls back to the numeric
+    /// profile URL for existing credential rows without `anilist_username`.
+    pub fn anilist_profile_url(&self) -> String {
+        match self.anilist_username.as_deref() {
+            Some(username) => format!("https://anilist.co/user/{username}/"),
+            None => format!("https://anilist.co/user/{}/", self.anilist_id),
+        }
+    }
+
     /// Look up an OAuth credential row for the given Discord snowflake.
     ///
     /// Returns `Ok(None)` when no row exists for the user. Takes the
@@ -93,11 +131,42 @@ impl OAuthCredential {
 mod tests {
     use super::*;
 
+    fn oauth_credential(anilist_username: Option<&str>) -> OAuthCredential {
+        OAuthCredential {
+            discord_user_id: "987654321".to_string(),
+            anilist_id: 4567,
+            anilist_username: anilist_username.map(str::to_owned),
+        }
+    }
+
+    #[test]
+    fn anilist_display_fields_use_username_when_available() {
+        let credential = oauth_credential(Some("AniUser"));
+
+        assert_eq!(credential.anilist_display_name(), "AniUser");
+        assert_eq!(
+            credential.anilist_profile_url(),
+            "https://anilist.co/user/AniUser/"
+        );
+    }
+
+    #[test]
+    fn anilist_display_fields_fall_back_to_id_without_username() {
+        let credential = oauth_credential(None);
+
+        assert_eq!(credential.anilist_display_name(), "AniList account ID 4567");
+        assert_eq!(
+            credential.anilist_profile_url(),
+            "https://anilist.co/user/4567/"
+        );
+    }
+
     #[test]
     fn discord_id_u64_parses_valid_snowflake() {
         let credential = OAuthCredential {
             discord_user_id: "987654321".to_string(),
             anilist_id: 1,
+            anilist_username: Some("AniUser".to_string()),
         };
         assert_eq!(credential.discord_id_u64(), Some(987654321));
     }
@@ -110,6 +179,7 @@ mod tests {
         let credential = OAuthCredential {
             discord_user_id: u64::MAX.to_string(),
             anilist_id: 1,
+            anilist_username: None,
         };
         assert_eq!(credential.discord_id_u64(), Some(u64::MAX));
     }
@@ -119,7 +189,24 @@ mod tests {
         let credential = OAuthCredential {
             discord_user_id: "not-a-number".to_string(),
             anilist_id: 1,
+            anilist_username: None,
         };
         assert_eq!(credential.discord_id_u64(), None);
+    }
+
+    #[test]
+    fn debug_redacts_identifiers() {
+        let credential = OAuthCredential {
+            discord_user_id: "987654321".to_string(),
+            anilist_id: 4567,
+            anilist_username: Some("AniUser".to_string()),
+        };
+
+        let debug = format!("{credential:?}");
+
+        assert!(debug.contains("[REDACTED]"));
+        assert!(!debug.contains("987654321"));
+        assert!(!debug.contains("4567"));
+        assert!(!debug.contains("AniUser"));
     }
 }
