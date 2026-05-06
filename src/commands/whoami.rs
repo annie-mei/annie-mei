@@ -44,9 +44,10 @@ impl LinkedAniListProfile {
     }
 
     fn display_name(&self) -> String {
-        self.anilist_username
-            .clone()
-            .unwrap_or_else(|| format!("AniList account ID {}", self.anilist_id))
+        self.anilist_username.as_deref().map_or_else(
+            || format!("AniList account ID {}", self.anilist_id),
+            str::to_owned,
+        )
     }
 }
 
