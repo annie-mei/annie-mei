@@ -13,55 +13,20 @@ use serenity::{
     client::Context,
     model::prelude::UserId,
 };
-use std::fmt;
 use tokio::task;
 use tracing::{error, instrument};
-
-#[derive(Clone, PartialEq, Eq)]
-pub struct LinkedAniListProfile {
-    pub anilist_id: i64,
-    pub anilist_username: Option<String>,
-}
-
-impl fmt::Debug for LinkedAniListProfile {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_struct("LinkedAniListProfile")
-            .field("anilist_id", &"[REDACTED]")
-            .field(
-                "anilist_username",
-                &self.anilist_username.as_ref().map(|_| "[REDACTED]"),
-            )
-            .finish()
-    }
-}
-
-impl LinkedAniListProfile {
-    fn profile_url(&self) -> String {
-        match self.anilist_username.as_deref() {
-            Some(username) => format!("https://anilist.co/user/{username}/"),
-            None => format!("https://anilist.co/user/{}/", self.anilist_id),
-        }
-    }
-
-    fn display_name(&self) -> String {
-        self.anilist_username.as_deref().map_or_else(
-            || format!("AniList account ID {}", self.anilist_id),
-            str::to_owned,
-        )
-    }
-}
 
 pub fn register() -> CreateCommand {
     CreateCommand::new("whoami").description("Show your currently linked AniList account")
 }
 
 #[instrument(name = "command.whoami.handle", skip(profile))]
-pub fn handle_whoami(profile: Option<LinkedAniListProfile>) -> CommandResponse {
+pub fn handle_whoami(profile: Option<OAuthCredential>) -> CommandResponse {
     match profile {
         Some(profile) => CommandResponse::Content(format!(
             "Your linked AniList account is **{}**.\nProfile: <{}>",
-            profile.display_name(),
-            profile.profile_url()
+            profile.anilist_display_name(),
+            profile.anilist_profile_url()
         )),
         None => CommandResponse::Content(
             "You have not linked an AniList account yet. Run `/register` first.".to_string(),
@@ -102,10 +67,7 @@ pub async fn run(ctx: &Context, interaction: &mut CommandInteraction) {
         task::spawn_blocking(move || fetch_whoami_profile(database_pool, discord_id)).await;
 
     let response = match db_result {
-        Ok(Ok(profile)) => handle_whoami(profile.map(|entry| LinkedAniListProfile {
-            anilist_id: entry.anilist_id,
-            anilist_username: entry.anilist_username,
-        })),
+        Ok(Ok(profile)) => handle_whoami(profile),
         Ok(Err(err)) => {
             error!(
                 error = %err,
@@ -143,12 +105,17 @@ pub async fn run(ctx: &Context, interaction: &mut CommandInteraction) {
 mod tests {
     use super::*;
 
+    fn oauth_credential(anilist_username: Option<&str>) -> OAuthCredential {
+        OAuthCredential {
+            discord_user_id: "123456789".to_string(),
+            anilist_id: 4567,
+            anilist_username: anilist_username.map(str::to_owned),
+        }
+    }
+
     #[test]
     fn handle_whoami_with_linked_profile_returns_anilist_username_and_url() {
-        let response = handle_whoami(Some(LinkedAniListProfile {
-            anilist_id: 4567,
-            anilist_username: Some("AniUser".to_string()),
-        }));
+        let response = handle_whoami(Some(oauth_credential(Some("AniUser"))));
 
         assert!(response.is_content(), "expected Content variant");
         let content = response.unwrap_content();
@@ -164,10 +131,7 @@ mod tests {
 
     #[test]
     fn handle_whoami_without_username_falls_back_to_anilist_id() {
-        let response = handle_whoami(Some(LinkedAniListProfile {
-            anilist_id: 4567,
-            anilist_username: None,
-        }));
+        let response = handle_whoami(Some(oauth_credential(None)));
 
         assert!(response.is_content(), "expected Content variant");
         let content = response.unwrap_content();
@@ -191,19 +155,5 @@ mod tests {
             content.contains("/register"),
             "expected /register guidance for unlinked users"
         );
-    }
-
-    #[test]
-    fn linked_anilist_profile_debug_redacts_identifiers() {
-        let profile = LinkedAniListProfile {
-            anilist_id: 4567,
-            anilist_username: Some("AniUser".to_string()),
-        };
-
-        let debug = format!("{profile:?}");
-
-        assert!(debug.contains("[REDACTED]"));
-        assert!(!debug.contains("4567"));
-        assert!(!debug.contains("AniUser"));
     }
 }

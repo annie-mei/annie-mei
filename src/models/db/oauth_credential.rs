@@ -52,6 +52,28 @@ impl fmt::Debug for OAuthCredential {
 }
 
 impl OAuthCredential {
+    /// Display label for the linked AniList account.
+    ///
+    /// Prefers the AniList username populated by the auth service, while
+    /// preserving the numeric ID fallback for older rows that do not have one.
+    pub fn anilist_display_name(&self) -> String {
+        self.anilist_username.as_deref().map_or_else(
+            || format!("AniList account ID {}", self.anilist_id),
+            str::to_owned,
+        )
+    }
+
+    /// Public AniList profile URL for the linked account.
+    ///
+    /// Uses the username URL when available and falls back to the numeric
+    /// profile URL for existing credential rows without `anilist_username`.
+    pub fn anilist_profile_url(&self) -> String {
+        match self.anilist_username.as_deref() {
+            Some(username) => format!("https://anilist.co/user/{username}/"),
+            None => format!("https://anilist.co/user/{}/", self.anilist_id),
+        }
+    }
+
     /// Look up an OAuth credential row for the given Discord snowflake.
     ///
     /// Returns `Ok(None)` when no row exists for the user. Takes the
@@ -108,6 +130,36 @@ impl OAuthCredential {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn oauth_credential(anilist_username: Option<&str>) -> OAuthCredential {
+        OAuthCredential {
+            discord_user_id: "987654321".to_string(),
+            anilist_id: 4567,
+            anilist_username: anilist_username.map(str::to_owned),
+        }
+    }
+
+    #[test]
+    fn anilist_display_fields_use_username_when_available() {
+        let credential = oauth_credential(Some("AniUser"));
+
+        assert_eq!(credential.anilist_display_name(), "AniUser");
+        assert_eq!(
+            credential.anilist_profile_url(),
+            "https://anilist.co/user/AniUser/"
+        );
+    }
+
+    #[test]
+    fn anilist_display_fields_fall_back_to_id_without_username() {
+        let credential = oauth_credential(None);
+
+        assert_eq!(credential.anilist_display_name(), "AniList account ID 4567");
+        assert_eq!(
+            credential.anilist_profile_url(),
+            "https://anilist.co/user/4567/"
+        );
+    }
 
     #[test]
     fn discord_id_u64_parses_valid_snowflake() {
