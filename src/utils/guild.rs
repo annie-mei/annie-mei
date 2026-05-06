@@ -198,10 +198,12 @@ mod tests {
             OAuthCredential {
                 discord_user_id: "1".to_string(),
                 anilist_id: 100,
+                anilist_username: Some("UserOne".to_string()),
             },
             OAuthCredential {
                 discord_user_id: "2".to_string(),
                 anilist_id: 200,
+                anilist_username: Some("UserTwo".to_string()),
             },
         ];
 

@@ -19,11 +19,21 @@ use tracing::{error, instrument};
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct LinkedAniListProfile {
     pub anilist_id: i64,
+    pub anilist_username: Option<String>,
 }
 
 impl LinkedAniListProfile {
     fn profile_url(&self) -> String {
-        format!("https://anilist.co/user/{}/", self.anilist_id)
+        match self.anilist_username.as_deref() {
+            Some(username) => format!("https://anilist.co/user/{username}/"),
+            None => format!("https://anilist.co/user/{}/", self.anilist_id),
+        }
+    }
+
+    fn display_name(&self) -> String {
+        self.anilist_username
+            .clone()
+            .unwrap_or_else(|| format!("AniList account ID {}", self.anilist_id))
     }
 }
 
@@ -35,8 +45,8 @@ pub fn register() -> CreateCommand {
 pub fn handle_whoami(profile: Option<LinkedAniListProfile>) -> CommandResponse {
     match profile {
         Some(profile) => CommandResponse::Content(format!(
-            "Your linked AniList account ID is **{}**.\nProfile: <{}>",
-            profile.anilist_id,
+            "Your linked AniList account is **{}**.\nProfile: <{}>",
+            profile.display_name(),
             profile.profile_url()
         )),
         None => CommandResponse::Content(
@@ -80,6 +90,7 @@ pub async fn run(ctx: &Context, interaction: &mut CommandInteraction) {
     let response = match db_result {
         Ok(Ok(profile)) => handle_whoami(profile.map(|entry| LinkedAniListProfile {
             anilist_id: entry.anilist_id,
+            anilist_username: entry.anilist_username,
         })),
         Ok(Err(err)) => {
             error!(
@@ -119,18 +130,40 @@ mod tests {
     use super::*;
 
     #[test]
-    fn handle_whoami_with_linked_profile_returns_anilist_id_and_url() {
-        let response = handle_whoami(Some(LinkedAniListProfile { anilist_id: 4567 }));
+    fn handle_whoami_with_linked_profile_returns_anilist_username_and_url() {
+        let response = handle_whoami(Some(LinkedAniListProfile {
+            anilist_id: 4567,
+            anilist_username: Some("AniUser".to_string()),
+        }));
 
         assert!(response.is_content(), "expected Content variant");
         let content = response.unwrap_content();
         assert!(
-            content.contains("**4567**"),
-            "expected AniList ID in response"
+            content.contains("**AniUser**"),
+            "expected AniList username in response"
+        );
+        assert!(
+            content.contains("https://anilist.co/user/AniUser/"),
+            "expected AniList profile URL in response"
+        );
+    }
+
+    #[test]
+    fn handle_whoami_without_username_falls_back_to_anilist_id() {
+        let response = handle_whoami(Some(LinkedAniListProfile {
+            anilist_id: 4567,
+            anilist_username: None,
+        }));
+
+        assert!(response.is_content(), "expected Content variant");
+        let content = response.unwrap_content();
+        assert!(
+            content.contains("**AniList account ID 4567**"),
+            "expected AniList ID fallback in response"
         );
         assert!(
             content.contains("https://anilist.co/user/4567/"),
-            "expected AniList profile URL in response"
+            "expected numeric AniList profile URL fallback in response"
         );
     }
 

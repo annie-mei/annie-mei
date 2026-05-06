@@ -48,11 +48,21 @@ fn handle_register(oauth_url: &str, ttl_seconds: i64) -> RegisterResponse {
     }
 }
 
-#[instrument(name = "command.register.handle_already_linked", skip(anilist_id))]
-fn handle_already_linked(anilist_id: i64) -> RegisterResponse {
+#[instrument(
+    name = "command.register.handle_already_linked",
+    skip(anilist_id, anilist_username)
+)]
+fn handle_already_linked(anilist_id: i64, anilist_username: Option<&str>) -> RegisterResponse {
+    let display_name = anilist_username
+        .map(ToOwned::to_owned)
+        .unwrap_or_else(|| format!("AniList account ID {anilist_id}"));
+    let profile_url = anilist_username
+        .map(|username| format!("https://anilist.co/user/{username}/"))
+        .unwrap_or_else(|| format!("https://anilist.co/user/{anilist_id}/"));
+
     RegisterResponse {
         content: format!(
-            "You're already linked to AniList account ID **{anilist_id}**.\nProfile: <https://anilist.co/user/{anilist_id}/>\nIf you want to link a different AniList account, run `/unregister confirmation:Confirm unlink` first, then run `/register` again."
+            "You're already linked to AniList account **{display_name}**.\nProfile: <{profile_url}>\nIf you want to link a different AniList account, run `/unregister confirmation:Confirm unlink` first, then run `/register` again."
         ),
         oauth_url: None,
     }
@@ -114,7 +124,10 @@ pub async fn run(ctx: &Context, interaction: &mut CommandInteraction) {
         task::spawn_blocking(move || fetch_existing_link(database_pool, discord_id)).await;
 
     let response = match linked_account {
-        Ok(Ok(Some(existing_link))) => handle_already_linked(existing_link.anilist_id),
+        Ok(Ok(Some(existing_link))) => handle_already_linked(
+            existing_link.anilist_id,
+            existing_link.anilist_username.as_deref(),
+        ),
         Ok(Ok(None)) => match get_config_from_context(ctx).await {
             Some(config) => {
                 let guild_id = interaction.guild_id.map(|id| id.to_string());
@@ -215,14 +228,27 @@ mod tests {
 
     #[test]
     fn already_linked_user_does_not_receive_oauth_link() {
-        let response = handle_already_linked(4567);
+        let response = handle_already_linked(4567, Some("AniUser"));
 
         assert_eq!(response.oauth_url, None);
         assert!(response.content.contains("already linked"));
-        assert!(response.content.contains("**4567**"));
-        assert!(response.content.contains("https://anilist.co/user/4567/"));
+        assert!(response.content.contains("**AniUser**"));
+        assert!(
+            response
+                .content
+                .contains("https://anilist.co/user/AniUser/")
+        );
         assert!(response.content.contains("/unregister"));
         assert!(response.content.contains("/register"));
+    }
+
+    #[test]
+    fn already_linked_user_without_username_falls_back_to_anilist_id() {
+        let response = handle_already_linked(4567, None);
+
+        assert_eq!(response.oauth_url, None);
+        assert!(response.content.contains("**AniList account ID 4567**"));
+        assert!(response.content.contains("https://anilist.co/user/4567/"));
     }
 
     #[test]
