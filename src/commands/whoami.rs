@@ -13,13 +13,26 @@ use serenity::{
     client::Context,
     model::prelude::UserId,
 };
+use std::fmt;
 use tokio::task;
 use tracing::{error, instrument};
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Clone, PartialEq, Eq)]
 pub struct LinkedAniListProfile {
     pub anilist_id: i64,
     pub anilist_username: Option<String>,
+}
+
+impl fmt::Debug for LinkedAniListProfile {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("LinkedAniListProfile")
+            .field("anilist_id", &"[REDACTED]")
+            .field(
+                "anilist_username",
+                &self.anilist_username.as_ref().map(|_| "[REDACTED]"),
+            )
+            .finish()
+    }
 }
 
 impl LinkedAniListProfile {
@@ -177,5 +190,19 @@ mod tests {
             content.contains("/register"),
             "expected /register guidance for unlinked users"
         );
+    }
+
+    #[test]
+    fn linked_anilist_profile_debug_redacts_identifiers() {
+        let profile = LinkedAniListProfile {
+            anilist_id: 4567,
+            anilist_username: Some("AniUser".to_string()),
+        };
+
+        let debug = format!("{profile:?}");
+
+        assert!(debug.contains("[REDACTED]"));
+        assert!(!debug.contains("4567"));
+        assert!(!debug.contains("AniUser"));
     }
 }
