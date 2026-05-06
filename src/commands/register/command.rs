@@ -53,12 +53,14 @@ fn handle_register(oauth_url: &str, ttl_seconds: i64) -> RegisterResponse {
     skip(anilist_id, anilist_username)
 )]
 fn handle_already_linked(anilist_id: i64, anilist_username: Option<&str>) -> RegisterResponse {
-    let display_name = anilist_username
-        .map(ToOwned::to_owned)
-        .unwrap_or_else(|| format!("AniList account ID {anilist_id}"));
-    let profile_url = anilist_username
-        .map(|username| format!("https://anilist.co/user/{username}/"))
-        .unwrap_or_else(|| format!("https://anilist.co/user/{anilist_id}/"));
+    let display_name = anilist_username.map_or_else(
+        || format!("AniList account ID {anilist_id}"),
+        ToOwned::to_owned,
+    );
+    let profile_url = anilist_username.map_or_else(
+        || format!("https://anilist.co/user/{anilist_id}/"),
+        |username| format!("https://anilist.co/user/{username}/"),
+    );
 
     RegisterResponse {
         content: format!(
