@@ -1,17 +1,12 @@
 use crate::utils::statics::DATABASE_URL;
 
-use diesel::pg::PgConnection;
-use diesel::prelude::*;
-use diesel::r2d2::{ConnectionManager, Pool, PooledConnection};
-use diesel::sql_query;
-use diesel_migrations::{EmbeddedMigrations, MigrationHarness, embed_migrations};
 use serenity::{client::Context, prelude::TypeMapKey};
+use sqlx::{Pool, Postgres, postgres::PgPoolOptions};
 use std::env;
 use std::time::Duration;
 use tracing::{error, info, instrument};
 
-pub type DbPool = Pool<ConnectionManager<PgConnection>>;
-pub type DbConnection = PooledConnection<ConnectionManager<PgConnection>>;
+pub type DbPool = Pool<Postgres>;
 
 pub struct DatabasePoolKey;
 
@@ -20,17 +15,17 @@ impl TypeMapKey for DatabasePoolKey {
 }
 
 #[instrument(name = "db.create_pool", skip_all)]
-pub fn create_pool() -> DbPool {
+pub async fn create_pool() -> DbPool {
     let database_url = env::var(DATABASE_URL).expect("DATABASE_URL must be set");
-    let manager = ConnectionManager::<PgConnection>::new(database_url.clone());
 
-    Pool::builder()
-        .max_size(10)
-        .min_idle(Some(0))
-        .test_on_check_out(true)
-        .max_lifetime(Some(Duration::from_secs(20 * 60)))
-        .idle_timeout(Some(Duration::from_secs(60)))
-        .build(manager)
+    PgPoolOptions::new()
+        .max_connections(10)
+        .min_connections(0)
+        .max_lifetime(Duration::from_secs(20 * 60))
+        .idle_timeout(Duration::from_secs(60))
+        .test_before_acquire(true)
+        .connect(&database_url)
+        .await
         .unwrap_or_else(|error| {
             let redacted_url = redact_database_url(&database_url);
             error!(
@@ -40,14 +35,6 @@ pub fn create_pool() -> DbPool {
             );
             panic!("Error creating pool for {redacted_url}: {error}")
         })
-}
-
-#[instrument(name = "db.get_connection", skip(pool))]
-pub fn get_connection(pool: &DbPool) -> DbConnection {
-    pool.get().unwrap_or_else(|error| {
-        error!(error = %error, "Failed to get database connection from pool");
-        panic!("Error retrieving pooled database connection: {error}")
-    })
 }
 
 #[instrument(name = "db.pool_from_context", skip(ctx))]
@@ -73,17 +60,8 @@ fn redact_database_url(database_url: &str) -> String {
 }
 
 #[instrument(name = "db.ping", skip_all)]
-pub fn ping(pool: &DbPool) -> Result<(), diesel::result::Error> {
-    let mut conn = get_connection(pool);
-    sql_query("SELECT 1").execute(&mut conn)?;
+pub async fn ping(pool: &DbPool) -> Result<(), sqlx::Error> {
+    sqlx::query("SELECT 1").fetch_one(pool).await?;
     info!("Database ping successful");
     Ok(())
-}
-
-pub const MIGRATIONS: EmbeddedMigrations = embed_migrations!();
-
-#[instrument(name = "db.run_migrations", skip(conn))]
-pub fn run_migration(conn: &mut PgConnection) {
-    info!("Running database migrations ... ");
-    conn.run_pending_migrations(MIGRATIONS).unwrap();
 }
