@@ -20,11 +20,11 @@ fn run_redis_health_check() -> redis::RedisResult<()> {
     crate::utils::redis::ping()
 }
 
-#[instrument(name = "http.healthz.database_blocking", skip_all)]
-fn run_database_health_check(
+#[instrument(name = "http.healthz.database", skip_all)]
+async fn run_database_health_check(
     database_pool: &crate::utils::database::DbPool,
-) -> Result<(), diesel::result::Error> {
-    crate::utils::database::ping(database_pool)
+) -> Result<(), sqlx::Error> {
+    crate::utils::database::ping(database_pool).await
 }
 
 #[instrument(name = "http.healthz.metadata", skip_all)]
@@ -89,17 +89,11 @@ fn evaluate_redis_health(
 }
 
 #[instrument(name = "http.healthz.database_result", skip_all)]
-fn evaluate_database_health(
-    db_result: &Result<Result<(), diesel::result::Error>, tokio::task::JoinError>,
-) -> bool {
+fn evaluate_database_health(db_result: &Result<(), sqlx::Error>) -> bool {
     match db_result {
-        Ok(Ok(())) => true,
-        Ok(Err(e)) => {
-            error!(error = %e, "Database health check failed");
-            false
-        }
+        Ok(()) => true,
         Err(e) => {
-            error!(error = %e, "Database health check task panicked");
+            error!(error = %e, "Database health check failed");
             false
         }
     }
@@ -122,10 +116,9 @@ async fn readyz(
 ) -> (StatusCode, Json<Value>) {
     log_health_request("/readyz", &headers);
 
-    let health_check_pool = database_pool.clone();
     let (redis_result, db_result) = tokio::join!(
         tokio::task::spawn_blocking(run_redis_health_check),
-        tokio::task::spawn_blocking(move || run_database_health_check(&health_check_pool)),
+        run_database_health_check(&database_pool),
     );
 
     let redis_ok = evaluate_redis_health(&redis_result);
