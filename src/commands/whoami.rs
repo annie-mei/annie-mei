@@ -2,7 +2,7 @@ use crate::{
     commands::response::CommandResponse,
     models::db::oauth_credential::OAuthCredential,
     utils::{
-        database,
+        database::get_pool_from_context,
         privacy::{configure_sentry_scope, hash_user_id},
     },
 };
@@ -11,9 +11,7 @@ use serenity::{
     all::{CommandInteraction, EditInteractionResponse},
     builder::CreateCommand,
     client::Context,
-    model::prelude::UserId,
 };
-use tokio::task;
 use tracing::{error, instrument};
 
 pub fn register() -> CreateCommand {
@@ -34,20 +32,6 @@ pub fn handle_whoami(profile: Option<OAuthCredential>) -> CommandResponse {
     }
 }
 
-/// Fetch the OAuth-linked AniList credential for a Discord user.
-///
-/// Reads from `oauth_credentials`, the auth-service-owned source of truth for
-/// AniList account links. The legacy bot-owned `users` table is no longer
-/// consulted — see ANNIE-156 and `docs/oauth-contract.md`.
-#[instrument(name = "whoami.fetch_profile_blocking", skip(database_pool, discord_id), fields(discord_user_id = %hash_user_id(discord_id.get())))]
-fn fetch_whoami_profile(
-    database_pool: crate::utils::database::DbPool,
-    discord_id: UserId,
-) -> Result<Option<OAuthCredential>, diesel::result::Error> {
-    let mut connection = database::get_connection(&database_pool);
-    OAuthCredential::get_by_discord_id(discord_id, &mut connection)
-}
-
 #[instrument(name = "command.whoami.run", skip(ctx, interaction))]
 pub async fn run(ctx: &Context, interaction: &mut CommandInteraction) {
     let _ = interaction.defer_ephemeral(&ctx.http).await;
@@ -55,7 +39,7 @@ pub async fn run(ctx: &Context, interaction: &mut CommandInteraction) {
     let user = &interaction.user;
     configure_sentry_scope("WhoAmI", user.id.get(), None);
 
-    let Some(database_pool) = database::get_pool_from_context(ctx).await else {
+    let Some(database_pool) = get_pool_from_context(ctx).await else {
         let builder = EditInteractionResponse::new()
             .content("Database is not initialized. Please try again later.");
         let _ = interaction.edit_response(&ctx.http, builder).await;
@@ -63,27 +47,15 @@ pub async fn run(ctx: &Context, interaction: &mut CommandInteraction) {
     };
 
     let discord_id = user.id;
-    let db_result =
-        task::spawn_blocking(move || fetch_whoami_profile(database_pool, discord_id)).await;
+    let db_result = OAuthCredential::get_by_discord_id(discord_id, &database_pool).await;
 
     let response = match db_result {
-        Ok(Ok(profile)) => handle_whoami(profile),
-        Ok(Err(err)) => {
-            error!(
-                error = %err,
-                discord_user_id = %hash_user_id(discord_id.get()),
-                "Failed to fetch whoami profile from database"
-            );
-            CommandResponse::Content(
-                "I hit an internal error while looking up your AniList account. Please try again later."
-                    .to_string(),
-            )
-        }
+        Ok(profile) => handle_whoami(profile),
         Err(err) => {
             error!(
                 error = %err,
                 discord_user_id = %hash_user_id(discord_id.get()),
-                "Failed to join whoami database task"
+                "Failed to fetch whoami profile from database"
             );
             CommandResponse::Content(
                 "I hit an internal error while looking up your AniList account. Please try again later."
