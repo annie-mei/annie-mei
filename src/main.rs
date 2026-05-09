@@ -1,6 +1,5 @@
 mod commands;
 mod models;
-mod schema;
 mod server;
 mod utils;
 
@@ -23,7 +22,7 @@ use serenity::{
 };
 
 use utils::{
-    database::{DatabasePoolKey, create_pool, get_connection, run_migration},
+    database::{DatabasePoolKey, create_pool},
     oauth::{OAuthContextConfigKey, load_context_config},
     privacy::{hash_user_id, redact_url_credentials},
     statics::{DISCORD_TOKEN, ENV, SENTRY_DSN, SENTRY_TRACES_SAMPLE_RATE},
@@ -204,9 +203,7 @@ async fn main() {
     }
 
     info!("Initializing database connection pool");
-    let database_pool = create_pool();
-    let connection = &mut get_connection(&database_pool);
-    run_migration(connection);
+    let database_pool = create_pool().await;
 
     info!("Loading OAuth configuration");
     let oauth_config = load_context_config().expect("Failed to load OAuth context config");
