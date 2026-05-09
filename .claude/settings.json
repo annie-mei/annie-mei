@@ -10,7 +10,7 @@
       "Bash(cargo check *)",
       "Bash(cargo test *)",
       "Bash(cargo build *)",
-      "Bash(diesel migration *)",
+
       "Bash(git status *)",
       "Bash(git diff *)",
       "Bash(git log *)",

@@ -37,9 +37,9 @@ The auth-service mirrors this document at
                                           Annie Mei bot
 ```
 
-The bot owns no Diesel-managed tables of its own. Account-link state
-lives in the auth-service tables and the bot reads/deletes those rows
-directly via raw SQL, sharing the same Postgres database.
+The bot owns no database tables of its own. Account-link state lives in
+the auth-service tables and the bot reads/deletes those rows directly
+via SQLx, sharing the same Postgres database.
 
 ## Tables
 
