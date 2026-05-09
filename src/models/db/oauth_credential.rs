@@ -15,26 +15,17 @@
 //! snowflake string (`user.id.get().to_string()`); `anilist_id` is `BIGINT` and
 //! `anilist_username` is nullable `TEXT`.
 
-use crate::utils::privacy::hash_user_id;
-use diesel::prelude::*;
-use diesel::sql_types::{BigInt, Nullable, Text};
+use crate::utils::{database::DbPool, privacy::hash_user_id};
 use serenity::model::prelude::UserId;
+use sqlx::FromRow;
 use std::fmt;
 use tracing::instrument;
 
-const SELECT_OAUTH_CREDENTIAL_BY_DISCORD_ID_SQL: &str = "SELECT discord_user_id, anilist_id, anilist_username FROM oauth_credentials WHERE discord_user_id = $1";
-
-const SELECT_OAUTH_CREDENTIALS_BY_DISCORD_IDS_SQL: &str = "SELECT discord_user_id, anilist_id, anilist_username FROM oauth_credentials \
-     WHERE discord_user_id = ANY($1)";
-
-#[derive(Clone, PartialEq, Eq, QueryableByName)]
+#[derive(Clone, PartialEq, Eq, FromRow)]
 pub struct OAuthCredential {
     /// Raw Discord snowflake stored as TEXT in the auth-service schema.
-    #[diesel(sql_type = Text)]
     pub discord_user_id: String,
-    #[diesel(sql_type = BigInt)]
     pub anilist_id: i64,
-    #[diesel(sql_type = Nullable<Text>)]
     pub anilist_username: Option<String>,
 }
 
@@ -82,17 +73,19 @@ impl OAuthCredential {
     /// bit set.
     #[instrument(
         name = "db.oauth_credential.get_by_discord_id",
-        skip(conn, user_discord_id),
+        skip(pool, user_discord_id),
         fields(discord_user_id = %hash_user_id(user_discord_id.get()))
     )]
-    pub fn get_by_discord_id(
+    pub async fn get_by_discord_id(
         user_discord_id: UserId,
-        conn: &mut PgConnection,
-    ) -> Result<Option<OAuthCredential>, diesel::result::Error> {
-        diesel::sql_query(SELECT_OAUTH_CREDENTIAL_BY_DISCORD_ID_SQL)
-            .bind::<Text, _>(user_discord_id.get().to_string())
-            .get_result::<OAuthCredential>(conn)
-            .optional()
+        pool: &DbPool,
+    ) -> Result<Option<OAuthCredential>, sqlx::Error> {
+        sqlx::query_as::<_, OAuthCredential>(
+            "SELECT discord_user_id, anilist_id, anilist_username FROM oauth_credentials WHERE discord_user_id = $1"
+        )
+        .bind(user_discord_id.get().to_string())
+        .fetch_optional(pool)
+        .await
     }
 
     /// Look up OAuth credential rows for any of the given Discord snowflakes.
@@ -101,21 +94,25 @@ impl OAuthCredential {
     /// missing users are simply absent from the result.
     #[instrument(
         name = "db.oauth_credential.get_by_discord_ids",
-        skip(conn, user_discord_ids),
+        skip(pool, user_discord_ids),
         fields(user_count = user_discord_ids.len())
     )]
-    pub fn get_by_discord_ids(
+    pub async fn get_by_discord_ids(
         user_discord_ids: Vec<UserId>,
-        conn: &mut PgConnection,
-    ) -> Result<Vec<OAuthCredential>, diesel::result::Error> {
+        pool: &DbPool,
+    ) -> Result<Vec<OAuthCredential>, sqlx::Error> {
         let ids: Vec<String> = user_discord_ids
             .iter()
             .map(|id| id.get().to_string())
             .collect();
 
-        diesel::sql_query(SELECT_OAUTH_CREDENTIALS_BY_DISCORD_IDS_SQL)
-            .bind::<diesel::sql_types::Array<Text>, _>(ids)
-            .get_results::<OAuthCredential>(conn)
+        sqlx::query_as::<_, OAuthCredential>(
+            "SELECT discord_user_id, anilist_id, anilist_username FROM oauth_credentials \
+             WHERE discord_user_id = ANY($1)",
+        )
+        .bind(ids)
+        .fetch_all(pool)
+        .await
     }
 
     /// Parse the stored snowflake back to a `u64` for downstream Discord APIs.
