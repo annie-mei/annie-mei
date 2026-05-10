@@ -61,7 +61,7 @@ fn redact_database_url(database_url: &str) -> String {
 
 #[instrument(name = "db.ping", skip_all)]
 pub async fn ping(pool: &DbPool) -> Result<(), sqlx::Error> {
-    sqlx::query("SELECT 1").fetch_one(pool).await?;
+    sqlx::query("SELECT 1").execute(pool).await?;
     info!("Database ping successful");
     Ok(())
 }
