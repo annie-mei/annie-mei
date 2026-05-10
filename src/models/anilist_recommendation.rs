@@ -81,8 +81,7 @@ impl Recommendation {
 
     pub fn rating_text(&self) -> String {
         self.rating
-            .map(|rating| rating.to_string())
-            .unwrap_or_else(|| EMPTY_STR.to_string())
+            .map_or_else(|| EMPTY_STR.to_string(), |rating| rating.to_string())
     }
 }
 
