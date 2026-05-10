@@ -223,13 +223,7 @@ pub async fn run(ctx: &Context, interaction: &mut CommandInteraction) {
                 discord_user_id = %hash_user_id(discord_id),
                 "Failed to delete AniList profile link from database"
             );
-            if let Err(rollback_err) = transaction.rollback().await {
-                error!(
-                    error = %rollback_err,
-                    discord_user_id = %hash_user_id(discord_id),
-                    "Failed to rollback unregister transaction after error"
-                );
-            }
+            // Transaction will be automatically rolled back when dropped
             UnregisterOutcome::Failed
         }
     };
