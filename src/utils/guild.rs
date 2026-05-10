@@ -5,10 +5,7 @@ use crate::{
         db::oauth_credential::OAuthCredential, transformers::Transformers,
         user_media_list::MediaListData,
     },
-    utils::{
-        database::{get_connection, get_pool_from_context},
-        requests::anilist::send_request,
-    },
+    utils::{database::get_pool_from_context, requests::anilist::send_request},
 };
 
 use serenity::{
@@ -19,7 +16,6 @@ use serenity::{
 
 use serde::Deserialize;
 use serde_json::json;
-use tokio::task;
 use tracing::{error, info, instrument};
 
 #[derive(Deserialize, Debug)]
@@ -91,32 +87,16 @@ pub async fn get_guild_data_for_media<T: Transformers>(
         return HashMap::new();
     };
 
-    let anilist_users = match task::spawn_blocking(move || {
-        fetch_guild_members_with_ids_blocking(database_pool, guild_members)
-    })
-    .await
-    {
-        Ok(Ok(users)) => users,
-        Ok(Err(err)) => {
-            error!(error = %err, "Failed to fetch registered guild members from database");
-            return HashMap::new();
-        }
-        Err(err) => {
-            error!(error = %err, "Failed to join guild member fetch task");
-            return HashMap::new();
-        }
-    };
+    let anilist_users =
+        match OAuthCredential::get_by_discord_ids(guild_members, &database_pool).await {
+            Ok(users) => users,
+            Err(err) => {
+                error!(error = %err, "Failed to fetch registered guild members from database");
+                return HashMap::new();
+            }
+        };
 
     get_guild_anilist_data(anilist_users, media.get_id(), media.get_type().to_owned()).await
-}
-
-#[instrument(name = "guild.fetch_members_blocking", skip(database_pool, guild_member_ids), fields(member_count = guild_member_ids.len()))]
-fn fetch_guild_members_with_ids_blocking(
-    database_pool: crate::utils::database::DbPool,
-    guild_member_ids: Vec<UserId>,
-) -> Result<Vec<OAuthCredential>, diesel::result::Error> {
-    let mut conn = get_connection(&database_pool);
-    OAuthCredential::get_by_discord_ids(guild_member_ids, &mut conn)
 }
 
 #[instrument(name = "guild.fetch_anilist_data", skip(guild_members, media_type), fields(member_count = guild_members.len(), media_id = media_id, media_type = %media_type))]

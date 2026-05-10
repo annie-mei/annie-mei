@@ -1,6 +1,6 @@
 [package]
 name = "annie-mei"
-version = "2.17.0"
+version = "2.17.1"
 edition = "2024"
 license = "GPL-3.0-or-later"
 rust-version = "1.94"
@@ -22,8 +22,7 @@ base64 = "0.22"
 blake3 = "1.8.5"
 chrono = "0.4.44"
 clap = { version = "4", features = ["derive"] }
-diesel = { version = "2.3.9", features = ["postgres", "r2d2"] }
-diesel_migrations = "2.3.2"
+sqlx = { version = "0.8", default-features = false, features = ["runtime-tokio", "postgres", "chrono", "macros", "tls-rustls"] }
 env_logger = "0.11.10"
 futures = "0.3.32"
 hmac = "0.13"

@@ -1,13 +1,11 @@
 use crate::{
     commands::response::CommandResponse,
     utils::{
-        database,
+        database::get_pool_from_context,
         privacy::{configure_sentry_scope, hash_user_id},
     },
 };
 
-use diesel::prelude::*;
-use diesel::sql_types::Text;
 use serenity::{
     all::{
         CommandDataOption, CommandDataOptionValue, CommandInteraction, CreateCommandOption,
@@ -17,7 +15,7 @@ use serenity::{
     client::Context,
     model::application::CommandOptionType,
 };
-use tokio::task;
+use sqlx::PgConnection;
 use tracing::{error, instrument};
 
 const CONFIRMATION_OPTION: &str = "confirmation";
@@ -39,8 +37,8 @@ pub enum UnregisterOutcome {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 struct DeletedRegistrations {
-    oauth_credentials_deleted: usize,
-    oauth_sessions_deleted: usize,
+    oauth_credentials_deleted: u64,
+    oauth_sessions_deleted: u64,
 }
 
 pub fn register() -> CreateCommand {
@@ -94,52 +92,44 @@ pub fn handle_unregister(outcome: UnregisterOutcome) -> CommandResponse {
     }
 }
 
-#[instrument(name = "unregister.delete_user_registration_blocking", skip(database_pool, discord_id), fields(discord_user_id = %hash_user_id(discord_id)))]
-fn delete_user_registration(
-    database_pool: crate::utils::database::DbPool,
-    discord_id: u64,
-) -> Result<DeletedRegistrations, diesel::result::Error> {
-    let mut connection = database::get_connection(&database_pool);
-    delete_user_registration_in_transaction(discord_id, &mut connection)
-}
-
 #[instrument(name = "unregister.delete_user_registration_transaction", skip(conn, discord_id), fields(discord_user_id = %hash_user_id(discord_id)))]
-fn delete_user_registration_in_transaction(
+async fn delete_user_registration_in_transaction(
     discord_id: u64,
     conn: &mut PgConnection,
-) -> Result<DeletedRegistrations, diesel::result::Error> {
-    conn.transaction(|conn| {
-        let discord_id = discord_id.to_string();
-        let oauth_credentials_deleted = delete_auth_records(
-            OAUTH_CREDENTIALS_TABLE,
-            DELETE_OAUTH_CREDENTIALS_SQL,
-            &discord_id,
-            conn,
-        )?;
-        let oauth_sessions_deleted = delete_auth_records(
-            OAUTH_SESSIONS_TABLE,
-            DELETE_OAUTH_SESSIONS_SQL,
-            &discord_id,
-            conn,
-        )?;
+) -> Result<DeletedRegistrations, sqlx::Error> {
+    let discord_id_str = discord_id.to_string();
 
-        Ok(DeletedRegistrations {
-            oauth_credentials_deleted,
-            oauth_sessions_deleted,
-        })
+    let oauth_credentials_deleted = delete_auth_records(
+        OAUTH_CREDENTIALS_TABLE,
+        DELETE_OAUTH_CREDENTIALS_SQL,
+        &discord_id_str,
+        conn,
+    )
+    .await?;
+
+    let oauth_sessions_deleted = delete_auth_records(
+        OAUTH_SESSIONS_TABLE,
+        DELETE_OAUTH_SESSIONS_SQL,
+        &discord_id_str,
+        conn,
+    )
+    .await?;
+
+    Ok(DeletedRegistrations {
+        oauth_credentials_deleted,
+        oauth_sessions_deleted,
     })
 }
 
-#[instrument(name = "unregister.delete_auth_records", skip(conn, sql, discord_id), fields(table = table))]
-fn delete_auth_records(
-    table: &str,
+#[instrument(name = "unregister.delete_auth_records", skip(conn, sql, discord_id), fields(table = _table))]
+async fn delete_auth_records(
+    _table: &str,
     sql: &str,
     discord_id: &str,
     conn: &mut PgConnection,
-) -> Result<usize, diesel::result::Error> {
-    diesel::sql_query(sql)
-        .bind::<Text, _>(discord_id)
-        .execute(conn)
+) -> Result<u64, sqlx::Error> {
+    let result = sqlx::query(sql).bind(discord_id).execute(conn).await?;
+    Ok(result.rows_affected())
 }
 
 #[instrument(name = "command.unregister.outcome_from_deletions", skip(deletions))]
@@ -181,7 +171,7 @@ pub async fn run(ctx: &Context, interaction: &mut CommandInteraction) {
         return;
     }
 
-    let Some(database_pool) = database::get_pool_from_context(ctx).await else {
+    let Some(database_pool) = get_pool_from_context(ctx).await else {
         let builder = EditInteractionResponse::new()
             .content("Database is not initialized. Please try again later.");
         let _ = interaction.edit_response(&ctx.http, builder).await;
@@ -189,25 +179,51 @@ pub async fn run(ctx: &Context, interaction: &mut CommandInteraction) {
     };
 
     let discord_id = user.id.get();
-    let db_result =
-        task::spawn_blocking(move || delete_user_registration(database_pool, discord_id)).await;
 
-    let outcome = match db_result {
-        Ok(Ok(deletions)) => outcome_from_deletions(deletions),
-        Ok(Err(err)) => {
+    // Start a transaction and delete both records
+    let mut transaction = match database_pool.begin().await {
+        Ok(tx) => tx,
+        Err(err) => {
             error!(
                 error = %err,
                 discord_user_id = %hash_user_id(discord_id),
-                "Failed to delete AniList profile link from database"
+                "Failed to begin unregister transaction"
             );
-            UnregisterOutcome::Failed
+            let builder = match handle_unregister(UnregisterOutcome::Failed) {
+                CommandResponse::Content(content) => {
+                    EditInteractionResponse::new().content(content)
+                }
+                CommandResponse::Embed(embed) => EditInteractionResponse::new().embed(*embed),
+                CommandResponse::Message(content) => {
+                    EditInteractionResponse::new().content(content)
+                }
+            };
+            let _ = interaction.edit_response(&ctx.http, builder).await;
+            return;
+        }
+    };
+
+    let outcome = match delete_user_registration_in_transaction(discord_id, &mut transaction).await
+    {
+        Ok(deletions) => {
+            if let Err(err) = transaction.commit().await {
+                error!(
+                    error = %err,
+                    discord_user_id = %hash_user_id(discord_id),
+                    "Failed to commit unregister transaction"
+                );
+                UnregisterOutcome::Failed
+            } else {
+                outcome_from_deletions(deletions)
+            }
         }
         Err(err) => {
             error!(
                 error = %err,
                 discord_user_id = %hash_user_id(discord_id),
-                "Failed to join unregister database task"
+                "Failed to delete AniList profile link from database"
             );
+            // Transaction will be automatically rolled back when dropped
             UnregisterOutcome::Failed
         }
     };
