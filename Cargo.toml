@@ -30,13 +30,23 @@ html2md = "0.2.15"
 linkify = "0.11"
 log = "0.4.29"
 ngrammatic = "0.7.0"
-reqwest = { version = "0.13.3", features = ["rustls"] }
+reqwest = { version = "0.13.3", default-features = false, features = ["rustls"] }
 redis = { version = "1.2.1", features = ["tls-native-tls"] }
 rspotify = { version = "0.16.1", default-features = false, features = [
   "client-ureq",
   "ureq-rustls-tls",
 ] }
-sentry = { version = "0.48.1", features = ["tracing", "logs"] }
+sentry = { version = "0.48.1", default-features = false, features = [
+  "backtrace",
+  "contexts",
+  "debug-images",
+  "logs",
+  "panic",
+  "release-health",
+  "reqwest",
+  "rustls",
+  "tracing",
+] }
 serde = "1.0.228"
 serde_json = "1.0.149"
 serenity = "0.12"
