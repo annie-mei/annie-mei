@@ -6,7 +6,9 @@ use crate::{
     },
     models::{
         anilist_common::TitleVariant,
-        anilist_recommendation::{RecommendationMedia, RecommendationMediaResponse},
+        anilist_recommendation::{
+            Recommendation, RecommendationMedia, RecommendationMediaResponse, RecommendedMedia,
+        },
         media_response::FetchResponse as SearchResponse,
         media_type::MediaType,
         transformers::Transformers,
@@ -310,10 +312,7 @@ fn recommendation_cache_key(media_type: &MediaType, search_term: &str) -> String
 #[instrument(skip(media, recommendations))]
 fn recommendations_embed(
     media: &RecommendationMedia,
-    recommendations: &[(
-        &crate::models::anilist_recommendation::Recommendation,
-        &crate::models::anilist_recommendation::RecommendedMedia,
-    )],
+    recommendations: &[(&Recommendation, &RecommendedMedia)],
     title_variant: Option<TitleVariant>,
 ) -> CreateEmbed {
     let mut embed = CreateEmbed::new()
@@ -346,8 +345,8 @@ fn recommendations_embed(
 
 #[instrument(skip(recommendation, recommended_media))]
 fn format_recommendation(
-    recommendation: &crate::models::anilist_recommendation::Recommendation,
-    recommended_media: &crate::models::anilist_recommendation::RecommendedMedia,
+    recommendation: &Recommendation,
+    recommended_media: &RecommendedMedia,
 ) -> String {
     let score = recommended_media
         .average_score()
@@ -378,9 +377,7 @@ fn format_recommendation(
 }
 
 #[instrument(skip(recommended_media))]
-fn format_media_descriptor(
-    recommended_media: &crate::models::anilist_recommendation::RecommendedMedia,
-) -> String {
+fn format_media_descriptor(recommended_media: &RecommendedMedia) -> String {
     let format = recommended_media.format_text();
     let status = recommended_media.status_text();
 
