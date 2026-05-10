@@ -24,7 +24,6 @@ const RECOMMENDATION_MEDIA_FIELDS: &str = "
         rating
         mediaRecommendation {
           type
-          id
           isAdult
           title {
             romaji
@@ -34,12 +33,6 @@ const RECOMMENDATION_MEDIA_FIELDS: &str = "
           format
           status
           genres
-          coverImage {
-            extraLarge
-            large
-            medium
-            color
-          }
           averageScore
           siteUrl
         }

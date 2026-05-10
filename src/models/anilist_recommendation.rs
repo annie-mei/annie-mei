@@ -54,13 +54,11 @@ pub struct Recommendation {
 pub struct RecommendedMedia {
     #[serde(rename = "type")]
     media_type: Option<String>,
-    id: u32,
     is_adult: Option<bool>,
     title: Title,
     format: Option<String>,
     status: Option<String>,
     genres: Vec<String>,
-    cover_image: CoverImage,
     average_score: Option<u32>,
     site_url: String,
 }
@@ -126,10 +124,6 @@ impl RecommendedMedia {
 
     pub fn site_url(&self) -> &str {
         &self.site_url
-    }
-
-    pub fn cover_image(&self) -> &CoverImage {
-        &self.cover_image
     }
 }
 
