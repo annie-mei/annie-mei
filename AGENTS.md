@@ -4,7 +4,7 @@ This document provides context for AI coding agents working on the Annie Mei Dis
 
 ## Project Summary
 
-Annie Mei is a Rust Discord bot using Serenity 0.12 that fetches anime/manga data from AniList and theme songs from MyAnimeList/Spotify. Users interact via Discord slash commands. The app also exposes a small Axum health server and reports errors/logs to Sentry.
+Annie Mei is a Rust Discord bot using Serenity 0.12 that fetches anime/manga data from AniList and theme songs from MyAnimeList/Spotify. Users interact via Discord slash commands. The app reports errors/logs to Sentry; HTTP health endpoints live in the companion auth service.
 
 ## Project Layout
 
@@ -12,7 +12,6 @@ Annie Mei is a Rust Discord bot using Serenity 0.12 that fetches anime/manga dat
 src/
 ├── commands/        # Slash command implementations
 ├── models/          # Data types, DB models, API responses
-├── server.rs        # Axum health server (/healthz)
 ├── utils/           # Shared utilities, API clients, DB helpers
 └── main.rs          # Bot entry point, event routing, startup/shutdown
 migrations/          # Historical Diesel migrations (schema owned by auth-service)
@@ -162,13 +161,12 @@ the bot only reads from the shared `oauth_credentials` table.
 - Ensure long-running Discord interactions defer before doing expensive work
 - Check that `tracing` and `#[instrument]` are added where they provide useful observability
 - Verify secrets, credential-bearing URLs, and raw Discord user IDs are not exposed in logs or code
-- Confirm validation matches the scope: targeted tests, `cargo test`, `cargo clippy`, and manual Discord or `/healthz` verification when applicable
+- Confirm validation matches the scope: targeted tests, `cargo test`, `cargo clippy`, and manual Discord or auth-service `/healthz`/`/readyz` verification when applicable
 - For versioned changes, verify the `Cargo.toml` bump is correct and `Cargo.lock` is updated
 
 ## Key Paths
 
 - `src/main.rs` - bot startup, command registration/dispatch, shutdown, Sentry setup
-- `src/server.rs` - `/healthz` server
 - `src/commands/<name>/command.rs` or `src/commands/<name>.rs` - slash commands
 - `src/commands/response.rs` and `src/commands/traits.rs` - testable command patterns
 - `src/models/transformers.rs` - shared embed construction
@@ -189,7 +187,6 @@ Required environment variables:
 - `SPOTIFY_CLIENT_SECRET` - Spotify API client secret
 - `MAL_CLIENT_ID` - MyAnimeList API client ID
 - `USERID_HASH_SALT` - Salt used when hashing Discord user IDs for Sentry/log correlation
-- `SERVER_PORT` - Optional local HTTP server port (defaults to 8080)
 - `GEMINI_API_KEY` - API key for the Gemini / OpenAI-compatible LLM endpoint
 - `LLM_BASE_URL` - Optional base URL override for the LLM API (defaults to Gemini OpenAI compatibility endpoint)
 - `LLM_MODEL` - Optional model name override (defaults to `gemini-2.0-flash`)
