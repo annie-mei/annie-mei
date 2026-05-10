@@ -4,6 +4,7 @@ pub mod help;
 pub mod input_validation;
 pub mod manga;
 pub mod ping;
+pub mod recommend;
 pub mod register;
 pub mod response;
 pub mod songs;
