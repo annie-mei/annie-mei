@@ -1,3 +1,5 @@
+use tracing::instrument;
+
 const RECOMMENDATION_MEDIA_FIELDS: &str = "
     type
     id
@@ -40,6 +42,7 @@ const RECOMMENDATION_MEDIA_FIELDS: &str = "
     }
 ";
 
+#[instrument]
 pub fn fetch_recommendations_by_id(media_type: &str) -> String {
     format!(
         "
@@ -52,6 +55,7 @@ query ($id: Int) {{
     )
 }
 
+#[instrument]
 pub fn fetch_recommendations_by_search(media_type: &str) -> String {
     format!(
         "

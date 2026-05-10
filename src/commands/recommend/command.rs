@@ -242,6 +242,7 @@ async fn fetch_recommendation_media_by_search(
     response.fuzzy_match(search_term, media_type)
 }
 
+#[instrument(skip(media, recommendations))]
 fn recommendations_embed(
     media: &RecommendationMedia,
     recommendations: &[(
@@ -278,6 +279,7 @@ fn recommendations_embed(
     embed
 }
 
+#[instrument(skip(recommendation, recommended_media))]
 fn format_recommendation(
     recommendation: &crate::models::anilist_recommendation::Recommendation,
     recommended_media: &crate::models::anilist_recommendation::RecommendedMedia,
@@ -310,6 +312,7 @@ fn format_recommendation(
     )
 }
 
+#[instrument(skip(recommended_media))]
 fn format_media_descriptor(
     recommended_media: &crate::models::anilist_recommendation::RecommendedMedia,
 ) -> String {
@@ -328,6 +331,7 @@ fn format_media_descriptor(
     }
 }
 
+#[instrument(skip(media))]
 fn media_title(media: &RecommendationMedia, title_variant: Option<TitleVariant>) -> String {
     match title_variant {
         Some(TitleVariant::English) => media.transform_english_title(),
@@ -336,6 +340,7 @@ fn media_title(media: &RecommendationMedia, title_variant: Option<TitleVariant>)
     }
 }
 
+#[instrument]
 fn not_found_message(media_type: &MediaType) -> &'static str {
     match media_type {
         MediaType::Anime => NOT_FOUND_ANIME,
@@ -343,6 +348,7 @@ fn not_found_message(media_type: &MediaType) -> &'static str {
     }
 }
 
+#[instrument]
 fn anilist_type(media_type: &MediaType) -> &'static str {
     match media_type {
         MediaType::Anime => "ANIME",
