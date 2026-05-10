@@ -222,5 +222,5 @@ jobs:
           EOF
       - name: Verify /healthz over Cloudflare
         run: |
-          curl --fail --silent --show-error --retry 6 --retry-delay 5 "https://${{ secrets.CF_HEALTHZ_HOSTNAME }}/healthz" > healthz.json
+          curl --fail --silent --show-error --retry 6 --retry-delay 5 "https://${{ secrets.AUTH_HEALTHZ_HOSTNAME }}/healthz" > healthz.json
           python3 -c 'import json; from pathlib import Path; payload = json.loads(Path("healthz.json").read_text()); assert payload.get("status") == "healthy", f"Unexpected health payload: {payload}"; print("Cloudflare health check passed")'
