@@ -2,6 +2,7 @@ pub mod anilist_anime;
 pub mod anilist_character;
 pub mod anilist_common;
 pub mod anilist_manga;
+pub mod anilist_recommendation;
 pub mod character_id_response;
 pub mod character_response;
 pub mod db;
