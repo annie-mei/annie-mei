@@ -16,10 +16,12 @@ use crate::{
         fetch_by_arguments::{fetch_by_id, fetch_by_name},
         formatter::{code, linker, remove_underscores_and_titlecase, titlecase},
         privacy::configure_sentry_scope,
+        redis::{check_cache, try_to_cache_response},
         statics::{EMPTY_STR, NOT_FOUND_ANIME, NOT_FOUND_MANGA, NSFW_NOT_ALLOWED},
     },
 };
 
+use redis::RedisResult;
 use serde_json::json;
 use serenity::{
     all::{
@@ -30,6 +32,7 @@ use serenity::{
     client::Context,
     model::application::CommandOptionType,
 };
+use tokio::task;
 use tracing::{error, info, instrument};
 
 const TYPE_OPTION: &str = "type";
@@ -224,11 +227,27 @@ async fn fetch_recommendation_media_by_search(
     media_type: MediaType,
 ) -> Option<(RecommendationMedia, TitleVariant)> {
     let query = fetch_recommendations_by_search(anilist_type(&media_type));
-    let fetched_data = match fetch_by_name(query, search_term.to_string()).await {
-        Ok(data) => data,
+    let cache_key = recommendation_cache_key(&media_type, search_term);
+    let cache_key_for_lookup = cache_key.clone();
+
+    let fetched_data = match task::spawn_blocking(move || {
+        read_cached_recommendation_response(cache_key_for_lookup)
+    })
+    .await
+    {
+        Ok(Ok(cached_value)) => {
+            info!("Cache hit for {:#?}", cache_key);
+            cached_value
+        }
+        Ok(Err(err)) => {
+            info!("Cache miss for {:#?} with error {:#?}", cache_key, err);
+            fetch_recommendations_from_network_and_cache(query, search_term.to_string(), cache_key)
+                .await?
+        }
         Err(err) => {
-            error!(error = %err, "Failed to fetch AniList recommendations by search");
-            return None;
+            error!(error = %err, "Failed to read AniList recommendation cache");
+            fetch_recommendations_from_network_and_cache(query, search_term.to_string(), cache_key)
+                .await?
         }
     };
     let response: SearchResponse<RecommendationMedia> = match serde_json::from_str(&fetched_data) {
@@ -240,6 +259,52 @@ async fn fetch_recommendation_media_by_search(
     };
 
     response.fuzzy_match(search_term, media_type)
+}
+
+#[instrument(
+    name = "command.recommend.fetch_from_network_and_cache",
+    skip(query),
+    fields(cache_key = %cache_key, lookup_len = search_term.len())
+)]
+async fn fetch_recommendations_from_network_and_cache(
+    query: String,
+    search_term: String,
+    cache_key: String,
+) -> Option<String> {
+    let response = match fetch_by_name(query, search_term).await {
+        Ok(data) => data,
+        Err(err) => {
+            error!(error = %err, "Failed to fetch AniList recommendations by search");
+            return None;
+        }
+    };
+
+    let cache_key_for_write = cache_key.clone();
+    let response_to_cache = response.clone();
+    if let Err(err) = task::spawn_blocking(move || {
+        write_cached_recommendation_response(cache_key_for_write, response_to_cache)
+    })
+    .await
+    {
+        error!(error = %err, cache_key = %cache_key, "Failed to cache AniList recommendation response");
+    }
+
+    Some(response)
+}
+
+#[instrument(name = "command.recommend.read_cache_blocking", skip(cache_key), fields(cache_key = %cache_key))]
+fn read_cached_recommendation_response(cache_key: String) -> RedisResult<String> {
+    check_cache(&cache_key)
+}
+
+#[instrument(name = "command.recommend.write_cache_blocking", skip(cache_key, response), fields(cache_key = %cache_key))]
+fn write_cached_recommendation_response(cache_key: String, response: String) {
+    try_to_cache_response(&cache_key, &response)
+}
+
+#[instrument]
+fn recommendation_cache_key(media_type: &MediaType, search_term: &str) -> String {
+    format!("recommendation:{}:{search_term}", media_type.as_ref())
 }
 
 #[instrument(skip(media, recommendations))]
