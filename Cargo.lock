@@ -199,7 +199,7 @@ dependencies = [
  "clap",
  "env_logger",
  "futures",
- "getrandom 0.3.4",
+ "getrandom 0.4.2",
  "hmac 0.13.0",
  "html2md",
  "linkify",
