@@ -1,6 +1,5 @@
 mod commands;
 mod models;
-mod server;
 mod utils;
 
 use std::env;
@@ -228,16 +227,7 @@ async fn main() {
         data.insert::<OAuthContextConfigKey>(Arc::new(oauth_config));
     }
 
-    let (shutdown_tx, shutdown_rx) = tokio::sync::watch::channel(());
-    let http_database_pool = database_pool.clone();
-
-    let http_handle = tokio::spawn(async move {
-        if let Err(e) = server::run(shutdown_rx, http_database_pool).await {
-            tracing::error!(error = %e, "HTTP server error");
-        }
-    });
-
-    info!("Starting Discord client and HTTP server");
+    info!("Starting Discord client");
     tokio::select! {
         result = client.start() => {
             if let Err(why) = result {
@@ -251,8 +241,4 @@ async fn main() {
 
     info!("Shutting down");
     client.shard_manager.shutdown_all().await;
-    let _ = shutdown_tx.send(());
-    if let Err(e) = http_handle.await {
-        tracing::error!(error = %e, "HTTP server task join failed");
-    }
 }

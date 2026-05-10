@@ -4,7 +4,7 @@ use serenity::{client::Context, prelude::TypeMapKey};
 use sqlx::{Pool, Postgres, postgres::PgPoolOptions};
 use std::env;
 use std::time::Duration;
-use tracing::{error, info, instrument};
+use tracing::{error, instrument};
 
 pub type DbPool = Pool<Postgres>;
 
@@ -57,11 +57,4 @@ fn redact_database_url(database_url: &str) -> String {
         }
         _ => database_url.to_string(),
     }
-}
-
-#[instrument(name = "db.ping", skip_all)]
-pub async fn ping(pool: &DbPool) -> Result<(), sqlx::Error> {
-    sqlx::query("SELECT 1").execute(pool).await?;
-    info!("Database ping successful");
-    Ok(())
 }
