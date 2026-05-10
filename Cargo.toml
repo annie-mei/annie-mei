@@ -31,11 +31,12 @@ linkify = "0.11"
 log = "0.4.29"
 ngrammatic = "0.7.0"
 reqwest = { version = "0.13.3", default-features = false, features = ["rustls"] }
-redis = { version = "1.2.1", features = ["tls-native-tls"] }
+redis = { version = "1.2.1", features = ["tls-rustls"] }
 rspotify = { version = "0.16.1", default-features = false, features = [
   "client-ureq",
   "ureq-rustls-tls",
 ] }
+rustls = { version = "0.23", default-features = false, features = ["aws_lc_rs", "std", "tls12"] }
 sentry = { version = "0.48.1", default-features = false, features = [
   "backtrace",
   "contexts",

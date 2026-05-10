@@ -47,6 +47,15 @@ enum Commands {
 
 struct Handler;
 
+#[instrument(name = "app.install_rustls_crypto_provider")]
+fn install_rustls_crypto_provider() {
+    if rustls::crypto::CryptoProvider::get_default().is_none() {
+        rustls::crypto::aws_lc_rs::default_provider()
+            .install_default()
+            .expect("failed to install rustls crypto provider");
+    }
+}
+
 #[async_trait]
 impl EventHandler for Handler {
     #[instrument(name = "discord.interaction_create", skip_all)]
@@ -131,6 +140,8 @@ async fn main() {
     }
 
     // Default: run the bot
+    install_rustls_crypto_provider();
+
     let environment = env::var(ENV).expect("Expected an environment in the environment");
     let sentry_dsn = env::var(SENTRY_DSN).expect("Expected a sentry dsn in the environment");
     let sentry_traces_sample_rate_raw = env::var(SENTRY_TRACES_SAMPLE_RATE).ok();
