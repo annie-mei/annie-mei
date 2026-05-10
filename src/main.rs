@@ -223,7 +223,7 @@ async fn main() {
 
     {
         let mut data = client.data.write().await;
-        data.insert::<DatabasePoolKey>(database_pool.clone());
+        data.insert::<DatabasePoolKey>(database_pool);
         data.insert::<OAuthContextConfigKey>(Arc::new(oauth_config));
     }
 
