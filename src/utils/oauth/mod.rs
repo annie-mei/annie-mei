@@ -3,8 +3,8 @@ use std::sync::Arc;
 
 use base64::{Engine as _, engine::general_purpose::URL_SAFE_NO_PAD};
 use chrono::Utc;
+use getrandom::fill as fill_random;
 use hmac::{Hmac, KeyInit, Mac};
-use openssl::rand::rand_bytes;
 use serde::Serialize;
 use serenity::{client::Context, prelude::TypeMapKey};
 use sha2::Sha256;
@@ -44,7 +44,7 @@ pub enum OAuthContextError {
     AuthServiceBaseUrlHasPath,
     InvalidTtl(String),
     InvalidSecret,
-    Nonce(openssl::error::ErrorStack),
+    Nonce(getrandom::Error),
     Serialize(serde_json::Error),
     UrlJoin(url::ParseError),
 }
@@ -180,7 +180,7 @@ fn build_oauth_start_url_with_values(
 #[instrument(name = "oauth.context.generate_nonce")]
 fn generate_nonce() -> Result<String, OAuthContextError> {
     let mut bytes = [0u8; NONCE_BYTES];
-    rand_bytes(&mut bytes).map_err(OAuthContextError::Nonce)?;
+    fill_random(&mut bytes).map_err(OAuthContextError::Nonce)?;
     Ok(URL_SAFE_NO_PAD.encode(bytes))
 }
 

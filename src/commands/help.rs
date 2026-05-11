@@ -3,7 +3,7 @@ use crate::utils::privacy::configure_sentry_scope;
 use serenity::{
     all::{
         CommandInteraction, CreateAttachment, CreateEmbed, CreateEmbedFooter,
-        CreateInteractionResponse, CreateInteractionResponseMessage,
+        CreateInteractionResponse, CreateInteractionResponseMessage, Timestamp,
     },
     builder::CreateCommand,
     prelude::*,
@@ -42,7 +42,7 @@ pub async fn run(ctx: &Context, interaction: &CommandInteraction) {
             false,
         )
         .footer(CreateEmbedFooter::new("Annie Mei"))
-        .timestamp(chrono::Utc::now());
+        .timestamp(Timestamp::now());
 
     let mut response_message = CreateInteractionResponseMessage::new();
 

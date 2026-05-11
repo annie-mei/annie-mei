@@ -31,7 +31,10 @@ use reqwest::Client;
 use serde::{Deserialize, Serialize};
 use tracing::{info, instrument};
 
-use crate::utils::statics::{GEMINI_API_KEY, LLM_BASE_URL, LLM_MODEL};
+use crate::utils::{
+    statics::{GEMINI_API_KEY, LLM_BASE_URL, LLM_MODEL},
+    tls::install_rustls_crypto_provider,
+};
 
 const DEFAULT_BASE_URL: &str = "https://generativelanguage.googleapis.com/v1beta/openai";
 const DEFAULT_MODEL: &str = "gemini-2.0-flash";
@@ -224,6 +227,8 @@ impl GeminiClient {
     /// Returns an error if the HTTP client cannot be constructed
     /// (e.g. TLS backend unavailable).
     pub fn new(config: GeminiClientConfig) -> Result<Self, LlmError> {
+        install_rustls_crypto_provider();
+
         let http = Client::builder()
             .timeout(Duration::from_secs(DEFAULT_TIMEOUT_SECS))
             .build()

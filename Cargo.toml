@@ -22,24 +22,38 @@ blake3 = "1.8.5"
 chrono = "0.4.44"
 clap = { version = "4", features = ["derive"] }
 sqlx = { version = "0.8", default-features = false, features = ["runtime-tokio", "postgres", "chrono", "macros", "tls-rustls"] }
-env_logger = "0.11.10"
-futures = "0.3.32"
+getrandom = "0.4"
 hmac = "0.13"
 html2md = "0.2.15"
 linkify = "0.11"
-log = "0.4.29"
 ngrammatic = "0.7.0"
-openssl = { version = "0.10.79", features = ["vendored"] }
-reqwest = { version = "0.13.3", features = ["rustls"] }
-redis = { version = "1.2.1", features = ["tls-native-tls"] }
+reqwest = { version = "0.13.3", default-features = false, features = ["http2", "rustls-no-provider"] }
+redis = { version = "1.2.1", features = ["tls-rustls"] }
 rspotify = { version = "0.16.1", default-features = false, features = [
   "client-ureq",
   "ureq-rustls-tls",
 ] }
-sentry = { version = "0.48.1", features = ["tracing", "logs"] }
+rustls = { version = "0.23", default-features = false, features = ["ring", "std", "tls12"] }
+sentry = { version = "0.48.1", default-features = false, features = [
+  "backtrace",
+  "contexts",
+  "debug-images",
+  "logs",
+  "panic",
+  "release-health",
+  "rustls",
+  "tracing",
+  "ureq",
+] }
 serde = "1.0.228"
 serde_json = "1.0.149"
-serenity = "0.12"
+serenity = { version = "0.12", default-features = false, features = [
+  "cache",
+  "client",
+  "gateway",
+  "model",
+  "rustls_backend",
+] }
 sha2 = "0.11"
 strum = { version = "0.28.0", features = ["derive"] }
 titlecase = "3.6.0"

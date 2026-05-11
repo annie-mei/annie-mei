@@ -25,6 +25,7 @@ use utils::{
     oauth::{OAuthContextConfigKey, load_context_config},
     privacy::{hash_user_id, redact_url_credentials},
     statics::{DISCORD_TOKEN, ENV, SENTRY_DSN, SENTRY_TRACES_SAMPLE_RATE},
+    tls::install_rustls_crypto_provider,
 };
 
 /// Annie Mei Discord Bot
@@ -131,6 +132,8 @@ async fn main() {
     }
 
     // Default: run the bot
+    install_rustls_crypto_provider();
+
     let environment = env::var(ENV).expect("Expected an environment in the environment");
     let sentry_dsn = env::var(SENTRY_DSN).expect("Expected a sentry dsn in the environment");
     let sentry_traces_sample_rate_raw = env::var(SENTRY_TRACES_SAMPLE_RATE).ok();

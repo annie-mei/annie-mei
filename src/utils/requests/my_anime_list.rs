@@ -5,7 +5,7 @@ use std::time::Duration;
 use reqwest::Client;
 use tracing::{info, instrument};
 
-use crate::utils::statics::MAL_CLIENT_ID;
+use crate::utils::{statics::MAL_CLIENT_ID, tls::install_rustls_crypto_provider};
 
 #[derive(Debug)]
 pub enum MalRequestError {
@@ -41,6 +41,8 @@ const FIELDS_TO_FETCH: [&str; 3] = ["id", "opening_themes", "ending_themes"];
 const MAL_TIMEOUT_SECS: u64 = 10;
 
 static MAL_CLIENT: LazyLock<Result<Client, String>> = LazyLock::new(|| {
+    install_rustls_crypto_provider();
+
     Client::builder()
         .timeout(Duration::from_secs(MAL_TIMEOUT_SECS))
         .build()

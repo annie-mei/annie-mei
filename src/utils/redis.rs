@@ -2,7 +2,7 @@ use redis::{Commands, Connection, ErrorKind, RedisResult};
 use std::env;
 use tracing::{info, instrument};
 
-use crate::utils::statics::REDIS_URL;
+use crate::utils::{statics::REDIS_URL, tls::install_rustls_crypto_provider};
 
 #[instrument(name = "redis.get_connection", skip_all)]
 fn get_redis_client() -> RedisResult<Connection> {
@@ -13,6 +13,8 @@ fn get_redis_client() -> RedisResult<Connection> {
             e.to_string(),
         )
     })?;
+
+    install_rustls_crypto_provider();
 
     let client = redis::Client::open(redis_url)?;
     let connection = client.get_connection()?;
