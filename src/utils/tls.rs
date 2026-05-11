@@ -1,7 +1,10 @@
-use tracing::instrument;
+use std::sync::Once;
 
-#[instrument(name = "app.install_rustls_crypto_provider")]
+static RUSTLS_PROVIDER_INIT: Once = Once::new();
+
 pub fn install_rustls_crypto_provider() {
-    // Ignore failure when another thread won the process-global provider race.
-    let _ = rustls::crypto::ring::default_provider().install_default();
+    RUSTLS_PROVIDER_INIT.call_once(|| {
+        // Ignore failure if a compatible process-global provider was installed elsewhere.
+        let _ = rustls::crypto::ring::default_provider().install_default();
+    });
 }
