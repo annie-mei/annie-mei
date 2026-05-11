@@ -25,6 +25,7 @@ use utils::{
     oauth::{OAuthContextConfigKey, load_context_config},
     privacy::{hash_user_id, redact_url_credentials},
     statics::{DISCORD_TOKEN, ENV, SENTRY_DSN, SENTRY_TRACES_SAMPLE_RATE},
+    tls::install_rustls_crypto_provider,
 };
 
 /// Annie Mei Discord Bot
@@ -46,15 +47,6 @@ enum Commands {
 }
 
 struct Handler;
-
-#[instrument(name = "app.install_rustls_crypto_provider")]
-fn install_rustls_crypto_provider() {
-    if rustls::crypto::CryptoProvider::get_default().is_none() {
-        rustls::crypto::aws_lc_rs::default_provider()
-            .install_default()
-            .expect("failed to install rustls crypto provider");
-    }
-}
 
 #[async_trait]
 impl EventHandler for Handler {

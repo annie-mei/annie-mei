@@ -2998,7 +2998,6 @@ dependencies = [
  "sentry-log",
  "sentry-panic",
  "sentry-tracing",
- "tokio",
  "ureq 3.3.0",
 ]
 

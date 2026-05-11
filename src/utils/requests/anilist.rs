@@ -5,6 +5,8 @@ use reqwest::Client;
 use serde_json::Value;
 use tracing::instrument;
 
+use crate::utils::tls::install_rustls_crypto_provider;
+
 #[derive(Debug)]
 pub enum AniListRequestError {
     ClientBuild(String),
@@ -40,6 +42,8 @@ impl std::error::Error for AniListRequestError {}
 const ANILIST_TIMEOUT_SECS: u64 = 10;
 
 static ANILIST_CLIENT: LazyLock<Result<Client, String>> = LazyLock::new(|| {
+    install_rustls_crypto_provider();
+
     Client::builder()
         .timeout(Duration::from_secs(ANILIST_TIMEOUT_SECS))
         .build()

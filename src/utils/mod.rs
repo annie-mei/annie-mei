@@ -12,3 +12,4 @@ pub mod requests;
 pub mod response_fetcher;
 pub mod spotify;
 pub mod statics;
+pub mod tls;
