@@ -109,9 +109,9 @@ impl SearchIntent {
     #[instrument(name = "command.search.intent_terms", skip(self))]
     fn search_terms(&self) -> Vec<String> {
         let mut terms = Vec::with_capacity(self.candidates.len() + 1);
-        let _ = push_unique_search_term(&mut terms, self.search.clone());
+        let _ = push_valid_search_term(&mut terms, self.search.clone());
         for candidate in &self.candidates {
-            let _ = push_unique_search_term(&mut terms, candidate.clone());
+            let _ = push_valid_search_term(&mut terms, candidate.clone());
         }
         terms
     }
@@ -419,9 +419,9 @@ fn validate_raw_intent(raw: RawSearchIntent) -> Result<SearchIntent, SearchInten
 
     let mut search_terms = Vec::with_capacity(raw.candidates.len() + 1);
     let primary_search_error =
-        push_unique_search_term(&mut search_terms, normalize_search_phrase(&raw.search)).err();
+        push_llm_search_term(&mut search_terms, normalize_search_phrase(&raw.search)).err();
     for candidate in raw.candidates.into_iter().take(5) {
-        let _ = push_unique_search_term(&mut search_terms, normalize_search_phrase(&candidate));
+        let _ = push_llm_search_term(&mut search_terms, normalize_search_phrase(&candidate));
     }
 
     if search_terms.is_empty() {
@@ -439,33 +439,36 @@ fn validate_raw_intent(raw: RawSearchIntent) -> Result<SearchIntent, SearchInten
     })
 }
 
-#[instrument(name = "command.search.push_unique_term", skip(terms, term))]
-fn push_unique_search_term(terms: &mut Vec<String>, term: String) -> Result<(), String> {
+#[instrument(name = "command.search.push_valid_term", skip(terms, term))]
+fn push_valid_search_term(terms: &mut Vec<String>, term: String) -> Result<(), String> {
+    let trimmed = term.trim();
+    validate_search_term(trimmed).map_err(search_validation_error_message)?;
+    push_unique_trimmed_search_term(terms, trimmed);
+    Ok(())
+}
+
+#[instrument(name = "command.search.push_llm_term", skip(terms, term))]
+fn push_llm_search_term(terms: &mut Vec<String>, term: String) -> Result<(), String> {
     let trimmed = term.trim();
     validate_llm_search_term(trimmed)?;
+    push_unique_trimmed_search_term(terms, trimmed);
+    Ok(())
+}
 
+fn push_unique_trimmed_search_term(terms: &mut Vec<String>, trimmed: &str) {
     if terms
         .iter()
         .any(|existing| existing.eq_ignore_ascii_case(trimmed))
     {
-        return Ok(());
+        return;
     }
 
     terms.push(trimmed.to_string());
-    Ok(())
 }
 
 #[instrument(name = "command.search.validate_llm_term", skip(term))]
 fn validate_llm_search_term(term: &str) -> Result<(), String> {
-    match validate_search_term(term) {
-        Ok(()) => {}
-        Err(ValidationError::Empty) => return Err("search cannot be empty".to_string()),
-        Err(ValidationError::TooLong { max, actual }) => {
-            return Err(format!(
-                "search is too long ({actual} characters, max {max} allowed)"
-            ));
-        }
-    }
+    validate_search_term(term).map_err(search_validation_error_message)?;
 
     let actual = term.chars().count();
     if actual > MAX_LLM_SEARCH_TERM_LENGTH {
@@ -475,6 +478,15 @@ fn validate_llm_search_term(term: &str) -> Result<(), String> {
     }
 
     Ok(())
+}
+
+fn search_validation_error_message(error: ValidationError) -> String {
+    match error {
+        ValidationError::Empty => "search cannot be empty".to_string(),
+        ValidationError::TooLong { max, actual } => {
+            format!("search is too long ({actual} characters, max {max} allowed)")
+        }
+    }
 }
 
 #[instrument(name = "command.search.normalize_phrase", skip(search))]
@@ -736,6 +748,21 @@ mod tests {
 
         assert!(matches!(result, MediaSearchResult::NotFound));
         assert_eq!(source.calls(), vec!["anime:monster", "manga:monster"]);
+    }
+
+    #[tokio::test]
+    async fn fetch_search_result_accepts_long_valid_fallback_term() {
+        let source = FakeMediaSource::new();
+        let query = "a".repeat(MAX_LLM_SEARCH_TERM_LENGTH + 1);
+        let intent = fallback_intent(&query);
+
+        let result = fetch_search_result(&source, intent).await;
+
+        assert!(matches!(result, MediaSearchResult::NotFound));
+        assert_eq!(
+            source.calls(),
+            vec![format!("anime:{query}"), format!("manga:{query}")]
+        );
     }
 
     #[tokio::test]
