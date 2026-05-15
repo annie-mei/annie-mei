@@ -3,7 +3,6 @@ use std::fmt;
 use crate::{
     commands::{
         response::CommandResponse,
-        search::prompts::SEARCH_SYSTEM_PROMPT,
         traits::{AniListSource, MediaDataSource},
     },
     models::{
@@ -12,7 +11,7 @@ use crate::{
     },
     utils::{
         channel::is_nsfw_channel,
-        llm::{GeminiClient, LlmClient, LlmError},
+        llm::{LlmClient, LlmError, get_gemini_client_from_context},
         privacy::configure_sentry_scope,
         statics::NSFW_NOT_ALLOWED,
     },
@@ -307,18 +306,16 @@ pub async fn run(ctx: &Context, interaction: &mut CommandInteraction) {
 
     info!("Got command 'search'");
 
-    let intent = match GeminiClient::from_env_with_system_prompt(SEARCH_SYSTEM_PROMPT)
-        .and_then(|client| client.with_temperature(0.0))
-    {
-        Ok(client) => match parse_search_intent(&client, &query).await {
+    let intent = match get_gemini_client_from_context(ctx).await {
+        Some(client) => match parse_search_intent(client.as_ref(), &query).await {
             Ok(intent) => intent,
             Err(error) => {
                 warn!(error = %error, "Natural-language search parsing failed; falling back to raw query");
                 fallback_intent(&query)
             }
         },
-        Err(error) => {
-            warn!(error = %error, "LLM client unavailable; falling back to raw query");
+        None => {
+            warn!("LLM client unavailable; falling back to raw query");
             fallback_intent(&query)
         }
     };

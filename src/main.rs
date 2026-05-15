@@ -22,7 +22,7 @@ use serenity::{
 
 use utils::{
     database::{DatabasePoolKey, create_pool},
-    llm::configured_model_name,
+    llm::{GeminiClient, GeminiClientKey, configured_model_name},
     oauth::{OAuthContextConfigKey, load_context_config},
     privacy::{hash_user_id, redact_url_credentials},
     statics::{DISCORD_TOKEN, ENV, SENTRY_DSN, SENTRY_TRACES_SAMPLE_RATE},
@@ -195,6 +195,17 @@ async fn main() {
     subscriber.with(sentry_tracing::layer()).init();
 
     info!(model = %configured_model_name(), "LLM model configured");
+    let gemini_client = match GeminiClient::from_env_with_system_prompt(
+        commands::search::prompts::SEARCH_SYSTEM_PROMPT,
+    )
+    .and_then(|client| client.with_temperature(0.0))
+    {
+        Ok(client) => Some(Arc::new(client)),
+        Err(error) => {
+            warn!(error = %error, "LLM client unavailable; natural-language search will use fallback search");
+            None
+        }
+    };
 
     if let Some(invalid_value) = sentry_traces_sample_rate_invalid {
         warn!(
@@ -233,6 +244,9 @@ async fn main() {
         let mut data = client.data.write().await;
         data.insert::<DatabasePoolKey>(database_pool);
         data.insert::<OAuthContextConfigKey>(Arc::new(oauth_config));
+        if let Some(gemini_client) = gemini_client {
+            data.insert::<GeminiClientKey>(gemini_client);
+        }
     }
 
     info!("Starting Discord client");

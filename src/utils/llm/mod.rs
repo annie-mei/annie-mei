@@ -25,10 +25,12 @@
 use std::env;
 use std::fmt;
 use std::future::Future;
+use std::sync::Arc;
 use std::time::Duration;
 
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
+use serenity::{client::Context, prelude::TypeMapKey};
 use tracing::{info, instrument};
 
 use crate::utils::{
@@ -44,6 +46,18 @@ const DEFAULT_TIMEOUT_SECS: u64 = 30;
 #[instrument(name = "llm.configured_model_name")]
 pub fn configured_model_name() -> String {
     env::var(LLM_MODEL).unwrap_or_else(|_| DEFAULT_MODEL.to_string())
+}
+
+pub struct GeminiClientKey;
+
+impl TypeMapKey for GeminiClientKey {
+    type Value = Arc<GeminiClient>;
+}
+
+#[instrument(name = "llm.client_from_context", skip(ctx))]
+pub async fn get_gemini_client_from_context(ctx: &Context) -> Option<Arc<GeminiClient>> {
+    let data = ctx.data.read().await;
+    data.get::<GeminiClientKey>().cloned()
 }
 
 // ── Error type ───────────────────────────────────────────────────────
