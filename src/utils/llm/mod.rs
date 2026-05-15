@@ -25,10 +25,12 @@
 use std::env;
 use std::fmt;
 use std::future::Future;
+use std::sync::Arc;
 use std::time::Duration;
 
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
+use serenity::{client::Context, prelude::TypeMapKey};
 use tracing::{info, instrument};
 
 use crate::utils::{
@@ -39,6 +41,24 @@ use crate::utils::{
 const DEFAULT_BASE_URL: &str = "https://generativelanguage.googleapis.com/v1beta/openai";
 const DEFAULT_MODEL: &str = "gemini-2.0-flash";
 const DEFAULT_TIMEOUT_SECS: u64 = 30;
+
+/// Return the configured LLM model name without requiring an API key.
+#[instrument(name = "llm.configured_model_name")]
+pub fn configured_model_name() -> String {
+    env::var(LLM_MODEL).unwrap_or_else(|_| DEFAULT_MODEL.to_string())
+}
+
+pub struct GeminiClientKey;
+
+impl TypeMapKey for GeminiClientKey {
+    type Value = Arc<GeminiClient>;
+}
+
+#[instrument(name = "llm.client_from_context", skip(ctx))]
+pub async fn get_gemini_client_from_context(ctx: &Context) -> Option<Arc<GeminiClient>> {
+    let data = ctx.data.read().await;
+    data.get::<GeminiClientKey>().cloned()
+}
 
 // ── Error type ───────────────────────────────────────────────────────
 
@@ -75,8 +95,12 @@ impl fmt::Display for LlmError {
                 write!(f, "API error (HTTP {status}): {body}")
             }
             LlmError::ResponseBody(e) => write!(f, "failed to read response body: {e}"),
-            LlmError::Deserialization { message, .. } => {
-                write!(f, "response deserialization failed: {message}")
+            LlmError::Deserialization { message, body } => {
+                write!(
+                    f,
+                    "response deserialization failed: {message}; body length: {} bytes",
+                    body.len()
+                )
             }
             LlmError::EmptyResponse => write!(f, "response contained no choices"),
             LlmError::InvalidTemperature(t) => {
@@ -165,19 +189,6 @@ pub trait LlmClient: Send + Sync {
     /// If the implementation has a system prompt configured, it is
     /// automatically prepended to the conversation.
     fn chat(&self, user_message: &str) -> impl Future<Output = Result<String, LlmError>> + Send;
-
-    /// Send a full conversation (multiple messages) and return the
-    /// assistant's reply.
-    ///
-    /// The caller has full control over the message list — no system
-    /// prompt is automatically prepended.
-    fn chat_with_messages(
-        &self,
-        messages: &[ChatMessage],
-    ) -> impl Future<Output = Result<String, LlmError>> + Send;
-
-    /// Return the model name this client is configured for.
-    fn model(&self) -> &str;
 }
 
 // ── Gemini client ────────────────────────────────────────────────────
@@ -245,7 +256,7 @@ impl GeminiClient {
         let api_key = env::var(GEMINI_API_KEY)
             .map_err(|_| LlmError::MissingEnvVar(GEMINI_API_KEY.to_string()))?;
         let base_url = env::var(LLM_BASE_URL).unwrap_or_else(|_| DEFAULT_BASE_URL.to_string());
-        let model = env::var(LLM_MODEL).unwrap_or_else(|_| DEFAULT_MODEL.to_string());
+        let model = configured_model_name();
 
         Self::new(GeminiClientConfig {
             api_key,
@@ -311,6 +322,35 @@ impl GeminiClient {
             .next()
             .map(|choice| choice.message.content)
             .ok_or(LlmError::EmptyResponse)
+    }
+
+    /// Log provider metadata without logging prompt or completion text.
+    #[instrument(name = "llm.log_completion_metadata", skip(response))]
+    fn log_completion_metadata(response: &ChatCompletionResponse) {
+        let first_choice = response.choices.first();
+        let choice_index = first_choice.map(|choice| choice.index);
+        let choice_role = first_choice.map(|choice| choice.message.role.as_str());
+        let finish_reason = first_choice.and_then(|choice| choice.finish_reason.as_deref());
+        let prompt_tokens = response
+            .usage
+            .as_ref()
+            .and_then(|usage| usage.prompt_tokens);
+        let completion_tokens = response
+            .usage
+            .as_ref()
+            .and_then(|usage| usage.completion_tokens);
+        let total_tokens = response.usage.as_ref().and_then(|usage| usage.total_tokens);
+
+        info!(
+            model = response.model.as_deref(),
+            choice_index,
+            choice_role,
+            finish_reason,
+            prompt_tokens,
+            completion_tokens,
+            total_tokens,
+            "Chat completion received"
+        );
     }
 
     /// POST to the chat completions endpoint and deserialise the response.
@@ -382,29 +422,9 @@ impl LlmClient for GeminiClient {
         let messages = self.build_messages(user_message);
         let response = self.send_chat_completion(&messages).await?;
 
-        info!(usage = ?response.usage, "Chat completion received");
+        Self::log_completion_metadata(&response);
 
         Self::extract_reply(response)
-    }
-
-    #[instrument(
-        name = "llm.chat_with_messages",
-        skip(self, messages),
-        fields(
-            model = %self.config.model,
-            message_count = messages.len(),
-        )
-    )]
-    async fn chat_with_messages(&self, messages: &[ChatMessage]) -> Result<String, LlmError> {
-        let response = self.send_chat_completion(messages).await?;
-
-        info!(usage = ?response.usage, "Chat completion received");
-
-        Self::extract_reply(response)
-    }
-
-    fn model(&self) -> &str {
-        &self.config.model
     }
 }
 

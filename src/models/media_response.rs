@@ -109,10 +109,16 @@ impl<T: Transformers + std::clone::Clone> FetchResponse<T> {
         };
 
         if !need_to_match_synonyms {
+            let matched_title = match top_variant {
+                TitleVariant::English => media_list[top_match.index].get_english_title(),
+                TitleVariant::Romaji => media_list[top_match.index].get_romaji_title(),
+                TitleVariant::Native => media_list[top_match.index].get_native_title(),
+            };
             info!(
-                "Title match says: {:#?} at Index: {:#?}",
-                media_list[top_match.index].get_english_title(),
-                top_match.index
+                matched_title = ?matched_title,
+                matched_variant = ?top_variant,
+                match_index = top_match.index,
+                "Title match selected"
             );
             Some((media_list[top_match.index].clone(), top_variant))
         } else {
