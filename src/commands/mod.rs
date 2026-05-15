@@ -7,6 +7,7 @@ pub mod ping;
 pub mod recommend;
 pub mod register;
 pub mod response;
+pub mod search;
 pub mod songs;
 pub mod traits;
 pub mod unregister;
