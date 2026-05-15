@@ -303,8 +303,6 @@ pub async fn run(ctx: &Context, interaction: &mut CommandInteraction) {
     };
     let query = query.clone();
 
-    configure_sentry_scope("Search", user.id.get(), Some(json!(query.clone())));
-
     info!("Got command 'search'");
 
     let intent = match GeminiClient::from_env_with_system_prompt(SEARCH_SYSTEM_PROMPT)
@@ -322,6 +320,17 @@ pub async fn run(ctx: &Context, interaction: &mut CommandInteraction) {
             fallback_intent(&query)
         }
     };
+
+    configure_sentry_scope(
+        "Search",
+        user.id.get(),
+        Some(json!({
+            "query_len": query.chars().count(),
+            "media_type": intent.media_type.to_string(),
+            "search": intent.search.clone(),
+            "candidate_count": intent.candidates.len(),
+        })),
+    );
 
     let result = fetch_search_result(&AniListSource, intent).await;
 
