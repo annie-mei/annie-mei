@@ -2,6 +2,7 @@ use std::fmt;
 
 use crate::{
     commands::{
+        input_validation::{ValidationError, validate_search_term},
         response::CommandResponse,
         traits::{AniListSource, MediaDataSource},
     },
@@ -30,6 +31,7 @@ use serenity::{
 use tracing::{info, instrument, warn};
 
 const NOT_FOUND_SEARCH: &str = "I couldn't find an anime or manga for that search.";
+const MAX_LLM_SEARCH_TERM_LENGTH: usize = 120;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum SearchMediaType {
@@ -107,9 +109,9 @@ impl SearchIntent {
     #[instrument(name = "command.search.intent_terms", skip(self))]
     fn search_terms(&self) -> Vec<String> {
         let mut terms = Vec::with_capacity(self.candidates.len() + 1);
-        push_unique_search_term(&mut terms, self.search.clone());
+        let _ = push_valid_search_term(&mut terms, self.search.clone());
         for candidate in &self.candidates {
-            push_unique_search_term(&mut terms, candidate.clone());
+            let _ = push_valid_search_term(&mut terms, candidate.clone());
         }
         terms
     }
@@ -287,6 +289,14 @@ pub async fn run(ctx: &Context, interaction: &mut CommandInteraction) {
     };
     let query = query.clone();
 
+    if let Err(err) = validate_search_term(&query) {
+        let builder = EditInteractionResponse::new().content(format!(
+            "Invalid search input: {err}. Please check your input and try again."
+        ));
+        let _ = interaction.edit_response(&ctx.http, builder).await;
+        return;
+    }
+
     configure_sentry_scope("Search", user.id.get(), Some(json!(query.clone())));
 
     info!("Got command 'search'");
@@ -408,14 +418,15 @@ fn validate_raw_intent(raw: RawSearchIntent) -> Result<SearchIntent, SearchInten
     };
 
     let mut search_terms = Vec::with_capacity(raw.candidates.len() + 1);
-    push_unique_search_term(&mut search_terms, normalize_search_phrase(&raw.search));
+    let primary_search_error =
+        push_llm_search_term(&mut search_terms, normalize_search_phrase(&raw.search)).err();
     for candidate in raw.candidates.into_iter().take(5) {
-        push_unique_search_term(&mut search_terms, normalize_search_phrase(&candidate));
+        let _ = push_llm_search_term(&mut search_terms, normalize_search_phrase(&candidate));
     }
 
     if search_terms.is_empty() {
         return Err(SearchIntentError::InvalidIntent(
-            "search cannot be empty".to_string(),
+            primary_search_error.unwrap_or_else(|| "search cannot be empty".to_string()),
         ));
     }
 
@@ -428,13 +439,24 @@ fn validate_raw_intent(raw: RawSearchIntent) -> Result<SearchIntent, SearchInten
     })
 }
 
-#[instrument(name = "command.search.push_unique_term", skip(terms, term))]
-fn push_unique_search_term(terms: &mut Vec<String>, term: String) {
+#[instrument(name = "command.search.push_valid_term", skip(terms, term))]
+fn push_valid_search_term(terms: &mut Vec<String>, term: String) -> Result<(), String> {
     let trimmed = term.trim();
-    if trimmed.is_empty() || trimmed.chars().count() > 120 {
-        return;
-    }
+    validate_search_term(trimmed).map_err(search_validation_error_message)?;
+    push_unique_trimmed_search_term(terms, trimmed);
+    Ok(())
+}
 
+#[instrument(name = "command.search.push_llm_term", skip(terms, term))]
+fn push_llm_search_term(terms: &mut Vec<String>, term: String) -> Result<(), String> {
+    let trimmed = term.trim();
+    validate_llm_search_term(trimmed)?;
+    push_unique_trimmed_search_term(terms, trimmed);
+    Ok(())
+}
+
+#[instrument(name = "command.search.push_unique_trimmed_term", skip(terms, trimmed))]
+fn push_unique_trimmed_search_term(terms: &mut Vec<String>, trimmed: &str) {
     if terms
         .iter()
         .any(|existing| existing.eq_ignore_ascii_case(trimmed))
@@ -443,6 +465,30 @@ fn push_unique_search_term(terms: &mut Vec<String>, term: String) {
     }
 
     terms.push(trimmed.to_string());
+}
+
+#[instrument(name = "command.search.validate_llm_term", skip(term))]
+fn validate_llm_search_term(term: &str) -> Result<(), String> {
+    validate_search_term(term).map_err(search_validation_error_message)?;
+
+    let actual = term.chars().count();
+    if actual > MAX_LLM_SEARCH_TERM_LENGTH {
+        return Err(format!(
+            "search is too long ({actual} characters, max {MAX_LLM_SEARCH_TERM_LENGTH} allowed)"
+        ));
+    }
+
+    Ok(())
+}
+
+#[instrument(name = "command.search.validation_error_message", skip(error))]
+fn search_validation_error_message(error: ValidationError) -> String {
+    match error {
+        ValidationError::Empty => "search cannot be empty".to_string(),
+        ValidationError::TooLong { max, actual } => {
+            format!("search is too long ({actual} characters, max {max} allowed)")
+        }
+    }
 }
 
 #[instrument(name = "command.search.normalize_phrase", skip(search))]
@@ -599,6 +645,40 @@ mod tests {
     }
 
     #[test]
+    fn parse_search_intent_json_rejects_overlong_search_with_specific_error() {
+        let search = "a".repeat(MAX_LLM_SEARCH_TERM_LENGTH + 1);
+        let response = serde_json::json!({
+            "media_type": "anime",
+            "search": search,
+        });
+
+        let result = parse_search_intent_json(&response.to_string());
+
+        match result {
+            Err(SearchIntentError::InvalidIntent(error)) => {
+                assert!(error.contains("search is too long"));
+                assert!(error.contains("max 120 allowed"));
+            }
+            other => panic!("expected overlong invalid intent, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn parse_search_intent_json_skips_overlong_candidates() {
+        let candidate = "a".repeat(MAX_LLM_SEARCH_TERM_LENGTH + 1);
+        let response = serde_json::json!({
+            "media_type": "anime",
+            "search": "cowboy bebop",
+            "candidates": [candidate, "samurai champloo"],
+        });
+
+        let intent = parse_search_intent_json(&response.to_string()).unwrap();
+
+        assert_eq!(intent.search, "cowboy bebop");
+        assert_eq!(intent.candidates, vec!["samurai champloo"]);
+    }
+
+    #[test]
     fn fallback_intent_infers_manga_keywords() {
         let intent = fallback_intent("find a manga like berserk");
 
@@ -670,6 +750,21 @@ mod tests {
 
         assert!(matches!(result, MediaSearchResult::NotFound));
         assert_eq!(source.calls(), vec!["anime:monster", "manga:monster"]);
+    }
+
+    #[tokio::test]
+    async fn fetch_search_result_accepts_long_valid_fallback_term() {
+        let source = FakeMediaSource::new();
+        let query = "a".repeat(MAX_LLM_SEARCH_TERM_LENGTH + 1);
+        let intent = fallback_intent(&query);
+
+        let result = fetch_search_result(&source, intent).await;
+
+        assert!(matches!(result, MediaSearchResult::NotFound));
+        assert_eq!(
+            source.calls(),
+            vec![format!("anime:{query}"), format!("manga:{query}")]
+        );
     }
 
     #[tokio::test]

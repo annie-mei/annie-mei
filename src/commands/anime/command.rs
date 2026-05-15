@@ -2,6 +2,7 @@ use std::collections::HashMap;
 
 use crate::{
     commands::{
+        input_validation::validate_search_term,
         response::CommandResponse,
         traits::{AniListSource, MediaDataSource},
     },
@@ -82,6 +83,14 @@ pub async fn run(ctx: &Context, interaction: &mut CommandInteraction) {
         return;
     };
     let search_term = search_term.clone();
+
+    if let Err(err) = validate_search_term(&search_term) {
+        let builder = EditInteractionResponse::new().content(format!(
+            "Invalid search input: {err}. Please check your input and try again."
+        ));
+        let _ = interaction.edit_response(&ctx.http, builder).await;
+        return;
+    }
 
     configure_sentry_scope("Anime", user.id.get(), Some(json!(search_term.clone())));
 
