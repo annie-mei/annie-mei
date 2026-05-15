@@ -2,7 +2,7 @@ use std::fmt;
 
 use crate::{
     commands::{
-        input_validation::validate_search_term,
+        input_validation::{ValidationError, validate_search_term},
         response::CommandResponse,
         traits::{AniListSource, MediaDataSource},
     },
@@ -31,6 +31,7 @@ use serenity::{
 use tracing::{info, instrument, warn};
 
 const NOT_FOUND_SEARCH: &str = "I couldn't find an anime or manga for that search.";
+const MAX_LLM_SEARCH_TERM_LENGTH: usize = 120;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum SearchMediaType {
@@ -108,9 +109,9 @@ impl SearchIntent {
     #[instrument(name = "command.search.intent_terms", skip(self))]
     fn search_terms(&self) -> Vec<String> {
         let mut terms = Vec::with_capacity(self.candidates.len() + 1);
-        push_unique_search_term(&mut terms, self.search.clone());
+        let _ = push_unique_search_term(&mut terms, self.search.clone());
         for candidate in &self.candidates {
-            push_unique_search_term(&mut terms, candidate.clone());
+            let _ = push_unique_search_term(&mut terms, candidate.clone());
         }
         terms
     }
@@ -417,14 +418,15 @@ fn validate_raw_intent(raw: RawSearchIntent) -> Result<SearchIntent, SearchInten
     };
 
     let mut search_terms = Vec::with_capacity(raw.candidates.len() + 1);
-    push_unique_search_term(&mut search_terms, normalize_search_phrase(&raw.search));
+    let primary_search_error =
+        push_unique_search_term(&mut search_terms, normalize_search_phrase(&raw.search)).err();
     for candidate in raw.candidates.into_iter().take(5) {
-        push_unique_search_term(&mut search_terms, normalize_search_phrase(&candidate));
+        let _ = push_unique_search_term(&mut search_terms, normalize_search_phrase(&candidate));
     }
 
     if search_terms.is_empty() {
         return Err(SearchIntentError::InvalidIntent(
-            "search cannot be empty".to_string(),
+            primary_search_error.unwrap_or_else(|| "search cannot be empty".to_string()),
         ));
     }
 
@@ -438,20 +440,41 @@ fn validate_raw_intent(raw: RawSearchIntent) -> Result<SearchIntent, SearchInten
 }
 
 #[instrument(name = "command.search.push_unique_term", skip(terms, term))]
-fn push_unique_search_term(terms: &mut Vec<String>, term: String) {
+fn push_unique_search_term(terms: &mut Vec<String>, term: String) -> Result<(), String> {
     let trimmed = term.trim();
-    if validate_search_term(trimmed).is_err() {
-        return;
-    }
+    validate_llm_search_term(trimmed)?;
 
     if terms
         .iter()
         .any(|existing| existing.eq_ignore_ascii_case(trimmed))
     {
-        return;
+        return Ok(());
     }
 
     terms.push(trimmed.to_string());
+    Ok(())
+}
+
+#[instrument(name = "command.search.validate_llm_term", skip(term))]
+fn validate_llm_search_term(term: &str) -> Result<(), String> {
+    match validate_search_term(term) {
+        Ok(()) => {}
+        Err(ValidationError::Empty) => return Err("search cannot be empty".to_string()),
+        Err(ValidationError::TooLong { max, actual }) => {
+            return Err(format!(
+                "search is too long ({actual} characters, max {max} allowed)"
+            ));
+        }
+    }
+
+    let actual = term.chars().count();
+    if actual > MAX_LLM_SEARCH_TERM_LENGTH {
+        return Err(format!(
+            "search is too long ({actual} characters, max {MAX_LLM_SEARCH_TERM_LENGTH} allowed)"
+        ));
+    }
+
+    Ok(())
 }
 
 #[instrument(name = "command.search.normalize_phrase", skip(search))]
@@ -608,8 +631,8 @@ mod tests {
     }
 
     #[test]
-    fn parse_search_intent_json_rejects_overlong_search() {
-        let search = "a".repeat(256);
+    fn parse_search_intent_json_rejects_overlong_search_with_specific_error() {
+        let search = "a".repeat(MAX_LLM_SEARCH_TERM_LENGTH + 1);
         let response = serde_json::json!({
             "media_type": "anime",
             "search": search,
@@ -617,12 +640,18 @@ mod tests {
 
         let result = parse_search_intent_json(&response.to_string());
 
-        assert!(matches!(result, Err(SearchIntentError::InvalidIntent(_))));
+        match result {
+            Err(SearchIntentError::InvalidIntent(error)) => {
+                assert!(error.contains("search is too long"));
+                assert!(error.contains("max 120 allowed"));
+            }
+            other => panic!("expected overlong invalid intent, got {other:?}"),
+        }
     }
 
     #[test]
     fn parse_search_intent_json_skips_overlong_candidates() {
-        let candidate = "a".repeat(256);
+        let candidate = "a".repeat(MAX_LLM_SEARCH_TERM_LENGTH + 1);
         let response = serde_json::json!({
             "media_type": "anime",
             "search": "cowboy bebop",
