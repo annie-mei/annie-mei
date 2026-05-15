@@ -100,20 +100,7 @@ pub enum MediaSearchResult {
         title_variant: Option<TitleVariant>,
         intent: SearchIntent,
     },
-    NotFound {
-        intent: SearchIntent,
-    },
-}
-
-impl MediaSearchResult {
-    #[instrument(name = "command.search.result_intent", skip(self))]
-    fn intent(&self) -> &SearchIntent {
-        match self {
-            Self::Anime { intent, .. } | Self::Manga { intent, .. } | Self::NotFound { intent } => {
-                intent
-            }
-        }
-    }
+    NotFound,
 }
 
 impl SearchIntent {
@@ -222,7 +209,7 @@ pub async fn fetch_search_result<S: MediaDataSource>(
                 }
             }
 
-            MediaSearchResult::NotFound { intent }
+            MediaSearchResult::NotFound
         }
     }
 }
@@ -242,7 +229,7 @@ async fn fetch_anime_candidates<S: MediaDataSource>(
         }
     }
 
-    MediaSearchResult::NotFound { intent }
+    MediaSearchResult::NotFound
 }
 
 #[instrument(name = "command.search.fetch_manga_candidates", skip(source, intent))]
@@ -260,7 +247,7 @@ async fn fetch_manga_candidates<S: MediaDataSource>(
         }
     }
 
-    MediaSearchResult::NotFound { intent }
+    MediaSearchResult::NotFound
 }
 
 #[instrument(name = "command.search.build_response", skip(result))]
@@ -280,9 +267,7 @@ pub fn build_response(result: MediaSearchResult) -> CommandResponse {
         } => CommandResponse::Embed(Box::new(
             manga.transform_response_embed(None, title_variant),
         )),
-        MediaSearchResult::NotFound { .. } => {
-            CommandResponse::Content(NOT_FOUND_SEARCH.to_string())
-        }
+        MediaSearchResult::NotFound => CommandResponse::Content(NOT_FOUND_SEARCH.to_string()),
     }
 }
 
@@ -340,18 +325,26 @@ pub async fn run(ctx: &Context, interaction: &mut CommandInteraction) {
         _ => {}
     }
 
-    let interpretation = format_interpretation(result.intent());
+    let interpretation = match &result {
+        MediaSearchResult::Anime { intent, .. } | MediaSearchResult::Manga { intent, .. } => {
+            Some(format_interpretation(intent))
+        }
+        MediaSearchResult::NotFound => None,
+    };
     let response = build_response(result);
     let _result = match response {
         CommandResponse::Content(text) | CommandResponse::Message(text) => {
-            let builder =
-                EditInteractionResponse::new().content(format!("{interpretation}\n{text}"));
+            let builder = EditInteractionResponse::new().content(match interpretation {
+                Some(interpretation) => format!("{interpretation}\n{text}"),
+                None => text,
+            });
             interaction.edit_response(&ctx.http, builder).await
         }
         CommandResponse::Embed(embed) => {
-            let builder = EditInteractionResponse::new()
-                .content(interpretation)
-                .embed(*embed);
+            let mut builder = EditInteractionResponse::new().embed(*embed);
+            if let Some(interpretation) = interpretation {
+                builder = builder.content(interpretation);
+            }
             interaction.edit_response(&ctx.http, builder).await
         }
     };
@@ -660,7 +653,7 @@ mod tests {
 
         let result = fetch_search_result(&source, intent).await;
 
-        assert!(matches!(result, MediaSearchResult::NotFound { .. }));
+        assert!(matches!(result, MediaSearchResult::NotFound));
         assert_eq!(source.calls(), vec!["anime:cowboy bebop"]);
     }
 
@@ -675,7 +668,7 @@ mod tests {
 
         let result = fetch_search_result(&source, intent).await;
 
-        assert!(matches!(result, MediaSearchResult::NotFound { .. }));
+        assert!(matches!(result, MediaSearchResult::NotFound));
         assert_eq!(source.calls(), vec!["anime:monster", "manga:monster"]);
     }
 
@@ -693,7 +686,7 @@ mod tests {
 
         let result = fetch_search_result(&source, intent).await;
 
-        assert!(matches!(result, MediaSearchResult::NotFound { .. }));
+        assert!(matches!(result, MediaSearchResult::NotFound));
         assert_eq!(
             source.calls(),
             vec![
