@@ -1,5 +1,7 @@
 # Annie Mei
 
+<!-- Environment verified -->
+
 A Discord bot written in Rust that fetches anime and manga information from AniList, with theme song lookups powered by MyAnimeList and Spotify.
 
 ![Rust](https://img.shields.io/badge/Rust-2024-orange?logo=rust)
