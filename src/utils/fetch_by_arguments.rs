@@ -5,10 +5,10 @@ use tracing::{info, instrument, warn};
 use wana_kana::{ConvertJapanese, IsJapaneseStr};
 
 /// Japanese particles reliable enough to split on in title searches.
-/// Only `の` is used — it is almost always a true particle in compound
-/// titles, whereas single-kana particles like は, と, で frequently
-/// appear inside words (e.g. はたらく, とじまり, です).
-const KANA_PARTICLES: &[&str] = &["の"];
+/// Only the hiragana/katakana forms of `no` are used — they are almost always
+/// true particles in compound titles, whereas single-kana particles like は,
+/// と, で frequently appear inside words (e.g. はたらく, とじまり, です).
+const KANA_PARTICLES: &[&str] = &["の", "ノ"];
 
 /// Splits kana text at particle boundaries and transliterates each segment,
 /// producing spaced romaji that AniList can match
@@ -106,21 +106,20 @@ pub async fn fetch_by_id(query: String, id: u32) -> Result<String, AniListReques
 
 #[instrument(name = "anilist.fetch_by_name", skip(query), fields(name_len = name.len()))]
 pub async fn fetch_by_name(query: String, name: String) -> Result<String, AniListRequestError> {
-    let searchable_name = if name.as_str().is_japanese() {
-        // Strategy 1: try the original kana — AniList may match native titles directly
+    if name.as_str().is_japanese() {
+        // Strategy 1: try the original Japanese input, but only keep it as a fallback.
+        // Short kana abbreviations can return weak partial native-title matches, while
+        // AniList often has a stronger romaji synonym/search match (e.g. このすば → konosuba).
         let kana_json = json!({"query": &query, "variables": {"search": &name}});
         let kana_result = send_request(kana_json).await?;
-        match has_media_results(&kana_result) {
-            Some(true) => {
-                info!(strategy = "kana", "Fetched By Name: {:#?}", name);
-                return Ok(kana_result);
-            }
+        let kana_fallback = match has_media_results(&kana_result) {
+            Some(true) => Some(kana_result),
             None => {
                 // GraphQL error — skip further strategies, return as-is
                 return Ok(kana_result);
             }
-            Some(false) => {}
-        }
+            Some(false) => None,
+        };
 
         // Strategy 2: particle-split romaji (e.g. きめつのやいば → kimetsu no yaiba)
         let spaced = kana_to_particle_spaced_romaji(&name);
@@ -138,17 +137,41 @@ pub async fn fetch_by_name(query: String, name: String) -> Result<String, AniLis
             }
         }
 
-        // Fallback: compact romaji (original behaviour)
-        compact
+        // Strategy 3: compact romaji (original behaviour). Prefer this over raw
+        // Japanese fallback when it has candidates, because those candidates tend
+        // to align better with downstream romaji/English fuzzy matching.
+        let compact_json = json!({"query": query, "variables": {"search": &compact}});
+        let compact_result = send_request(compact_json).await?;
+        match has_media_results(&compact_result) {
+            Some(true) => {
+                info!(
+                    strategy = "compact_romaji",
+                    "Fetched By Name: {:#?}", compact
+                );
+                Ok(compact_result)
+            }
+            None => Ok(compact_result),
+            Some(false) => {
+                if let Some(kana_result) = kana_fallback {
+                    info!(
+                        strategy = "japanese_fallback",
+                        "Fetched By Name: {:#?}", name
+                    );
+                    Ok(kana_result)
+                } else {
+                    Ok(compact_result)
+                }
+            }
+        }
     } else {
-        name.clone()
-    };
-    let json = json!({"query": query, "variables": {"search": &searchable_name}});
-    let result = send_request(json).await?;
+        let searchable_name = name.clone();
+        let json = json!({"query": query, "variables": {"search": &searchable_name}});
+        let result = send_request(json).await?;
 
-    info!("Fetched By Name: {:#?}", searchable_name);
+        info!("Fetched By Name: {:#?}", searchable_name);
 
-    Ok(result)
+        Ok(result)
+    }
 }
 
 #[instrument(name = "anilist.fetch_by_raw_name", skip(query), fields(name_len = name.len()))]
@@ -168,6 +191,12 @@ mod tests {
     #[test]
     fn spaced_romaji_splits_at_no_particle() {
         let result = kana_to_particle_spaced_romaji("きめつのやいば");
+        assert_eq!(result, "kimetsu no yaiba");
+    }
+
+    #[test]
+    fn spaced_romaji_splits_at_katakana_no_particle() {
+        let result = kana_to_particle_spaced_romaji("キメツノヤイバ");
         assert_eq!(result, "kimetsu no yaiba");
     }
 
