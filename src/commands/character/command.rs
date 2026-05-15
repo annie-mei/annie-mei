@@ -1,5 +1,6 @@
 use crate::{
     commands::{
+        input_validation::validate_search_term,
         response::CommandResponse,
         traits::{AniListSource, CharacterDataSource},
     },
@@ -100,6 +101,14 @@ pub async fn run(ctx: &Context, interaction: &mut CommandInteraction) {
         let _ = interaction.edit_response(&ctx.http, builder).await;
         return;
     };
+
+    if let Err(err) = validate_search_term(&search_term) {
+        let builder = EditInteractionResponse::new().content(format!(
+            "Invalid search input: {err}. Please check your input and try again."
+        ));
+        let _ = interaction.edit_response(&ctx.http, builder).await;
+        return;
+    }
 
     configure_sentry_scope("Character", user.id.get(), Some(json!(search_term.clone())));
 
