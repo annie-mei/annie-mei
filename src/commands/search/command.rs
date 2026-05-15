@@ -455,6 +455,7 @@ fn push_llm_search_term(terms: &mut Vec<String>, term: String) -> Result<(), Str
     Ok(())
 }
 
+#[instrument(name = "command.search.push_unique_trimmed_term", skip(terms, trimmed))]
 fn push_unique_trimmed_search_term(terms: &mut Vec<String>, trimmed: &str) {
     if terms
         .iter()
@@ -480,6 +481,7 @@ fn validate_llm_search_term(term: &str) -> Result<(), String> {
     Ok(())
 }
 
+#[instrument(name = "command.search.validation_error_message", skip(error))]
 fn search_validation_error_message(error: ValidationError) -> String {
     match error {
         ValidationError::Empty => "search cannot be empty".to_string(),
