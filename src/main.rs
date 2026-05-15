@@ -22,6 +22,7 @@ use serenity::{
 
 use utils::{
     database::{DatabasePoolKey, create_pool},
+    llm::configured_model_name,
     oauth::{OAuthContextConfigKey, load_context_config},
     privacy::{hash_user_id, redact_url_credentials},
     statics::{DISCORD_TOKEN, ENV, SENTRY_DSN, SENTRY_TRACES_SAMPLE_RATE},
@@ -190,6 +191,8 @@ async fn main() {
         .finish();
 
     subscriber.with(sentry_tracing::layer()).init();
+
+    info!(model = %configured_model_name(), "LLM model configured");
 
     if let Some(invalid_value) = sentry_traces_sample_rate_invalid {
         warn!(

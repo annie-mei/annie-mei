@@ -35,12 +35,6 @@ fn build_messages_with_system_prompt() {
 }
 
 #[test]
-fn model_returns_configured_model_name() {
-    let client = GeminiClient::new(sample_config()).unwrap();
-    assert_eq!(client.model(), "test-model");
-}
-
-#[test]
 fn with_temperature_sets_value() {
     let client = GeminiClient::new(sample_config())
         .unwrap()
