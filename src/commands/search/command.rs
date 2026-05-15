@@ -2,6 +2,7 @@ use std::fmt;
 
 use crate::{
     commands::{
+        input_validation::validate_search_term,
         response::CommandResponse,
         traits::{AniListSource, MediaDataSource},
     },
@@ -287,6 +288,14 @@ pub async fn run(ctx: &Context, interaction: &mut CommandInteraction) {
     };
     let query = query.clone();
 
+    if let Err(err) = validate_search_term(&query) {
+        let builder = EditInteractionResponse::new().content(format!(
+            "Invalid search input: {err}. Please check your input and try again."
+        ));
+        let _ = interaction.edit_response(&ctx.http, builder).await;
+        return;
+    }
+
     configure_sentry_scope("Search", user.id.get(), Some(json!(query.clone())));
 
     info!("Got command 'search'");
@@ -431,7 +440,7 @@ fn validate_raw_intent(raw: RawSearchIntent) -> Result<SearchIntent, SearchInten
 #[instrument(name = "command.search.push_unique_term", skip(terms, term))]
 fn push_unique_search_term(terms: &mut Vec<String>, term: String) {
     let trimmed = term.trim();
-    if trimmed.is_empty() || trimmed.chars().count() > 120 {
+    if validate_search_term(trimmed).is_err() {
         return;
     }
 
@@ -596,6 +605,34 @@ mod tests {
         let result = parse_search_intent_json(r#"{"media_type":"anime","search":"   "}"#);
 
         assert!(matches!(result, Err(SearchIntentError::InvalidIntent(_))));
+    }
+
+    #[test]
+    fn parse_search_intent_json_rejects_overlong_search() {
+        let search = "a".repeat(256);
+        let response = serde_json::json!({
+            "media_type": "anime",
+            "search": search,
+        });
+
+        let result = parse_search_intent_json(&response.to_string());
+
+        assert!(matches!(result, Err(SearchIntentError::InvalidIntent(_))));
+    }
+
+    #[test]
+    fn parse_search_intent_json_skips_overlong_candidates() {
+        let candidate = "a".repeat(256);
+        let response = serde_json::json!({
+            "media_type": "anime",
+            "search": "cowboy bebop",
+            "candidates": [candidate, "samurai champloo"],
+        });
+
+        let intent = parse_search_intent_json(&response.to_string()).unwrap();
+
+        assert_eq!(intent.search, "cowboy bebop");
+        assert_eq!(intent.candidates, vec!["samurai champloo"]);
     }
 
     #[test]
