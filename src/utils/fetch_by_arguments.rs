@@ -94,6 +94,22 @@ fn has_media_results(response: &str) -> Option<bool> {
     )
 }
 
+#[instrument(
+    name = "anilist.fetch_name_search",
+    skip(query),
+    fields(search_len = search.len())
+)]
+async fn fetch_name_search(
+    query: &str,
+    search: &str,
+) -> Result<(String, Option<bool>), AniListRequestError> {
+    let json = json!({"query": query, "variables": {"search": search}});
+    let result = send_request(json).await?;
+    let has_results = has_media_results(&result);
+
+    Ok((result, has_results))
+}
+
 #[instrument(name = "anilist.fetch_by_id", skip(query), fields(id = id))]
 pub async fn fetch_by_id(query: String, id: u32) -> Result<String, AniListRequestError> {
     let json = json!({"query": query, "variables": {"id":id}});
@@ -106,71 +122,62 @@ pub async fn fetch_by_id(query: String, id: u32) -> Result<String, AniListReques
 
 #[instrument(name = "anilist.fetch_by_name", skip(query), fields(name_len = name.len()))]
 pub async fn fetch_by_name(query: String, name: String) -> Result<String, AniListRequestError> {
-    if name.as_str().is_japanese() {
-        // Strategy 1: try the original Japanese input, but only keep it as a fallback.
-        // Short kana abbreviations can return weak partial native-title matches, while
-        // AniList often has a stronger romaji synonym/search match (e.g. このすば → konosuba).
-        let kana_json = json!({"query": &query, "variables": {"search": &name}});
-        let kana_result = send_request(kana_json).await?;
-        let kana_fallback = match has_media_results(&kana_result) {
-            Some(true) => Some(kana_result),
-            None => {
-                // GraphQL error — skip further strategies, return as-is
-                return Ok(kana_result);
-            }
-            Some(false) => None,
-        };
+    if !name.as_str().is_japanese() {
+        let (result, _) = fetch_name_search(&query, &name).await?;
+        info!("Fetched By Name: {:#?}", name);
+        return Ok(result);
+    }
 
-        // Strategy 2: particle-split romaji (e.g. きめつのやいば → kimetsu no yaiba)
-        let spaced = kana_to_particle_spaced_romaji(&name);
-        let compact = name.to_romaji();
-        if spaced != compact {
-            let spaced_json = json!({"query": &query, "variables": {"search": &spaced}});
-            let spaced_result = send_request(spaced_json).await?;
-            match has_media_results(&spaced_result) {
-                Some(true) => {
-                    info!(strategy = "spaced_romaji", "Fetched By Name: {:#?}", spaced);
-                    return Ok(spaced_result);
-                }
-                None => return Ok(spaced_result),
-                Some(false) => {}
-            }
-        }
+    // Try the original Japanese input, but only keep it as a fallback. Short kana
+    // abbreviations can return weak partial native-title matches, while AniList
+    // often has a stronger romaji synonym/search match (e.g. このすば → konosuba).
+    let (kana_result, kana_has_results) = fetch_name_search(&query, &name).await?;
+    let kana_fallback = match kana_has_results {
+        Some(true) => Some(kana_result),
+        None => return Ok(kana_result),
+        Some(false) => None,
+    };
 
-        // Strategy 3: compact romaji (original behaviour). Prefer this over raw
-        // Japanese fallback when it has candidates, because those candidates tend
-        // to align better with downstream romaji/English fuzzy matching.
-        let compact_json = json!({"query": query, "variables": {"search": &compact}});
-        let compact_result = send_request(compact_json).await?;
-        match has_media_results(&compact_result) {
+    // Prefer particle-split romaji when it returns candidates
+    // (e.g. きめつのやいば → kimetsu no yaiba).
+    let spaced = kana_to_particle_spaced_romaji(&name);
+    let compact = name.to_romaji();
+    if spaced != compact {
+        let (spaced_result, spaced_has_results) = fetch_name_search(&query, &spaced).await?;
+        match spaced_has_results {
             Some(true) => {
+                info!(strategy = "spaced_romaji", "Fetched By Name: {:#?}", spaced);
+                return Ok(spaced_result);
+            }
+            None => return Ok(spaced_result),
+            Some(false) => {}
+        }
+    }
+
+    // Prefer compact romaji (original behaviour) over raw Japanese fallback when
+    // it has candidates, because those candidates align better with downstream
+    // romaji/English fuzzy matching.
+    let (compact_result, compact_has_results) = fetch_name_search(&query, &compact).await?;
+    match compact_has_results {
+        Some(true) => {
+            info!(
+                strategy = "compact_romaji",
+                "Fetched By Name: {:#?}", compact
+            );
+            Ok(compact_result)
+        }
+        None => Ok(compact_result),
+        Some(false) => {
+            if let Some(kana_result) = kana_fallback {
                 info!(
-                    strategy = "compact_romaji",
-                    "Fetched By Name: {:#?}", compact
+                    strategy = "japanese_fallback",
+                    "Fetched By Name: {:#?}", name
                 );
+                Ok(kana_result)
+            } else {
                 Ok(compact_result)
             }
-            None => Ok(compact_result),
-            Some(false) => {
-                if let Some(kana_result) = kana_fallback {
-                    info!(
-                        strategy = "japanese_fallback",
-                        "Fetched By Name: {:#?}", name
-                    );
-                    Ok(kana_result)
-                } else {
-                    Ok(compact_result)
-                }
-            }
         }
-    } else {
-        let searchable_name = name.clone();
-        let json = json!({"query": query, "variables": {"search": &searchable_name}});
-        let result = send_request(json).await?;
-
-        info!("Fetched By Name: {:#?}", searchable_name);
-
-        Ok(result)
     }
 }
 
