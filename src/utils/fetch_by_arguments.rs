@@ -1,7 +1,7 @@
 use crate::utils::requests::anilist::{AniListRequestError, send_request};
 
 use serde_json::json;
-use tracing::{info, instrument};
+use tracing::{info, instrument, warn};
 use wana_kana::{ConvertJapanese, IsJapaneseStr};
 
 /// Japanese particles reliable enough to split on in title searches.
@@ -63,18 +63,35 @@ fn kana_to_particle_spaced_romaji(input: &str) -> String {
 }
 
 /// Checks whether an AniList Page response contains at least one media entry.
+///
+/// Returns `None` when the response carries a GraphQL-level error (so the
+/// caller can short-circuit instead of retrying with a different search term).
+/// Returns `Some(true)` when media results exist, `Some(false)` when the
+/// response is valid but empty.
 #[instrument(name = "anilist.has_media_results", skip(response))]
-fn has_media_results(response: &str) -> bool {
-    serde_json::from_str::<serde_json::Value>(response)
-        .ok()
-        .and_then(|v| {
-            v.get("data")
-                .and_then(|d| d.get("Page"))
-                .and_then(|p| p.get("media"))
-                .and_then(|m| m.as_array())
-                .map(|a| !a.is_empty())
-        })
-        .unwrap_or(false)
+fn has_media_results(response: &str) -> Option<bool> {
+    let value: serde_json::Value = match serde_json::from_str(response) {
+        Ok(v) => v,
+        Err(_) => return None,
+    };
+
+    if value
+        .get("errors")
+        .and_then(|e| e.as_array())
+        .is_some_and(|a| !a.is_empty())
+    {
+        warn!("AniList response contains GraphQL errors");
+        return None;
+    }
+
+    Some(
+        value
+            .get("data")
+            .and_then(|d| d.get("Page"))
+            .and_then(|p| p.get("media"))
+            .and_then(|m| m.as_array())
+            .is_some_and(|a| !a.is_empty()),
+    )
 }
 
 #[instrument(name = "anilist.fetch_by_id", skip(query), fields(id = id))]
@@ -93,9 +110,16 @@ pub async fn fetch_by_name(query: String, name: String) -> Result<String, AniLis
         // Strategy 1: try the original kana — AniList may match native titles directly
         let kana_json = json!({"query": &query, "variables": {"search": &name}});
         let kana_result = send_request(kana_json).await?;
-        if has_media_results(&kana_result) {
-            info!(strategy = "kana", "Fetched By Name: {:#?}", name);
-            return Ok(kana_result);
+        match has_media_results(&kana_result) {
+            Some(true) => {
+                info!(strategy = "kana", "Fetched By Name: {:#?}", name);
+                return Ok(kana_result);
+            }
+            None => {
+                // GraphQL error — skip further strategies, return as-is
+                return Ok(kana_result);
+            }
+            Some(false) => {}
         }
 
         // Strategy 2: particle-split romaji (e.g. きめつのやいば → kimetsu no yaiba)
@@ -104,9 +128,13 @@ pub async fn fetch_by_name(query: String, name: String) -> Result<String, AniLis
         if spaced != compact {
             let spaced_json = json!({"query": &query, "variables": {"search": &spaced}});
             let spaced_result = send_request(spaced_json).await?;
-            if has_media_results(&spaced_result) {
-                info!(strategy = "spaced_romaji", "Fetched By Name: {:#?}", spaced);
-                return Ok(spaced_result);
+            match has_media_results(&spaced_result) {
+                Some(true) => {
+                    info!(strategy = "spaced_romaji", "Fetched By Name: {:#?}", spaced);
+                    return Ok(spaced_result);
+                }
+                None => return Ok(spaced_result),
+                Some(false) => {}
             }
         }
 
@@ -177,32 +205,38 @@ mod tests {
     }
 
     #[test]
-    fn spaced_romaji_no_false_positive_particles() {
-        // Single-kana particles inside words are not split
-        let result = kana_to_particle_spaced_romaji("はたらくさいぼう");
-        assert_eq!(result, "hatarakusaibou");
+    fn spaced_romaji_medial_non_no_particle_not_split() {
+        // おとうと contains と in a medial position but it is not a split particle
+        let result = kana_to_particle_spaced_romaji("おとうと");
+        assert_eq!(result, "otouto");
     }
 
     #[test]
-    fn has_media_results_true_for_non_empty() {
+    fn has_media_results_some_true_for_non_empty() {
         let json = r#"{"data":{"Page":{"media":[{"id":1}]}}}"#;
-        assert!(has_media_results(json));
+        assert_eq!(has_media_results(json), Some(true));
     }
 
     #[test]
-    fn has_media_results_false_for_empty() {
+    fn has_media_results_some_false_for_empty() {
         let json = r#"{"data":{"Page":{"media":[]}}}"#;
-        assert!(!has_media_results(json));
+        assert_eq!(has_media_results(json), Some(false));
     }
 
     #[test]
-    fn has_media_results_false_for_missing_field() {
+    fn has_media_results_some_false_for_missing_field() {
         let json = r#"{"data":{"Page":{}}}"#;
-        assert!(!has_media_results(json));
+        assert_eq!(has_media_results(json), Some(false));
     }
 
     #[test]
-    fn has_media_results_false_for_invalid_json() {
-        assert!(!has_media_results("not json"));
+    fn has_media_results_none_for_invalid_json() {
+        assert_eq!(has_media_results("not json"), None);
+    }
+
+    #[test]
+    fn has_media_results_none_for_graphql_errors() {
+        let json = r#"{"data":null,"errors":[{"message":"query error"}]}"#;
+        assert_eq!(has_media_results(json), None);
     }
 }
