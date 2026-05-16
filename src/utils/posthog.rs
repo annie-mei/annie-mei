@@ -7,7 +7,7 @@ use std::{env, fmt, time::Duration};
 
 use reqwest::Client;
 use serde_json::{Value, json};
-use tracing::{debug, instrument, warn};
+use tracing::{debug, info, instrument, warn};
 
 use crate::utils::{
     statics::{ENV, POSTHOG_HOST, POSTHOG_PROJECT_API_KEY},
@@ -81,6 +81,7 @@ impl fmt::Debug for PostHogClient {
 }
 
 impl PostHogClient {
+    #[instrument(name = "posthog.client.new", skip(config), fields(host = %config.host))]
     pub fn new(config: PostHogConfig) -> Result<Self, String> {
         install_rustls_crypto_provider();
 
@@ -94,10 +95,16 @@ impl PostHogClient {
 
     #[instrument(name = "posthog.client.from_env")]
     pub fn from_env() -> Option<Self> {
-        let config = PostHogConfig::from_env()?;
+        let Some(config) = PostHogConfig::from_env() else {
+            debug!("PostHog project API key not configured; LLM analytics disabled");
+            return None;
+        };
 
         match Self::new(config) {
-            Ok(client) => Some(client),
+            Ok(client) => {
+                info!(host = %client.config.host, "PostHog LLM analytics enabled");
+                Some(client)
+            }
             Err(error) => {
                 warn!(error = %error, "PostHog client unavailable; LLM analytics disabled");
                 None
@@ -111,24 +118,59 @@ impl PostHogClient {
     /// Discord command.
     #[instrument(name = "posthog.capture", skip(self, event))]
     pub async fn capture(&self, event: Value) -> Result<(), String> {
+        let summary = CaptureLogSummary::from_event(&event);
         let body = serde_json::to_string(&event).map_err(|error| error.to_string())?;
+        let endpoint = self.config.capture_endpoint();
 
-        let response = self
+        info!(
+            endpoint = %endpoint,
+            event = summary.event.as_deref(),
+            ai_trace_id = summary.ai_trace_id.as_deref(),
+            ai_model = summary.ai_model.as_deref(),
+            environment = summary.environment.as_deref(),
+            command = summary.command.as_deref(),
+            "Sending PostHog capture event"
+        );
+
+        let response = match self
             .http
-            .post(self.config.capture_endpoint())
+            .post(&endpoint)
             .header("Content-Type", "application/json")
             .body(body)
             .send()
             .await
-            .map_err(|error| error.to_string())?;
+        {
+            Ok(response) => response,
+            Err(error) => {
+                warn!(
+                    error = %error,
+                    event = summary.event.as_deref(),
+                    ai_trace_id = summary.ai_trace_id.as_deref(),
+                    "PostHog capture request failed"
+                );
+                return Err(error.to_string());
+            }
+        };
 
-        if !response.status().is_success() {
-            let status = response.status();
+        let status = response.status();
+        if !status.is_success() {
             let body = response.text().await.unwrap_or_default();
+            warn!(
+                http_status = status.as_u16(),
+                event = summary.event.as_deref(),
+                ai_trace_id = summary.ai_trace_id.as_deref(),
+                response_body_length = body.len(),
+                "PostHog capture event rejected"
+            );
             return Err(format!("PostHog capture failed with HTTP {status}: {body}"));
         }
 
-        debug!("PostHog capture event sent");
+        info!(
+            http_status = status.as_u16(),
+            event = summary.event.as_deref(),
+            ai_trace_id = summary.ai_trace_id.as_deref(),
+            "PostHog capture event sent"
+        );
         Ok(())
     }
 
@@ -167,6 +209,45 @@ impl PostHogClient {
             total_tokens,
             error,
         )
+    }
+}
+
+#[derive(Debug, Default)]
+struct CaptureLogSummary {
+    event: Option<String>,
+    ai_trace_id: Option<String>,
+    ai_model: Option<String>,
+    environment: Option<String>,
+    command: Option<String>,
+}
+
+impl CaptureLogSummary {
+    #[instrument(name = "posthog.capture_log_summary.from_event", skip(event))]
+    fn from_event(event: &Value) -> Self {
+        let properties = event.get("properties");
+
+        Self {
+            event: event
+                .get("event")
+                .and_then(Value::as_str)
+                .map(ToString::to_string),
+            ai_trace_id: properties
+                .and_then(|properties| properties.get("$ai_trace_id"))
+                .and_then(Value::as_str)
+                .map(ToString::to_string),
+            ai_model: properties
+                .and_then(|properties| properties.get("$ai_model"))
+                .and_then(Value::as_str)
+                .map(ToString::to_string),
+            environment: properties
+                .and_then(|properties| properties.get("environment"))
+                .and_then(Value::as_str)
+                .map(ToString::to_string),
+            command: properties
+                .and_then(|properties| properties.get("command"))
+                .and_then(Value::as_str)
+                .map(ToString::to_string),
+        }
     }
 }
 
