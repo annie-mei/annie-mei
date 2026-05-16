@@ -67,7 +67,10 @@ pub struct SettingsWriteRequest {
 
 #[derive(Debug)]
 pub enum SettingsCommandPlan {
-    Read { key: SettingKey },
+    Read {
+        key: SettingKey,
+        scope: SettingScope,
+    },
     Write(SettingsWriteRequest),
     Respond(CommandResponse),
 }
@@ -129,15 +132,15 @@ pub fn register() -> CreateCommand {
 pub fn parse_settings_options(
     options: &[CommandDataOption],
 ) -> Result<SettingsCommandOptions, String> {
-    let action = required_string_option(options, ACTION_OPTION)
+    let action = optional_string_option(options, ACTION_OPTION)
         .and_then(parse_action)
         .ok_or_else(|| "Choose whether to `get` or `set` a setting.".to_string())?;
 
-    let key = required_string_option(options, KEY_OPTION)
+    let key = optional_string_option(options, KEY_OPTION)
         .and_then(SettingKey::parse)
         .ok_or_else(|| settings_help_message("Choose a valid setting key."))?;
 
-    let scope = required_string_option(options, SCOPE_OPTION)
+    let scope = optional_string_option(options, SCOPE_OPTION)
         .and_then(SettingScope::parse)
         .ok_or_else(|| "Choose a valid scope: `effective`, `user`, or `guild`.".to_string())?;
 
@@ -157,27 +160,36 @@ pub fn plan_settings_command(
     context: SettingsContext,
 ) -> SettingsCommandPlan {
     match options.action {
-        SettingsAction::Get => SettingsCommandPlan::Read { key: options.key },
+        SettingsAction::Get => SettingsCommandPlan::Read {
+            key: options.key,
+            scope: options.scope,
+        },
         SettingsAction::Set => plan_settings_write(options, context),
     }
 }
 
 #[instrument(name = "command.settings.format_layers", skip(layers))]
-pub fn format_setting_layers(layers: ResolvedSettingLayers, guild_id: Option<GuildId>) -> String {
+pub fn format_setting_layers(
+    layers: ResolvedSettingLayers,
+    guild_id: Option<GuildId>,
+    scope: SettingScope,
+) -> String {
     let key = layers.effective.key;
-    let guild_line = if guild_id.is_some() {
-        format_layer_value("Guild", layers.guild)
-    } else {
-        "Guild: not available in DMs".to_string()
+    let selected_layer = match scope {
+        SettingScope::Effective => format!(
+            "Effective: `{}` ({})",
+            layers.effective.value.as_storage_value(),
+            layers.effective.source
+        ),
+        SettingScope::User => format_layer_value("User", layers.user),
+        SettingScope::Guild if guild_id.is_some() => format_layer_value("Guild", layers.guild),
+        SettingScope::Guild => "Guild: not available in DMs".to_string(),
     };
 
     format!(
-        "**{}**\n{}\n{}\nEffective: `{}` ({})\n\n{}\nAllowed values: `{}`",
+        "**{}**\n{}\n\n{}\nAllowed values: `{}`",
         key.label(),
-        format_layer_value("User", layers.user),
-        guild_line,
-        layers.effective.value.as_storage_value(),
-        layers.effective.source,
+        selected_layer,
         key.description(),
         key.allowed_values().join("`, `"),
     )
@@ -238,11 +250,13 @@ pub async fn run(ctx: &Context, interaction: &mut CommandInteraction) {
 
     let response = match plan {
         SettingsCommandPlan::Respond(response) => response,
-        SettingsCommandPlan::Read { key } => {
+        SettingsCommandPlan::Read { key, scope } => {
             match resolve_setting_layers(&database_pool, user.id, interaction.guild_id, key).await {
-                Ok(layers) => {
-                    CommandResponse::Content(format_setting_layers(layers, interaction.guild_id))
-                }
+                Ok(layers) => CommandResponse::Content(format_setting_layers(
+                    layers,
+                    interaction.guild_id,
+                    scope,
+                )),
                 Err(error) => {
                     log_settings_storage_error("read", user.id, interaction.guild_id, &error);
                     CommandResponse::Content(
@@ -349,11 +363,6 @@ fn plan_settings_write(
     }
 }
 
-#[instrument(name = "command.settings.required_string_option", skip(options))]
-fn required_string_option<'a>(options: &'a [CommandDataOption], name: &str) -> Option<&'a str> {
-    optional_string_option(options, name)
-}
-
 #[instrument(name = "command.settings.optional_string_option", skip(options))]
 fn optional_string_option<'a>(options: &'a [CommandDataOption], name: &str) -> Option<&'a str> {
     options
@@ -404,7 +413,7 @@ fn settings_help_message(prefix: &str) -> String {
     format!("{prefix} Available settings: {settings}.")
 }
 
-#[instrument(name = "command.settings.log_storage_error", skip(error))]
+#[instrument(name = "command.settings.log_storage_error", skip(error, user_id))]
 fn log_settings_storage_error(
     operation: &str,
     user_id: UserId,
@@ -420,6 +429,7 @@ fn log_settings_storage_error(
     );
 }
 
+#[instrument(name = "command.settings.respond", skip(interaction, ctx, response))]
 async fn respond(interaction: &mut CommandInteraction, ctx: &Context, response: CommandResponse) {
     let builder = match response {
         CommandResponse::Content(content) => EditInteractionResponse::new().content(content),
@@ -463,6 +473,50 @@ mod tests {
         assert_eq!(parsed.key, SettingKey::TitleDisplay);
         assert_eq!(parsed.scope, SettingScope::Effective);
         assert_eq!(parsed.value, None);
+    }
+
+    #[test]
+    fn plans_read_with_requested_scope() {
+        let options = SettingsCommandOptions {
+            action: SettingsAction::Get,
+            key: SettingKey::TitleDisplay,
+            scope: SettingScope::User,
+            value: None,
+        };
+        let context = SettingsContext {
+            user_id: UserId::new(42),
+            guild_id: Some(GuildId::new(7)),
+            member_permissions: None,
+        };
+
+        let SettingsCommandPlan::Read { key, scope } = plan_settings_command(options, context)
+        else {
+            panic!("expected read request")
+        };
+
+        assert_eq!(key, SettingKey::TitleDisplay);
+        assert_eq!(scope, SettingScope::User);
+    }
+
+    #[test]
+    fn formats_only_requested_read_scope() {
+        let layers = ResolvedSettingLayers {
+            user: SettingKey::TitleDisplay.parse_value("romaji").ok(),
+            guild: SettingKey::TitleDisplay.parse_value("english").ok(),
+            effective: crate::models::settings::resolve_setting(
+                SettingKey::TitleDisplay,
+                crate::models::settings::ScopedSettingValues {
+                    user: SettingKey::TitleDisplay.parse_value("romaji").ok(),
+                    guild: SettingKey::TitleDisplay.parse_value("english").ok(),
+                },
+            ),
+        };
+
+        let content = format_setting_layers(layers, Some(GuildId::new(7)), SettingScope::User);
+
+        assert!(content.contains("User: `romaji`"));
+        assert!(!content.contains("Guild: `english`"));
+        assert!(!content.contains("Effective: `romaji`"));
     }
 
     #[test]
