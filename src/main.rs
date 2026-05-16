@@ -59,11 +59,14 @@ impl EventHandler for Handler {
     #[instrument(name = "discord.interaction_create", skip_all)]
     async fn interaction_create(&self, ctx: Context, interaction: Interaction) {
         if let Interaction::Command(mut command) = interaction {
+            let guild_id = command
+                .guild_id
+                .map(|guild_id| hash_discord_id(guild_id.get()).to_string());
             let command_span = info_span!(
                 "discord.command",
                 command_name = %command.data.name,
                 user_id = %hash_user_id(command.user.id.get()),
-                guild_id = ?command.guild_id
+                guild_id = guild_id.as_deref()
             );
 
             async {
