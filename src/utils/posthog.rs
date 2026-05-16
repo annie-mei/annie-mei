@@ -364,7 +364,10 @@ pub fn build_ai_generation_event(
 }
 
 /// Testable payload construction for Discord command usage analytics.
-#[instrument(name = "posthog.build_command_hit_event", skip(context))]
+#[instrument(
+    name = "posthog.build_command_hit_event",
+    skip(project_api_key, context)
+)]
 pub fn build_command_hit_event(project_api_key: &str, context: &CommandTelemetryContext) -> Value {
     let distinct_id = context
         .distinct_id
