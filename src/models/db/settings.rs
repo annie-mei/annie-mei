@@ -67,7 +67,7 @@ pub struct ResolvedSettingLayers {
 
 #[instrument(
     name = "db.settings.set_user_setting",
-    skip(pool),
+    skip(pool, user_discord_id, value),
     fields(
         discord_user_id = %hash_user_id(user_discord_id.get()),
         setting_key = %value.key().as_str()
@@ -77,7 +77,7 @@ pub async fn set_user_setting(
     pool: &DbPool,
     user_discord_id: UserId,
     value: SettingValue,
-) -> Result<(), sqlx::Error> {
+) -> Result<(), SettingsStorageError> {
     sqlx::query(
         "INSERT INTO user_settings (discord_user_id, setting_key, setting_value) \
          VALUES ($1, $2, $3) \
@@ -95,14 +95,14 @@ pub async fn set_user_setting(
 
 #[instrument(
     name = "db.settings.set_guild_setting",
-    skip(pool),
+    skip(pool, value),
     fields(guild_id = %guild_id.get(), setting_key = %value.key().as_str())
 )]
 pub async fn set_guild_setting(
     pool: &DbPool,
     guild_id: GuildId,
     value: SettingValue,
-) -> Result<(), sqlx::Error> {
+) -> Result<(), SettingsStorageError> {
     sqlx::query(
         "INSERT INTO guild_settings (guild_id, setting_key, setting_value) \
          VALUES ($1, $2, $3) \
@@ -120,7 +120,7 @@ pub async fn set_guild_setting(
 
 #[instrument(
     name = "db.settings.get_user_setting",
-    skip(pool),
+    skip(pool, user_discord_id),
     fields(
         discord_user_id = %hash_user_id(user_discord_id.get()),
         setting_key = %setting_key.as_str()
@@ -167,7 +167,7 @@ pub async fn get_guild_setting(
 
 #[instrument(
     name = "db.settings.resolve_setting_layers",
-    skip(pool),
+    skip(pool, user_discord_id),
     fields(
         discord_user_id = %hash_user_id(user_discord_id.get()),
         guild_id = guild_id.map(|id| id.get()),
