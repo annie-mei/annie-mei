@@ -127,10 +127,11 @@ Notes:
 
 ### Database Changes
 
-The bot uses **SQLx** for database access. The auth-service owns the schema;
-the bot only reads from the shared `oauth_credentials` table.
+The bot uses **SQLx** for database access. The auth-service owns OAuth schema;
+the bot reads from the shared `oauth_credentials` table and owns Annie Mei-specific
+settings tables such as `user_settings` and `guild_settings`.
 
-1. The bot does not manage schema migrations
+1. Keep migrations limited to bot-owned tables; coordinate auth-service schema changes in the auth-service
 2. Use `sqlx::query_as()` with `#[derive(FromRow)]` for queries
 3. All database operations are async - no `spawn_blocking` needed for DB
 4. Use `pool.begin().await` for transactions
