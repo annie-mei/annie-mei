@@ -3,11 +3,10 @@
 //! This module intentionally uses PostHog's capture API directly instead of a
 //! Rust SDK so LLM Analytics payloads stay explicit and easy to test.
 
-use std::{env, fmt, sync::Arc, time::Duration};
+use std::{env, fmt, time::Duration};
 
 use reqwest::Client;
 use serde_json::{Value, json};
-use serenity::{client::Context, prelude::TypeMapKey};
 use tracing::{debug, info, instrument, warn};
 
 use crate::utils::{
@@ -17,6 +16,9 @@ use crate::utils::{
 
 const DEFAULT_POSTHOG_HOST: &str = "https://us.i.posthog.com";
 const DEFAULT_TIMEOUT_SECS: u64 = 5;
+const COMMAND_HIT_EVENT: &str = "discord_command_hit";
+const SOURCE_DISCORD: &str = "discord";
+const INTERACTION_TYPE_SLASH_COMMAND: &str = "slash_command";
 
 /// Per-call context that is safe to send to PostHog.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
@@ -44,10 +46,6 @@ pub struct CommandTelemetryContext {
     pub command: String,
     /// Runtime environment, such as `development`, `staging`, or `production`.
     pub environment: Option<String>,
-    /// Bot package version.
-    pub bot_version: String,
-    /// Event source, such as `discord`.
-    pub source: String,
     /// Whether the command was sent in a direct message.
     pub is_dm: bool,
     /// Whether the Discord channel is marked NSFW.
@@ -244,18 +242,6 @@ impl PostHogClient {
     }
 }
 
-pub struct PostHogClientKey;
-
-impl TypeMapKey for PostHogClientKey {
-    type Value = Arc<PostHogClient>;
-}
-
-#[instrument(name = "posthog.client_from_context", skip(ctx))]
-pub async fn get_posthog_client_from_context(ctx: &Context) -> Option<Arc<PostHogClient>> {
-    let data = ctx.data.read().await;
-    data.get::<PostHogClientKey>().cloned()
-}
-
 #[derive(Debug, Default)]
 struct CaptureLogSummary {
     event: Option<String>,
@@ -388,9 +374,12 @@ pub fn build_command_hit_event(project_api_key: &str, context: &CommandTelemetry
     let mut properties = serde_json::Map::new();
     properties.insert("distinct_id".to_string(), json!(distinct_id));
     properties.insert("command".to_string(), json!(context.command));
-    properties.insert("bot_version".to_string(), json!(context.bot_version));
-    properties.insert("source".to_string(), json!(context.source));
-    properties.insert("interaction_type".to_string(), json!("slash_command"));
+    properties.insert("bot_version".to_string(), json!(env!("CARGO_PKG_VERSION")));
+    properties.insert("source".to_string(), json!(SOURCE_DISCORD));
+    properties.insert(
+        "interaction_type".to_string(),
+        json!(INTERACTION_TYPE_SLASH_COMMAND),
+    );
     properties.insert("is_dm".to_string(), json!(context.is_dm));
     properties.insert("channel_nsfw".to_string(), json!(context.channel_nsfw));
 
@@ -408,7 +397,7 @@ pub fn build_command_hit_event(project_api_key: &str, context: &CommandTelemetry
 
     json!({
         "api_key": project_api_key,
-        "event": "discord_command_hit",
+        "event": COMMAND_HIT_EVENT,
         "distinct_id": distinct_id,
         "properties": properties,
     })

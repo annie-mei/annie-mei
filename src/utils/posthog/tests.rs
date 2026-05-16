@@ -99,8 +99,6 @@ fn command_hit_payload_includes_safe_command_context() {
         guild_id: Some("guild_hash".to_string()),
         command: "anime".to_string(),
         environment: Some("test".to_string()),
-        bot_version: "2.19.3".to_string(),
-        source: "discord".to_string(),
         is_dm: false,
         channel_nsfw: true,
     };
@@ -115,7 +113,7 @@ fn command_hit_payload_includes_safe_command_context() {
     assert_eq!(properties["guild_id"], "guild_hash");
     assert_eq!(properties["command"], "anime");
     assert_eq!(properties["environment"], "test");
-    assert_eq!(properties["bot_version"], "2.19.3");
+    assert_eq!(properties["bot_version"], env!("CARGO_PKG_VERSION"));
     assert_eq!(properties["source"], "discord");
     assert_eq!(properties["interaction_type"], "slash_command");
     assert_eq!(properties["is_dm"], false);

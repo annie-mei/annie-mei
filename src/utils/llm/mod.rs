@@ -234,7 +234,7 @@ impl fmt::Debug for GeminiClientConfig {
 pub struct GeminiClient {
     config: GeminiClientConfig,
     http: Client,
-    posthog: Option<PostHogClient>,
+    posthog: Option<Arc<PostHogClient>>,
 }
 
 impl GeminiClient {
@@ -267,15 +267,13 @@ impl GeminiClient {
         let base_url = env::var(LLM_BASE_URL).unwrap_or_else(|_| DEFAULT_BASE_URL.to_string());
         let model = configured_model_name();
 
-        let mut client = Self::new(GeminiClientConfig {
+        Self::new(GeminiClientConfig {
             api_key,
             base_url,
             model,
             system_prompt: None,
             temperature: None,
-        })?;
-        client.posthog = PostHogClient::from_env();
-        Ok(client)
+        })
     }
 
     /// Build a client from environment variables with a system prompt.
@@ -300,6 +298,12 @@ impl GeminiClient {
         }
         self.config.temperature = Some(temperature);
         Ok(self)
+    }
+
+    #[instrument(name = "llm.with_posthog", skip(self, posthog))]
+    pub fn with_posthog(mut self, posthog: Option<Arc<PostHogClient>>) -> Self {
+        self.posthog = posthog;
+        self
     }
 
     // ── Internal helpers ─────────────────────────────────────────────
