@@ -105,7 +105,7 @@ pub async fn run(ctx: &Context, interaction: &mut CommandInteraction) {
     // Block adult content in non-NSFW channels.
     if let Some(ref anime) = anime_result
         && anime.is_adult()
-        && !is_nsfw_channel(ctx, interaction.channel_id).await
+        && !is_nsfw_channel(ctx, interaction.channel_id, interaction.guild_id).await
     {
         let builder = EditInteractionResponse::new().content(NSFW_NOT_ALLOWED);
         let _ = interaction.edit_response(&ctx.http, builder).await;

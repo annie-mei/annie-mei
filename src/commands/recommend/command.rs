@@ -170,7 +170,8 @@ pub async fn run(ctx: &Context, interaction: &mut CommandInteraction) {
         Some((media, variant)) => (Some(media), Some(variant)),
         None => (None, None),
     };
-    let allow_adult_media = is_nsfw_channel(ctx, interaction.channel_id).await;
+    let allow_adult_media =
+        is_nsfw_channel(ctx, interaction.channel_id, interaction.guild_id).await;
     let response = handle_recommend(media, media_type, title_variant, allow_adult_media);
 
     let _result = match response {

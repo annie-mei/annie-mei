@@ -123,7 +123,7 @@ pub async fn run(ctx: &Context, interaction: &mut CommandInteraction) {
         .as_ref()
         .is_some_and(Character::has_adult_media)
     {
-        is_nsfw_channel(ctx, interaction.channel_id).await
+        is_nsfw_channel(ctx, interaction.channel_id, interaction.guild_id).await
     } else {
         false
     };

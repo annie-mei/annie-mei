@@ -15,7 +15,7 @@ use crate::{
         channel::is_nsfw_channel,
         llm::{LlmError, get_gemini_client_from_context},
         posthog::LlmTelemetryContext,
-        privacy::{configure_sentry_scope, hash_user_id},
+        privacy::{configure_sentry_scope, hash_discord_id, hash_user_id},
         statics::ENV,
         statics::NSFW_NOT_ALLOWED,
     },
@@ -311,7 +311,7 @@ pub async fn run(ctx: &Context, interaction: &mut CommandInteraction) {
                 distinct_id: Some(hash_user_id(user.id.get()).to_string()),
                 guild_id: interaction
                     .guild_id
-                    .map(|guild_id| hash_user_id(guild_id.get()).to_string()),
+                    .map(|guild_id| hash_discord_id(guild_id.get()).to_string()),
                 command: Some("search".to_string()),
                 environment: std::env::var(ENV).ok(),
                 input: Some(json!([
@@ -344,14 +344,16 @@ pub async fn run(ctx: &Context, interaction: &mut CommandInteraction) {
 
     match &result {
         MediaSearchResult::Anime { anime, .. }
-            if anime.is_adult() && !is_nsfw_channel(ctx, interaction.channel_id).await =>
+            if anime.is_adult()
+                && !is_nsfw_channel(ctx, interaction.channel_id, interaction.guild_id).await =>
         {
             let builder = EditInteractionResponse::new().content(NSFW_NOT_ALLOWED);
             let _ = interaction.edit_response(&ctx.http, builder).await;
             return;
         }
         MediaSearchResult::Manga { manga, .. }
-            if manga.is_adult() && !is_nsfw_channel(ctx, interaction.channel_id).await =>
+            if manga.is_adult()
+                && !is_nsfw_channel(ctx, interaction.channel_id, interaction.guild_id).await =>
         {
             let builder = EditInteractionResponse::new().content(NSFW_NOT_ALLOWED);
             let _ = interaction.edit_response(&ctx.http, builder).await;

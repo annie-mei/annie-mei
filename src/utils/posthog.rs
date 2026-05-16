@@ -16,6 +16,9 @@ use crate::utils::{
 
 const DEFAULT_POSTHOG_HOST: &str = "https://us.i.posthog.com";
 const DEFAULT_TIMEOUT_SECS: u64 = 5;
+const COMMAND_HIT_EVENT: &str = "discord_command_hit";
+const SOURCE_DISCORD: &str = "discord";
+const INTERACTION_TYPE_SLASH_COMMAND: &str = "slash_command";
 
 /// Per-call context that is safe to send to PostHog.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
@@ -30,6 +33,23 @@ pub struct LlmTelemetryContext {
     pub environment: Option<String>,
     /// Optional display-friendly input for LLM Analytics when content capture is enabled.
     pub input: Option<Value>,
+}
+
+/// Per-command context that is safe to send to PostHog.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct CommandTelemetryContext {
+    /// Stable, salted hash for the Discord user. Never a raw Discord ID.
+    pub distinct_id: Option<String>,
+    /// Stable, salted hash for the Discord guild. Never a raw Discord ID.
+    pub guild_id: Option<String>,
+    /// Slash command name.
+    pub command: String,
+    /// Runtime environment, such as `development`, `staging`, or `production`.
+    pub environment: Option<String>,
+    /// Whether the command was sent in a direct message.
+    pub is_dm: bool,
+    /// Whether the Discord channel is marked NSFW.
+    pub channel_nsfw: bool,
 }
 
 /// Configuration for PostHog LLM Analytics capture.
@@ -100,17 +120,17 @@ impl PostHogClient {
     #[instrument(name = "posthog.client.from_env")]
     pub fn from_env() -> Option<Self> {
         let Some(config) = PostHogConfig::from_env() else {
-            debug!("PostHog project API key not configured; LLM analytics disabled");
+            debug!("PostHog project API key not configured; analytics disabled");
             return None;
         };
 
         match Self::new(config) {
             Ok(client) => {
-                info!(host = %client.config.host, "PostHog LLM analytics enabled");
+                info!(host = %client.config.host, "PostHog analytics enabled");
                 Some(client)
             }
             Err(error) => {
-                warn!(error = %error, "PostHog client unavailable; LLM analytics disabled");
+                warn!(error = %error, "PostHog client unavailable; analytics disabled");
                 None
             }
         }
@@ -213,6 +233,12 @@ impl PostHogClient {
             total_tokens,
             error,
         )
+    }
+
+    /// Build a generic Discord slash command hit event payload.
+    #[instrument(name = "posthog.build_command_hit", skip(self))]
+    pub fn build_command_hit_event(&self, context: &CommandTelemetryContext) -> Value {
+        build_command_hit_event(&self.config.project_api_key, context)
     }
 }
 
@@ -337,6 +363,49 @@ pub fn build_ai_generation_event(
     })
 }
 
+/// Testable payload construction for Discord command usage analytics.
+#[instrument(
+    name = "posthog.build_command_hit_event",
+    skip(project_api_key, context)
+)]
+pub fn build_command_hit_event(project_api_key: &str, context: &CommandTelemetryContext) -> Value {
+    let distinct_id = context
+        .distinct_id
+        .as_deref()
+        .unwrap_or("annie-mei-unknown-user");
+
+    let mut properties = serde_json::Map::new();
+    properties.insert("distinct_id".to_string(), json!(distinct_id));
+    properties.insert("command".to_string(), json!(context.command));
+    properties.insert("bot_version".to_string(), json!(env!("CARGO_PKG_VERSION")));
+    properties.insert("source".to_string(), json!(SOURCE_DISCORD));
+    properties.insert(
+        "interaction_type".to_string(),
+        json!(INTERACTION_TYPE_SLASH_COMMAND),
+    );
+    properties.insert("is_dm".to_string(), json!(context.is_dm));
+    properties.insert("channel_nsfw".to_string(), json!(context.channel_nsfw));
+
+    if let Some(environment) = context
+        .environment
+        .as_deref()
+        .or(option_env(ENV).as_deref())
+    {
+        properties.insert("environment".to_string(), json!(environment));
+    }
+
+    if let Some(guild_id) = &context.guild_id {
+        properties.insert("guild_id".to_string(), json!(guild_id));
+    }
+
+    json!({
+        "api_key": project_api_key,
+        "event": COMMAND_HIT_EVENT,
+        "distinct_id": distinct_id,
+        "properties": properties,
+    })
+}
+
 fn option_env(name: &str) -> Option<String> {
     env::var(name).ok().filter(|value| !value.trim().is_empty())
 }
@@ -352,96 +421,4 @@ fn env_flag(name: &str, default: bool) -> bool {
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn ai_generation_payload_excludes_content_by_default() {
-        let context = LlmTelemetryContext {
-            distinct_id: Some("user_hash".to_string()),
-            guild_id: Some("guild_hash".to_string()),
-            command: Some("search".to_string()),
-            environment: Some("test".to_string()),
-            input: None,
-        };
-
-        let event = build_ai_generation_event(
-            "ph_key",
-            false,
-            &context,
-            "trace-id",
-            "gemini-2.0-flash",
-            "gemini",
-            1.25,
-            Some(json!([{ "role": "user", "content": "raw prompt" }])),
-            Some(json!([{ "role": "assistant", "content": "raw output" }])),
-            Some(10),
-            Some(20),
-            Some(30),
-            None,
-        );
-
-        let properties = event["properties"].as_object().unwrap();
-        assert_eq!(event["api_key"], "ph_key");
-        assert_eq!(event["event"], "$ai_generation");
-        assert_eq!(event["distinct_id"], "user_hash");
-        assert_eq!(properties["distinct_id"], "user_hash");
-        assert_eq!(properties["guild_id"], "guild_hash");
-        assert_eq!(properties["command"], "search");
-        assert_eq!(properties["environment"], "test");
-        assert_eq!(properties["$ai_model"], "gemini-2.0-flash");
-        assert_eq!(properties["$ai_provider"], "gemini");
-        assert_eq!(properties["$ai_input_tokens"], 10);
-        assert_eq!(properties["$ai_output_tokens"], 20);
-        assert_eq!(properties["$ai_total_tokens"], 30);
-        assert!(!properties.contains_key("$ai_input"));
-        assert!(!properties.contains_key("$ai_output_choices"));
-    }
-
-    #[test]
-    fn ai_generation_payload_includes_content_when_enabled() {
-        let event = build_ai_generation_event(
-            "ph_key",
-            true,
-            &LlmTelemetryContext::default(),
-            "trace-id",
-            "gemini-2.0-flash",
-            "gemini",
-            1.25,
-            Some(json!([{ "role": "user", "content": "raw prompt" }])),
-            Some(json!([{ "role": "assistant", "content": "raw output" }])),
-            None,
-            None,
-            None,
-            None,
-        );
-
-        let properties = event["properties"].as_object().unwrap();
-        assert_eq!(properties["$ai_input"][0]["content"], "raw prompt");
-        assert_eq!(properties["$ai_output_choices"][0]["content"], "raw output");
-    }
-
-    #[test]
-    fn ai_generation_payload_records_errors_without_content() {
-        let event = build_ai_generation_event(
-            "ph_key",
-            false,
-            &LlmTelemetryContext::default(),
-            "trace-id",
-            "gemini-2.0-flash",
-            "gemini",
-            0.5,
-            Some(json!([{ "role": "user", "content": "raw prompt" }])),
-            None,
-            None,
-            None,
-            None,
-            Some("HTTP request failed"),
-        );
-
-        let properties = event["properties"].as_object().unwrap();
-        assert!(!properties["success"].as_bool().unwrap());
-        assert_eq!(properties["$ai_error"], "HTTP request failed");
-        assert!(!properties.contains_key("$ai_input"));
-    }
-}
+mod tests;

@@ -21,10 +21,12 @@ use serenity::{
 };
 
 use utils::{
+    channel::is_nsfw_channel,
     database::{DatabasePoolKey, create_pool},
     llm::{GeminiClient, GeminiClientKey, configured_model_name},
     oauth::{OAuthContextConfigKey, load_context_config},
-    privacy::{hash_user_id, redact_url_credentials},
+    posthog::{CommandTelemetryContext, PostHogClient},
+    privacy::{hash_discord_id, hash_user_id, redact_url_credentials},
     statics::{DISCORD_TOKEN, ENV, SENTRY_DSN, SENTRY_TRACES_SAMPLE_RATE},
     tls::install_rustls_crypto_provider,
 };
@@ -47,22 +49,29 @@ enum Commands {
     },
 }
 
-struct Handler;
+struct Handler {
+    posthog: Option<Arc<PostHogClient>>,
+    environment: Option<String>,
+}
 
 #[async_trait]
 impl EventHandler for Handler {
     #[instrument(name = "discord.interaction_create", skip_all)]
     async fn interaction_create(&self, ctx: Context, interaction: Interaction) {
         if let Interaction::Command(mut command) = interaction {
+            let guild_id = command
+                .guild_id
+                .map(|guild_id| hash_discord_id(guild_id.get()).to_string());
             let command_span = info_span!(
                 "discord.command",
                 command_name = %command.data.name,
                 user_id = %hash_user_id(command.user.id.get()),
-                guild_id = ?command.guild_id
+                guild_id = guild_id.as_deref()
             );
 
             async {
                 info!("Received command interaction");
+                self.capture_command_hit(&ctx, &command);
 
                 match command.data.name.as_str() {
                     "ping" => commands::ping::run(&ctx, &command).await,
@@ -122,6 +131,44 @@ impl EventHandler for Handler {
     }
 }
 
+impl Handler {
+    #[instrument(name = "posthog.capture_command_hit", skip(self, ctx, command))]
+    fn capture_command_hit(&self, ctx: &Context, command: &serenity::all::CommandInteraction) {
+        let Some(posthog) = self.posthog.clone() else {
+            return;
+        };
+
+        let ctx = ctx.clone();
+        let distinct_id = Some(hash_user_id(command.user.id.get()).to_string());
+        let guild_id = command
+            .guild_id
+            .map(|guild_id| hash_discord_id(guild_id.get()).to_string());
+        let command_name = command.data.name.clone();
+        let environment = self.environment.clone();
+        let is_dm = command.guild_id.is_none();
+        let channel_guild_id = command.guild_id;
+        let channel_id = command.channel_id;
+
+        tokio::spawn(
+            async move {
+                let event = posthog.build_command_hit_event(&CommandTelemetryContext {
+                    distinct_id,
+                    guild_id,
+                    command: command_name,
+                    environment,
+                    is_dm,
+                    channel_nsfw: is_nsfw_channel(&ctx, channel_id, channel_guild_id).await,
+                });
+
+                if let Err(error) = posthog.capture(event).await {
+                    warn!(error = %error, "PostHog command hit capture failed");
+                }
+            }
+            .instrument(tracing::Span::current()),
+        );
+    }
+}
+
 #[tokio::main]
 #[instrument(name = "app.main")]
 async fn main() {
@@ -138,6 +185,7 @@ async fn main() {
     install_rustls_crypto_provider();
 
     let environment = env::var(ENV).expect("Expected an environment in the environment");
+    let telemetry_environment = Some(environment.clone());
     let sentry_dsn = env::var(SENTRY_DSN).expect("Expected a sentry dsn in the environment");
     let sentry_traces_sample_rate_raw = env::var(SENTRY_TRACES_SAMPLE_RATE).ok();
     let (sentry_traces_sample_rate, sentry_traces_sample_rate_invalid) =
@@ -195,10 +243,12 @@ async fn main() {
     subscriber.with(sentry_tracing::layer()).init();
 
     info!(model = %configured_model_name(), "LLM model configured");
+    let posthog_client = PostHogClient::from_env().map(Arc::new);
     let gemini_client = match GeminiClient::from_env_with_system_prompt(
         commands::search::prompts::SEARCH_SYSTEM_PROMPT,
     )
     .and_then(|client| client.with_temperature(0.0))
+    .map(|client| client.with_posthog(posthog_client.clone()))
     {
         Ok(client) => Some(Arc::new(client)),
         Err(error) => {
@@ -236,7 +286,10 @@ async fn main() {
 
     info!("Creating Discord client");
     let mut client = Client::builder(&token, intents)
-        .event_handler(Handler)
+        .event_handler(Handler {
+            posthog: posthog_client,
+            environment: telemetry_environment,
+        })
         .await
         .expect("Err creating client");
 
