@@ -10,7 +10,7 @@ use serde_json::{Value, json};
 use tracing::{debug, info, instrument, warn};
 
 use crate::utils::{
-    statics::{ENV, POSTHOG_HOST, POSTHOG_PROJECT_API_KEY},
+    statics::{ENV, POSTHOG_CAPTURE_LLM_CONTENT, POSTHOG_HOST, POSTHOG_PROJECT_API_KEY},
     tls::install_rustls_crypto_provider,
 };
 
@@ -37,6 +37,7 @@ pub struct LlmTelemetryContext {
 pub struct PostHogConfig {
     pub project_api_key: String,
     pub host: String,
+    pub capture_content: bool,
 }
 
 impl PostHogConfig {
@@ -52,10 +53,12 @@ impl PostHogConfig {
         };
 
         let host = env::var(POSTHOG_HOST).unwrap_or_else(|_| DEFAULT_POSTHOG_HOST.to_string());
+        let capture_content = env_flag(POSTHOG_CAPTURE_LLM_CONTENT, true);
 
         Some(Self {
             project_api_key,
             host,
+            capture_content,
         })
     }
 
@@ -76,6 +79,7 @@ impl fmt::Debug for PostHogClient {
         f.debug_struct("PostHogClient")
             .field("project_api_key", &"[REDACTED]")
             .field("host", &self.config.host)
+            .field("capture_content", &self.config.capture_content)
             .finish()
     }
 }
@@ -196,7 +200,7 @@ impl PostHogClient {
     ) -> Value {
         build_ai_generation_event(
             &self.config.project_api_key,
-            true,
+            self.config.capture_content,
             context,
             trace_id,
             model,
@@ -255,7 +259,7 @@ impl CaptureLogSummary {
 #[allow(clippy::too_many_arguments)]
 pub fn build_ai_generation_event(
     project_api_key: &str,
-    capture_llm_content: bool,
+    capture_content: bool,
     context: &LlmTelemetryContext,
     trace_id: &str,
     model: &str,
@@ -316,7 +320,7 @@ pub fn build_ai_generation_event(
         properties.insert("success".to_string(), json!(true));
     }
 
-    if capture_llm_content {
+    if capture_content {
         if let Some(input) = input {
             properties.insert("$ai_input".to_string(), input);
         }
@@ -334,6 +338,16 @@ pub fn build_ai_generation_event(
 
 fn option_env(name: &str) -> Option<String> {
     env::var(name).ok().filter(|value| !value.trim().is_empty())
+}
+
+fn env_flag(name: &str, default: bool) -> bool {
+    match env::var(name) {
+        Ok(value) => matches!(
+            value.trim().to_ascii_lowercase().as_str(),
+            "1" | "true" | "yes" | "y" | "on"
+        ),
+        Err(_) => default,
+    }
 }
 
 #[cfg(test)]
