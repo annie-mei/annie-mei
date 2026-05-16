@@ -26,7 +26,7 @@ use utils::{
     llm::{GeminiClient, GeminiClientKey, configured_model_name},
     oauth::{OAuthContextConfigKey, load_context_config},
     posthog::{CommandTelemetryContext, PostHogClient},
-    privacy::{hash_user_id, redact_url_credentials},
+    privacy::{hash_discord_id, hash_user_id, redact_url_credentials},
     statics::{DISCORD_TOKEN, ENV, SENTRY_DSN, SENTRY_TRACES_SAMPLE_RATE},
     tls::install_rustls_crypto_provider,
 };
@@ -139,7 +139,7 @@ impl Handler {
         let distinct_id = Some(hash_user_id(command.user.id.get()).to_string());
         let guild_id = command
             .guild_id
-            .map(|guild_id| hash_user_id(guild_id.get()).to_string());
+            .map(|guild_id| hash_discord_id(guild_id.get()).to_string());
         let command_name = command.data.name.clone();
         let environment = self.environment.clone();
         let is_dm = command.guild_id.is_none();

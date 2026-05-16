@@ -15,7 +15,7 @@ use crate::{
         channel::is_nsfw_channel,
         llm::{LlmError, get_gemini_client_from_context},
         posthog::LlmTelemetryContext,
-        privacy::{configure_sentry_scope, hash_user_id},
+        privacy::{configure_sentry_scope, hash_discord_id, hash_user_id},
         statics::ENV,
         statics::NSFW_NOT_ALLOWED,
     },
@@ -311,7 +311,7 @@ pub async fn run(ctx: &Context, interaction: &mut CommandInteraction) {
                 distinct_id: Some(hash_user_id(user.id.get()).to_string()),
                 guild_id: interaction
                     .guild_id
-                    .map(|guild_id| hash_user_id(guild_id.get()).to_string()),
+                    .map(|guild_id| hash_discord_id(guild_id.get()).to_string()),
                 command: Some("search".to_string()),
                 environment: std::env::var(ENV).ok(),
                 input: Some(json!([

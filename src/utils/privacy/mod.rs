@@ -55,10 +55,17 @@ impl fmt::Debug for HashedUserId {
 /// println!("User: {}", hashed); // e.g., "a1b2c3d4e5f6g7h8"
 /// ```
 pub fn hash_user_id(user_id: u64) -> HashedUserId {
+    hash_discord_id(user_id)
+}
+
+/// Hashes a Discord snowflake ID using blake3 with a secret salt.
+///
+/// Use this for non-user Discord identifiers such as guild IDs.
+pub fn hash_discord_id(id: u64) -> HashedUserId {
     let salt =
         env::var(USERID_HASH_SALT).expect("USERID_HASH_SALT environment variable must be set");
 
-    hash_user_id_with_salt(user_id, &salt)
+    hash_user_id_with_salt(id, &salt)
 }
 
 /// Internal function that hashes a user ID with a given salt.
