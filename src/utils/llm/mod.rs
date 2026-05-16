@@ -20,7 +20,7 @@
 //! |------------------|----------|------------------------------------------|
 //! | `GEMINI_API_KEY` | **yes**  | API key for the Gemini / OpenAI endpoint |
 //! | `LLM_BASE_URL`   | no       | Base URL override for the API            |
-//! | `LLM_MODEL`      | no       | Model name (default: `gemini-2.0-flash`) |
+//! | `LLM_MODEL`      | no       | Model name (default: `gemini-3.1-flash-lite`) |
 
 use std::env;
 use std::fmt;
@@ -42,7 +42,7 @@ use crate::utils::{
 };
 
 const DEFAULT_BASE_URL: &str = "https://generativelanguage.googleapis.com/v1beta/openai";
-const DEFAULT_MODEL: &str = "gemini-2.0-flash";
+const DEFAULT_MODEL: &str = "gemini-3.1-flash-lite";
 const DEFAULT_TIMEOUT_SECS: u64 = 30;
 
 /// Return the configured LLM model name without requiring an API key.
@@ -207,7 +207,7 @@ pub struct GeminiClientConfig {
     pub api_key: String,
     /// Base URL **without** the `/chat/completions` suffix.
     pub base_url: String,
-    /// Model identifier (e.g. `"gemini-2.0-flash"`).
+    /// Model identifier (e.g. `"gemini-3.1-flash-lite"`).
     pub model: String,
     /// Optional system prompt prepended to every `chat()` call.
     pub system_prompt: Option<String>,
