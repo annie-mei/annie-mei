@@ -145,20 +145,23 @@ impl Handler {
         let is_dm = command.guild_id.is_none();
         let channel_id = command.channel_id;
 
-        tokio::spawn(async move {
-            let event = posthog.build_command_hit_event(&CommandTelemetryContext {
-                distinct_id,
-                guild_id,
-                command: command_name,
-                environment,
-                is_dm,
-                channel_nsfw: is_nsfw_channel(&ctx, channel_id).await,
-            });
+        tokio::spawn(
+            async move {
+                let event = posthog.build_command_hit_event(&CommandTelemetryContext {
+                    distinct_id,
+                    guild_id,
+                    command: command_name,
+                    environment,
+                    is_dm,
+                    channel_nsfw: is_nsfw_channel(&ctx, channel_id).await,
+                });
 
-            if let Err(error) = posthog.capture(event).await {
-                warn!(error = %error, "PostHog command hit capture failed");
+                if let Err(error) = posthog.capture(event).await {
+                    warn!(error = %error, "PostHog command hit capture failed");
+                }
             }
-        });
+            .instrument(tracing::Span::current()),
+        );
     }
 }
 

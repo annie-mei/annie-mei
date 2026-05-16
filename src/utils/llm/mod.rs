@@ -300,7 +300,6 @@ impl GeminiClient {
         Ok(self)
     }
 
-    #[instrument(name = "llm.with_posthog", skip(self, posthog))]
     pub fn with_posthog(mut self, posthog: Option<Arc<PostHogClient>>) -> Self {
         self.posthog = posthog;
         self
