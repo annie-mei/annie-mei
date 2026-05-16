@@ -493,11 +493,7 @@ impl GeminiClient {
         let input = Some(
             display_input.unwrap_or_else(|| serde_json::to_value(messages).unwrap_or(Value::Null)),
         );
-        let output_choices = Some(
-            response
-                .map(output_choices_for_posthog)
-                .unwrap_or_else(|| json!([])),
-        );
+        let output_choices = Some(response.map_or_else(|| json!([]), output_choices_for_posthog));
         let usage = response.and_then(|response| response.usage.as_ref());
         let model = response
             .and_then(|response| response.model.as_deref())

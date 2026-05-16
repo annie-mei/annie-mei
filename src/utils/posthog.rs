@@ -424,7 +424,7 @@ mod tests {
         );
 
         let properties = event["properties"].as_object().unwrap();
-        assert_eq!(properties["success"], false);
+        assert!(!properties["success"].as_bool().unwrap());
         assert_eq!(properties["$ai_error"], "HTTP request failed");
         assert!(!properties.contains_key("$ai_input"));
     }
