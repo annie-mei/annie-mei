@@ -13,8 +13,13 @@ pub async fn is_nsfw_channel(
     channel_id: ChannelId,
     guild_id: Option<GuildId>,
 ) -> bool {
-    if let Some(channel_nsfw) = guild_id
-        .and_then(|guild_id| ctx.cache.guild(guild_id))
+    let Some(guild_id) = guild_id else {
+        return false;
+    };
+
+    if let Some(channel_nsfw) = ctx
+        .cache
+        .guild(guild_id)
         .and_then(|guild| guild.channels.get(&channel_id).map(|channel| channel.nsfw))
     {
         return channel_nsfw;
