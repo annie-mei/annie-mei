@@ -11,14 +11,14 @@ on:
     paths-ignore:
       - "**/README.md"
 
-name: ARM64 build-release
+name: Build and deploy release
 
 permissions:
   contents: write
 
 jobs:
   build:
-    name: Build ARM64
+    name: Build release binary
     runs-on: blacksmith-4vcpu-ubuntu-2404-arm
     container: rust:1-bullseye
     outputs:
