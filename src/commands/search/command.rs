@@ -4,6 +4,7 @@ use crate::{
     commands::{
         input_validation::{ValidationError, validate_search_term},
         response::CommandResponse,
+        search::prompts::SEARCH_SYSTEM_PROMPT,
         traits::{AniListSource, MediaDataSource},
     },
     models::{
@@ -13,7 +14,9 @@ use crate::{
     utils::{
         channel::is_nsfw_channel,
         llm::{LlmClient, LlmError, get_gemini_client_from_context},
-        privacy::configure_sentry_scope,
+        posthog::LlmTelemetryContext,
+        privacy::{configure_sentry_scope, hash_user_id},
+        statics::ENV,
         statics::NSFW_NOT_ALLOWED,
     },
 };
@@ -155,6 +158,7 @@ pub fn fallback_intent(query: &str) -> SearchIntent {
     }
 }
 
+#[allow(dead_code)]
 #[instrument(name = "command.search.parse_intent", skip(llm, query))]
 pub async fn parse_search_intent<C: LlmClient>(
     llm: &C,
@@ -302,13 +306,34 @@ pub async fn run(ctx: &Context, interaction: &mut CommandInteraction) {
     info!("Got command 'search'");
 
     let intent = match get_gemini_client_from_context(ctx).await {
-        Some(client) => match parse_search_intent(client.as_ref(), &query).await {
-            Ok(intent) => intent,
-            Err(error) => {
-                warn!(error = %error, "Natural-language search parsing failed; falling back to raw query");
-                fallback_intent(&query)
+        Some(client) => {
+            let telemetry_context = LlmTelemetryContext {
+                distinct_id: Some(hash_user_id(user.id.get()).to_string()),
+                guild_id: interaction
+                    .guild_id
+                    .map(|guild_id| hash_user_id(guild_id.get()).to_string()),
+                command: Some("search".to_string()),
+                environment: std::env::var(ENV).ok(),
+                input: Some(json!([
+                    { "role": "system", "content": SEARCH_SYSTEM_PROMPT },
+                    { "role": "user", "content": query },
+                ])),
+            };
+            let user_message = format_intent_user_message(&query);
+
+            match client
+                .chat_with_telemetry_context(&user_message, telemetry_context)
+                .await
+                .map_err(SearchIntentError::Llm)
+                .and_then(|response| parse_search_intent_json(&response))
+            {
+                Ok(intent) => intent,
+                Err(error) => {
+                    warn!(error = %error, "Natural-language search parsing failed; falling back to raw query");
+                    fallback_intent(&query)
+                }
             }
-        },
+        }
         None => {
             warn!("LLM client unavailable; falling back to raw query");
             fallback_intent(&query)

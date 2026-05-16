@@ -6,6 +6,7 @@ pub mod fuzzy;
 pub mod guild;
 pub mod llm;
 pub mod oauth;
+pub mod posthog;
 pub mod privacy;
 pub mod redis;
 pub mod requests;

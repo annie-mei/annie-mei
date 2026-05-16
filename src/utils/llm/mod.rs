@@ -26,14 +26,17 @@ use std::env;
 use std::fmt;
 use std::future::Future;
 use std::sync::Arc;
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
+use serde_json::{Value, json};
 use serenity::{client::Context, prelude::TypeMapKey};
-use tracing::{info, instrument};
+use tracing::{info, instrument, warn};
+use uuid::Uuid;
 
 use crate::utils::{
+    posthog::{LlmTelemetryContext, PostHogClient},
     statics::{GEMINI_API_KEY, LLM_BASE_URL, LLM_MODEL},
     tls::install_rustls_crypto_provider,
 };
@@ -183,6 +186,7 @@ pub struct Usage {
 /// Implement this trait to swap providers, models, or add mock
 /// implementations for testing.  The default production implementation
 /// is [`GeminiClient`].
+#[allow(dead_code)]
 pub trait LlmClient: Send + Sync {
     /// Send a single user message and return the assistant's reply.
     ///
@@ -230,6 +234,7 @@ impl fmt::Debug for GeminiClientConfig {
 pub struct GeminiClient {
     config: GeminiClientConfig,
     http: Client,
+    posthog: Option<PostHogClient>,
 }
 
 impl GeminiClient {
@@ -245,7 +250,11 @@ impl GeminiClient {
             .build()
             .map_err(|e| LlmError::ClientBuild(e.to_string()))?;
 
-        Ok(Self { config, http })
+        Ok(Self {
+            config,
+            http,
+            posthog: None,
+        })
     }
 
     /// Build a client from environment variables.
@@ -258,13 +267,15 @@ impl GeminiClient {
         let base_url = env::var(LLM_BASE_URL).unwrap_or_else(|_| DEFAULT_BASE_URL.to_string());
         let model = configured_model_name();
 
-        Self::new(GeminiClientConfig {
+        let mut client = Self::new(GeminiClientConfig {
             api_key,
             base_url,
             model,
             system_prompt: None,
             temperature: None,
-        })
+        })?;
+        client.posthog = PostHogClient::from_env();
+        Ok(client)
     }
 
     /// Build a client from environment variables with a system prompt.
@@ -407,6 +418,143 @@ impl GeminiClient {
             }
         })
     }
+
+    /// Send a chat completion and include safe LLM Analytics context when PostHog is configured.
+    #[instrument(
+        name = "llm.chat_with_telemetry_context",
+        skip(self, user_message, telemetry_context),
+        fields(
+            model = %self.config.model,
+            has_system_prompt = self.config.system_prompt.is_some(),
+        )
+    )]
+    pub async fn chat_with_telemetry_context(
+        &self,
+        user_message: &str,
+        telemetry_context: LlmTelemetryContext,
+    ) -> Result<String, LlmError> {
+        self.chat_inner(user_message, Some(telemetry_context)).await
+    }
+
+    async fn chat_inner(
+        &self,
+        user_message: &str,
+        telemetry_context: Option<LlmTelemetryContext>,
+    ) -> Result<String, LlmError> {
+        let messages = self.build_messages(user_message);
+        let started_at = Instant::now();
+        let response = self.send_chat_completion(&messages).await;
+        let latency_seconds = started_at.elapsed().as_secs_f64();
+
+        match response {
+            Ok(response) => {
+                Self::log_completion_metadata(&response);
+                self.capture_llm_generation(
+                    telemetry_context,
+                    &messages,
+                    Some(&response),
+                    latency_seconds,
+                    None,
+                );
+                Self::extract_reply(response)
+            }
+            Err(error) => {
+                self.capture_llm_generation(
+                    telemetry_context,
+                    &messages,
+                    None,
+                    latency_seconds,
+                    Some(&error),
+                );
+                Err(error)
+            }
+        }
+    }
+
+    #[instrument(
+        name = "llm.capture_generation",
+        skip(self, context, messages, response, error)
+    )]
+    fn capture_llm_generation(
+        &self,
+        context: Option<LlmTelemetryContext>,
+        messages: &[ChatMessage],
+        response: Option<&ChatCompletionResponse>,
+        latency_seconds: f64,
+        error: Option<&LlmError>,
+    ) {
+        let Some(posthog) = self.posthog.clone() else {
+            return;
+        };
+
+        let context = context.unwrap_or_default();
+        let display_input = context.input.clone();
+        let trace_id = Uuid::new_v4().to_string();
+        let input = Some(
+            display_input.unwrap_or_else(|| serde_json::to_value(messages).unwrap_or(Value::Null)),
+        );
+        let output_choices = Some(
+            response
+                .map(output_choices_for_posthog)
+                .unwrap_or_else(|| json!([])),
+        );
+        let usage = response.and_then(|response| response.usage.as_ref());
+        let model = response
+            .and_then(|response| response.model.as_deref())
+            .unwrap_or(&self.config.model);
+        let error_label = error.map(telemetry_error_label);
+
+        let event = posthog.build_ai_generation_event(
+            &context,
+            &trace_id,
+            model,
+            "gemini",
+            latency_seconds,
+            input,
+            output_choices,
+            usage.and_then(|usage| usage.prompt_tokens),
+            usage.and_then(|usage| usage.completion_tokens),
+            usage.and_then(|usage| usage.total_tokens),
+            error_label.as_deref(),
+        );
+
+        tokio::spawn(async move {
+            if let Err(error) = posthog.capture(event).await {
+                warn!(error = %error, "PostHog LLM analytics capture failed");
+            }
+        });
+    }
+}
+
+#[instrument(name = "llm.output_choices_for_posthog", skip(response))]
+fn output_choices_for_posthog(response: &ChatCompletionResponse) -> Value {
+    Value::Array(
+        response
+            .choices
+            .iter()
+            .map(|choice| {
+                json!({
+                    "role": choice.message.role,
+                    "content": choice.message.content,
+                })
+            })
+            .collect(),
+    )
+}
+
+#[instrument(name = "llm.telemetry_error_label", skip(error))]
+fn telemetry_error_label(error: &LlmError) -> String {
+    match error {
+        LlmError::MissingEnvVar(_) => "missing_env_var".to_string(),
+        LlmError::Serialization(_) => "serialization".to_string(),
+        LlmError::Request(_) => "request".to_string(),
+        LlmError::ApiError { status, .. } => format!("api_error_{status}"),
+        LlmError::ResponseBody(_) => "response_body".to_string(),
+        LlmError::Deserialization { .. } => "deserialization".to_string(),
+        LlmError::EmptyResponse => "empty_response".to_string(),
+        LlmError::InvalidTemperature(_) => "invalid_temperature".to_string(),
+        LlmError::ClientBuild(_) => "client_build".to_string(),
+    }
 }
 
 impl LlmClient for GeminiClient {
@@ -419,12 +567,7 @@ impl LlmClient for GeminiClient {
         )
     )]
     async fn chat(&self, user_message: &str) -> Result<String, LlmError> {
-        let messages = self.build_messages(user_message);
-        let response = self.send_chat_completion(&messages).await?;
-
-        Self::log_completion_metadata(&response);
-
-        Self::extract_reply(response)
+        self.chat_inner(user_message, None).await
     }
 }
 
