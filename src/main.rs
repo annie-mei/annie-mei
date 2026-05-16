@@ -21,9 +21,13 @@ use serenity::{
 };
 
 use utils::{
+    channel::is_nsfw_channel,
     database::{DatabasePoolKey, create_pool},
     llm::{GeminiClient, GeminiClientKey, configured_model_name},
     oauth::{OAuthContextConfigKey, load_context_config},
+    posthog::{
+        CommandTelemetryContext, PostHogClient, PostHogClientKey, get_posthog_client_from_context,
+    },
     privacy::{hash_user_id, redact_url_credentials},
     statics::{DISCORD_TOKEN, ENV, SENTRY_DSN, SENTRY_TRACES_SAMPLE_RATE},
     tls::install_rustls_crypto_provider,
@@ -63,6 +67,7 @@ impl EventHandler for Handler {
 
             async {
                 info!("Received command interaction");
+                capture_command_hit(&ctx, &command).await;
 
                 match command.data.name.as_str() {
                     "ping" => commands::ping::run(&ctx, &command).await,
@@ -120,6 +125,32 @@ impl EventHandler for Handler {
         );
         info!("{} is connected!", ready.user.name);
     }
+}
+
+#[instrument(name = "posthog.capture_command_hit", skip(ctx, command))]
+async fn capture_command_hit(ctx: &Context, command: &serenity::all::CommandInteraction) {
+    let Some(posthog) = get_posthog_client_from_context(ctx).await else {
+        return;
+    };
+
+    let event = posthog.build_command_hit_event(&CommandTelemetryContext {
+        distinct_id: Some(hash_user_id(command.user.id.get()).to_string()),
+        guild_id: command
+            .guild_id
+            .map(|guild_id| hash_user_id(guild_id.get()).to_string()),
+        command: command.data.name.clone(),
+        environment: std::env::var(ENV).ok(),
+        bot_version: env!("CARGO_PKG_VERSION").to_string(),
+        source: "discord".to_string(),
+        is_dm: command.guild_id.is_none(),
+        channel_nsfw: is_nsfw_channel(ctx, command.channel_id).await,
+    });
+
+    tokio::spawn(async move {
+        if let Err(error) = posthog.capture(event).await {
+            warn!(error = %error, "PostHog command hit capture failed");
+        }
+    });
 }
 
 #[tokio::main]
@@ -195,6 +226,7 @@ async fn main() {
     subscriber.with(sentry_tracing::layer()).init();
 
     info!(model = %configured_model_name(), "LLM model configured");
+    let posthog_client = PostHogClient::from_env().map(Arc::new);
     let gemini_client = match GeminiClient::from_env_with_system_prompt(
         commands::search::prompts::SEARCH_SYSTEM_PROMPT,
     )
@@ -244,6 +276,9 @@ async fn main() {
         let mut data = client.data.write().await;
         data.insert::<DatabasePoolKey>(database_pool);
         data.insert::<OAuthContextConfigKey>(Arc::new(oauth_config));
+        if let Some(posthog_client) = posthog_client {
+            data.insert::<PostHogClientKey>(posthog_client);
+        }
         if let Some(gemini_client) = gemini_client {
             data.insert::<GeminiClientKey>(gemini_client);
         }

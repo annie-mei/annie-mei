@@ -3,10 +3,11 @@
 //! This module intentionally uses PostHog's capture API directly instead of a
 //! Rust SDK so LLM Analytics payloads stay explicit and easy to test.
 
-use std::{env, fmt, time::Duration};
+use std::{env, fmt, sync::Arc, time::Duration};
 
 use reqwest::Client;
 use serde_json::{Value, json};
+use serenity::{client::Context, prelude::TypeMapKey};
 use tracing::{debug, info, instrument, warn};
 
 use crate::utils::{
@@ -30,6 +31,27 @@ pub struct LlmTelemetryContext {
     pub environment: Option<String>,
     /// Optional display-friendly input for LLM Analytics when content capture is enabled.
     pub input: Option<Value>,
+}
+
+/// Per-command context that is safe to send to PostHog.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct CommandTelemetryContext {
+    /// Stable, salted hash for the Discord user. Never a raw Discord ID.
+    pub distinct_id: Option<String>,
+    /// Stable, salted hash for the Discord guild. Never a raw Discord ID.
+    pub guild_id: Option<String>,
+    /// Slash command name.
+    pub command: String,
+    /// Runtime environment, such as `development`, `staging`, or `production`.
+    pub environment: Option<String>,
+    /// Bot package version.
+    pub bot_version: String,
+    /// Event source, such as `discord`.
+    pub source: String,
+    /// Whether the command was sent in a direct message.
+    pub is_dm: bool,
+    /// Whether the Discord channel is marked NSFW.
+    pub channel_nsfw: bool,
 }
 
 /// Configuration for PostHog LLM Analytics capture.
@@ -100,17 +122,17 @@ impl PostHogClient {
     #[instrument(name = "posthog.client.from_env")]
     pub fn from_env() -> Option<Self> {
         let Some(config) = PostHogConfig::from_env() else {
-            debug!("PostHog project API key not configured; LLM analytics disabled");
+            debug!("PostHog project API key not configured; analytics disabled");
             return None;
         };
 
         match Self::new(config) {
             Ok(client) => {
-                info!(host = %client.config.host, "PostHog LLM analytics enabled");
+                info!(host = %client.config.host, "PostHog analytics enabled");
                 Some(client)
             }
             Err(error) => {
-                warn!(error = %error, "PostHog client unavailable; LLM analytics disabled");
+                warn!(error = %error, "PostHog client unavailable; analytics disabled");
                 None
             }
         }
@@ -214,6 +236,24 @@ impl PostHogClient {
             error,
         )
     }
+
+    /// Build a generic Discord slash command hit event payload.
+    #[instrument(name = "posthog.build_command_hit", skip(self))]
+    pub fn build_command_hit_event(&self, context: &CommandTelemetryContext) -> Value {
+        build_command_hit_event(&self.config.project_api_key, context)
+    }
+}
+
+pub struct PostHogClientKey;
+
+impl TypeMapKey for PostHogClientKey {
+    type Value = Arc<PostHogClient>;
+}
+
+#[instrument(name = "posthog.client_from_context", skip(ctx))]
+pub async fn get_posthog_client_from_context(ctx: &Context) -> Option<Arc<PostHogClient>> {
+    let data = ctx.data.read().await;
+    data.get::<PostHogClientKey>().cloned()
 }
 
 #[derive(Debug, Default)]
@@ -337,6 +377,43 @@ pub fn build_ai_generation_event(
     })
 }
 
+/// Testable payload construction for Discord command usage analytics.
+#[instrument(name = "posthog.build_command_hit_event", skip(context))]
+pub fn build_command_hit_event(project_api_key: &str, context: &CommandTelemetryContext) -> Value {
+    let distinct_id = context
+        .distinct_id
+        .as_deref()
+        .unwrap_or("annie-mei-unknown-user");
+
+    let mut properties = serde_json::Map::new();
+    properties.insert("distinct_id".to_string(), json!(distinct_id));
+    properties.insert("command".to_string(), json!(context.command));
+    properties.insert("bot_version".to_string(), json!(context.bot_version));
+    properties.insert("source".to_string(), json!(context.source));
+    properties.insert("interaction_type".to_string(), json!("slash_command"));
+    properties.insert("is_dm".to_string(), json!(context.is_dm));
+    properties.insert("channel_nsfw".to_string(), json!(context.channel_nsfw));
+
+    if let Some(environment) = context
+        .environment
+        .as_deref()
+        .or(option_env(ENV).as_deref())
+    {
+        properties.insert("environment".to_string(), json!(environment));
+    }
+
+    if let Some(guild_id) = &context.guild_id {
+        properties.insert("guild_id".to_string(), json!(guild_id));
+    }
+
+    json!({
+        "api_key": project_api_key,
+        "event": "discord_command_hit",
+        "distinct_id": distinct_id,
+        "properties": properties,
+    })
+}
+
 fn option_env(name: &str) -> Option<String> {
     env::var(name).ok().filter(|value| !value.trim().is_empty())
 }
@@ -443,5 +520,35 @@ mod tests {
         assert!(!properties["success"].as_bool().unwrap());
         assert_eq!(properties["$ai_error"], "HTTP request failed");
         assert!(!properties.contains_key("$ai_input"));
+    }
+
+    #[test]
+    fn command_hit_payload_includes_safe_command_context() {
+        let context = CommandTelemetryContext {
+            distinct_id: Some("user_hash".to_string()),
+            guild_id: Some("guild_hash".to_string()),
+            command: "anime".to_string(),
+            environment: Some("test".to_string()),
+            bot_version: "2.19.3".to_string(),
+            source: "discord".to_string(),
+            is_dm: false,
+            channel_nsfw: true,
+        };
+
+        let event = build_command_hit_event("ph_key", &context);
+        let properties = event["properties"].as_object().unwrap();
+
+        assert_eq!(event["api_key"], "ph_key");
+        assert_eq!(event["event"], "discord_command_hit");
+        assert_eq!(event["distinct_id"], "user_hash");
+        assert_eq!(properties["distinct_id"], "user_hash");
+        assert_eq!(properties["guild_id"], "guild_hash");
+        assert_eq!(properties["command"], "anime");
+        assert_eq!(properties["environment"], "test");
+        assert_eq!(properties["bot_version"], "2.19.3");
+        assert_eq!(properties["source"], "discord");
+        assert_eq!(properties["interaction_type"], "slash_command");
+        assert_eq!(properties["is_dm"], false);
+        assert_eq!(properties["channel_nsfw"], true);
     }
 }
