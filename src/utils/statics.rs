@@ -27,3 +27,8 @@ pub const OAUTH_CONTEXT_TTL_SECONDS: &str = "OAUTH_CONTEXT_TTL_SECONDS";
 pub const GEMINI_API_KEY: &str = "GEMINI_API_KEY";
 pub const LLM_MODEL: &str = "LLM_MODEL";
 pub const LLM_BASE_URL: &str = "LLM_BASE_URL";
+
+// PostHog LLM Analytics
+pub const POSTHOG_PROJECT_API_KEY: &str = "POSTHOG_PROJECT_API_KEY";
+pub const POSTHOG_HOST: &str = "POSTHOG_HOST";
+pub const POSTHOG_CAPTURE_LLM_CONTENT: &str = "POSTHOG_CAPTURE_LLM_CONTENT";
