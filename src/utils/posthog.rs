@@ -332,6 +332,7 @@ pub fn build_ai_generation_event(
     json!({
         "api_key": project_api_key,
         "event": "$ai_generation",
+        "distinct_id": distinct_id,
         "properties": properties,
     })
 }
@@ -383,6 +384,7 @@ mod tests {
         let properties = event["properties"].as_object().unwrap();
         assert_eq!(event["api_key"], "ph_key");
         assert_eq!(event["event"], "$ai_generation");
+        assert_eq!(event["distinct_id"], "user_hash");
         assert_eq!(properties["distinct_id"], "user_hash");
         assert_eq!(properties["guild_id"], "guild_hash");
         assert_eq!(properties["command"], "search");

@@ -487,13 +487,15 @@ impl GeminiClient {
             return;
         };
 
+        let capture_content = context.is_some();
         let context = context.unwrap_or_default();
         let display_input = context.input.clone();
         let trace_id = Uuid::new_v4().to_string();
-        let input = Some(
-            display_input.unwrap_or_else(|| serde_json::to_value(messages).unwrap_or(Value::Null)),
-        );
-        let output_choices = Some(response.map_or_else(|| json!([]), output_choices_for_posthog));
+        let input = capture_content.then(|| {
+            display_input.unwrap_or_else(|| serde_json::to_value(messages).unwrap_or(Value::Null))
+        });
+        let output_choices =
+            capture_content.then(|| response.map_or_else(|| json!([]), output_choices_for_posthog));
         let usage = response.and_then(|response| response.usage.as_ref());
         let model = response
             .and_then(|response| response.model.as_deref())
