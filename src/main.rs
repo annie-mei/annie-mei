@@ -143,6 +143,7 @@ impl Handler {
         let command_name = command.data.name.clone();
         let environment = self.environment.clone();
         let is_dm = command.guild_id.is_none();
+        let channel_guild_id = command.guild_id;
         let channel_id = command.channel_id;
 
         tokio::spawn(
@@ -153,7 +154,7 @@ impl Handler {
                     command: command_name,
                     environment,
                     is_dm,
-                    channel_nsfw: is_nsfw_channel(&ctx, channel_id).await,
+                    channel_nsfw: is_nsfw_channel(&ctx, channel_id, channel_guild_id).await,
                 });
 
                 if let Err(error) = posthog.capture(event).await {
