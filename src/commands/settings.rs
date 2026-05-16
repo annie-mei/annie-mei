@@ -385,9 +385,7 @@ fn parse_action(raw: &str) -> Option<SettingsAction> {
 
 #[instrument(name = "command.settings.can_manage_guild_settings")]
 fn can_manage_guild_settings(permissions: Option<Permissions>) -> bool {
-    permissions
-        .map(|permissions| permissions.contains(Permissions::MANAGE_GUILD))
-        .unwrap_or(false)
+    permissions.is_some_and(|permissions| permissions.contains(Permissions::MANAGE_GUILD))
 }
 
 #[instrument(name = "command.settings.format_layer_value", skip(value))]
