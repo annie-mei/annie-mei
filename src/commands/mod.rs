@@ -8,6 +8,7 @@ pub mod recommend;
 pub mod register;
 pub mod response;
 pub mod search;
+pub mod settings;
 pub mod songs;
 pub mod traits;
 pub mod unregister;
