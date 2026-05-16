@@ -116,6 +116,6 @@ fn command_hit_payload_includes_safe_command_context() {
     assert_eq!(properties["bot_version"], env!("CARGO_PKG_VERSION"));
     assert_eq!(properties["source"], "discord");
     assert_eq!(properties["interaction_type"], "slash_command");
-    assert_eq!(properties["is_dm"], false);
-    assert_eq!(properties["channel_nsfw"], true);
+    assert!(!properties["is_dm"].as_bool().unwrap());
+    assert!(properties["channel_nsfw"].as_bool().unwrap());
 }
