@@ -32,7 +32,7 @@ use reqwest::Client;
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 use serenity::{client::Context, prelude::TypeMapKey};
-use tracing::{info, instrument, warn};
+use tracing::{Instrument, info, instrument, warn};
 use uuid::Uuid;
 
 use crate::utils::{
@@ -519,11 +519,14 @@ impl GeminiClient {
             error_label.as_deref(),
         );
 
-        tokio::spawn(async move {
-            if let Err(error) = posthog.capture(event).await {
-                warn!(error = %error, "PostHog LLM analytics capture failed");
+        tokio::spawn(
+            async move {
+                if let Err(error) = posthog.capture(event).await {
+                    warn!(error = %error, "PostHog LLM analytics capture failed");
+                }
             }
-        });
+            .instrument(tracing::Span::current()),
+        );
     }
 }
 
