@@ -85,6 +85,7 @@ impl EventHandler for Handler {
                     "register" => commands::register::command::run(&ctx, &mut command).await,
                     "unregister" => commands::unregister::run(&ctx, &mut command).await,
                     "whoami" => commands::whoami::run(&ctx, &mut command).await,
+                    "settings" => commands::settings::run(&ctx, &mut command).await,
                     _ => {
                         let embed = CreateEmbed::new()
                             .title("Error")
@@ -117,6 +118,7 @@ impl EventHandler for Handler {
             commands::register::command::register(),
             commands::unregister::register(),
             commands::whoami::register(),
+            commands::settings::register(),
         ];
 
         let guild_commands = Command::set_global_commands(&ctx.http, commands).await;
