@@ -11,7 +11,10 @@ use crate::{
         ResolvedSetting, ScopedSettingValues, SettingKey, SettingValidationError, SettingValue,
         resolve_setting as resolve_scoped_setting,
     },
-    utils::{database::DbPool, privacy::hash_user_id},
+    utils::{
+        database::DbPool,
+        privacy::{hash_discord_id, hash_user_id},
+    },
 };
 
 #[derive(Clone, PartialEq, Eq, FromRow)]
@@ -96,7 +99,7 @@ pub async fn set_user_setting(
 #[instrument(
     name = "db.settings.set_guild_setting",
     skip(pool, value),
-    fields(guild_id = %guild_id.get(), setting_key = %value.key().as_str())
+    fields(guild_id = %hash_discord_id(guild_id.get()), setting_key = %value.key().as_str())
 )]
 pub async fn set_guild_setting(
     pool: &DbPool,
@@ -146,7 +149,7 @@ pub async fn get_user_setting(
 #[instrument(
     name = "db.settings.get_guild_setting",
     skip(pool),
-    fields(guild_id = %guild_id.get(), setting_key = %setting_key.as_str())
+    fields(guild_id = %hash_discord_id(guild_id.get()), setting_key = %setting_key.as_str())
 )]
 pub async fn get_guild_setting(
     pool: &DbPool,
@@ -170,7 +173,7 @@ pub async fn get_guild_setting(
     skip(pool, user_discord_id),
     fields(
         discord_user_id = %hash_user_id(user_discord_id.get()),
-        guild_id = guild_id.map(|id| id.get()),
+        guild_id = guild_id.map(|id| hash_discord_id(id.get()).to_string()),
         setting_key = %setting_key.as_str()
     )
 )]

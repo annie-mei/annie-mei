@@ -9,7 +9,7 @@ use crate::{
     },
     utils::{
         database::get_pool_from_context,
-        privacy::{configure_sentry_scope, hash_user_id},
+        privacy::{configure_sentry_scope, hash_discord_id, hash_user_id},
     },
 };
 
@@ -296,7 +296,7 @@ pub async fn run(ctx: &Context, interaction: &mut CommandInteraction) {
                     Err(error) => {
                         error!(
                             error = %error,
-                            guild_id = %guild_id.get(),
+                            guild_id = %hash_discord_id(guild_id.get()),
                             setting_key = %request.value.key().as_str(),
                             "Failed to save guild setting"
                         );
@@ -422,7 +422,7 @@ fn log_settings_storage_error(
         error = %error,
         operation,
         discord_user_id = %hash_user_id(user_id.get()),
-        guild_id = guild_id.map(|id| id.get()),
+        guild_id = guild_id.map(|id| hash_discord_id(id.get()).to_string()),
         "Settings storage operation failed"
     );
 }
