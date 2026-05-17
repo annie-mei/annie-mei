@@ -392,7 +392,10 @@ fn parse_action(raw: &str) -> Option<SettingsAction> {
 
 #[instrument(name = "command.settings.can_manage_guild_settings")]
 fn can_manage_guild_settings(permissions: Option<Permissions>) -> bool {
-    permissions.is_some_and(|permissions| permissions.contains(Permissions::MANAGE_GUILD))
+    permissions.is_some_and(|permissions| {
+        permissions.contains(Permissions::MANAGE_GUILD)
+            || permissions.contains(Permissions::ADMINISTRATOR)
+    })
 }
 
 #[instrument(name = "command.settings.format_layer_value", skip(value))]
@@ -619,6 +622,27 @@ mod tests {
                 .parse_value("opted_out")
                 .unwrap()
         );
+    }
+
+    #[test]
+    fn allows_guild_write_with_administrator_permission() {
+        let options = SettingsCommandOptions {
+            action: SettingsAction::Set,
+            key: SettingKey::AnalyticsPrivacy,
+            scope: SettingScope::Guild,
+            value: Some("opted_out".to_string()),
+        };
+        let context = SettingsContext {
+            user_id: UserId::new(42),
+            guild_id: Some(GuildId::new(7)),
+            member_permissions: Some(Permissions::ADMINISTRATOR),
+        };
+
+        let SettingsCommandPlan::Write(request) = plan_settings_command(options, context) else {
+            panic!("expected write request")
+        };
+
+        assert_eq!(request.target, SettingsWriteTarget::Guild(GuildId::new(7)));
     }
 
     #[test]
