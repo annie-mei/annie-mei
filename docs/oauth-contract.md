@@ -25,11 +25,11 @@ The auth-service mirrors this document at
                        │ /oauth/anilist  │        │ /oauth/anilist │
                        │   /start        │        │   /callback    │
                        ╰────────┬────────╯        ╰────────┬───────╯
-                                │ writes oauth_sessions    │ writes oauth_credentials
+                                 │ writes auth.oauth_sessions │ writes auth.oauth_credentials
                                 ▼                          ▼
                        ╭──────────────────────────────────────────╮
-                       │              Postgres (shared)           │
-                       │  oauth_sessions      oauth_credentials   │
+                        │              Postgres (shared)           │
+                        │ auth.oauth_sessions  auth.oauth_credentials │
                        ╰──────────────────────────────────────────╯
                                                 ▲
                                                 │ reads (whoami, guild overlay)
@@ -37,13 +37,14 @@ The auth-service mirrors this document at
                                           Annie Mei bot
 ```
 
-The bot owns no database tables of its own. Account-link state lives in
-the auth-service tables and the bot reads/deletes those rows directly
-via SQLx, sharing the same Postgres database.
+Account-link state lives in the auth-service-owned `auth` schema, and
+the bot reads/deletes those rows directly via SQLx. Bot-owned settings
+tables live in the `annie_mei` schema. Schema ownership and migration
+isolation are documented in [Database schema ownership](database-schemas.md).
 
 ## Tables
 
-### `oauth_credentials`
+### `auth.oauth_credentials`
 
 Source of truth for **linked** AniList accounts.
 
@@ -77,21 +78,27 @@ numeric `anilist_id`.
 same transaction as `oauth_sessions`. See
 [`src/commands/unregister.rs`](../src/commands/unregister.rs).
 
-### `oauth_sessions`
+### `auth.oauth_sessions`
 
 Short-lived state for in-flight OAuth flows.
 
 | Column            | Type           | Notes                                                                       |
 | ----------------- | -------------- | --------------------------------------------------------------------------- |
 | `state`           | `TEXT` (PK)    | Opaque per-flow state token issued by the auth-service.                     |
-| `discord_user_id` | `TEXT`         | Raw Discord snowflake string, mirroring `oauth_credentials.discord_user_id`. |
+| `discord_user_id` | `TEXT`         | Raw Discord snowflake string, mirroring `auth.oauth_credentials.discord_user_id`. |
 | `expires_at`      | `TIMESTAMPTZ`  | When the session token stops being valid.                                   |
 | `used_at`         | `TIMESTAMPTZ NULL` | When the session was redeemed (replay protection).                          |
 | `created_at`      | `TIMESTAMPTZ`  | Initial creation time.                                                      |
 
-**Bot deletes:** `/unregister` includes a `DELETE FROM oauth_sessions
+**Bot deletes:** `/unregister` includes a `DELETE FROM auth.oauth_sessions
 WHERE discord_user_id = $1` in the same transaction so half-finished
 flows do not linger after a user unlinks.
+
+### `annie_mei.user_settings` and `annie_mei.guild_settings`
+
+The bot owns configurable user and guild settings in the `annie_mei`
+schema. Auth-service migrations must not create, alter, or drop these
+tables.
 
 ## OAuth context payload
 
@@ -119,7 +126,7 @@ The signature segment is appended after `.` to form
 Make the matching change in both repos in the same release window if
 you touch any of the following:
 
-- A column on `oauth_credentials` or `oauth_sessions` (rename, type
+- A column on `auth.oauth_credentials` or `auth.oauth_sessions` (rename, type
   change, deletion, or new NOT NULL column).
 - The `discord_user_id` representation (it must stay the raw Discord
   snowflake stringified via `user.id.get().to_string()` so bot
@@ -137,10 +144,10 @@ When making one of those changes:
 
 ## Privacy
 
-`oauth_credentials.discord_user_id` and `oauth_sessions.discord_user_id`
+`auth.oauth_credentials.discord_user_id` and `auth.oauth_sessions.discord_user_id`
 intentionally store the raw Discord snowflake so that `/register`,
 `/whoami`, and `/unregister` can all match on the same value. The
-`oauth_credentials.anilist_id` and `oauth_credentials.anilist_username`
+`auth.oauth_credentials.anilist_id` and `auth.oauth_credentials.anilist_username`
 fields are also user-identifying account-linkage data. **Logs, spans,
 metrics labels, breadcrumbs, and Sentry telemetry must not include any
 of those raw identifiers.** Use `crate::utils::privacy::hash_user_id`
@@ -158,7 +165,7 @@ Sentry transactions, request breadcrumbs, distributed tracing spans, and
 any reverse-proxy logs before those observability records leave the
 service.
 
-`oauth_credentials.access_token` and `oauth_credentials.refresh_token`
+`auth.oauth_credentials.access_token` and `auth.oauth_credentials.refresh_token`
 are bearer credentials that grant full access to the linked AniList
 account. The bot's current `OAuthCredential` model intentionally only
 selects `discord_user_id`, `anilist_id`, and `anilist_username`, but if

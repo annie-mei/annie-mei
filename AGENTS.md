@@ -128,8 +128,9 @@ Notes:
 ### Database Changes
 
 The bot uses **SQLx** for database access. The auth-service owns OAuth schema;
-the bot reads from the shared `oauth_credentials` table and owns Annie Mei-specific
-settings tables such as `user_settings` and `guild_settings`.
+the bot reads from the auth-owned `auth.oauth_credentials` table and owns
+Annie Mei-specific settings tables in the `annie_mei` schema, such as
+`user_settings` and `guild_settings`.
 
 1. Keep migrations limited to bot-owned tables; coordinate auth-service schema changes in the auth-service
 2. Use `sqlx::query_as()` with `#[derive(FromRow)]` for queries
