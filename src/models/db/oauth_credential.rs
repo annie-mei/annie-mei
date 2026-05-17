@@ -81,7 +81,7 @@ impl OAuthCredential {
         pool: &DbPool,
     ) -> Result<Option<OAuthCredential>, sqlx::Error> {
         sqlx::query_as::<_, OAuthCredential>(
-            "SELECT discord_user_id, anilist_id, anilist_username FROM oauth_credentials WHERE discord_user_id = $1"
+            "SELECT discord_user_id, anilist_id, anilist_username FROM auth.oauth_credentials WHERE discord_user_id = $1"
         )
         .bind(user_discord_id.get().to_string())
         .fetch_optional(pool)
@@ -107,7 +107,7 @@ impl OAuthCredential {
             .collect();
 
         sqlx::query_as::<_, OAuthCredential>(
-            "SELECT discord_user_id, anilist_id, anilist_username FROM oauth_credentials \
+            "SELECT discord_user_id, anilist_id, anilist_username FROM auth.oauth_credentials \
              WHERE discord_user_id = ANY($1)",
         )
         .bind(ids)
