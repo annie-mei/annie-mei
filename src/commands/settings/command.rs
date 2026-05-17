@@ -95,7 +95,6 @@ pub fn register() -> CreateCommand {
                 "The setting to view or update",
             )
             .add_string_choice("Title display", SettingKey::TitleDisplay.as_str())
-            .add_string_choice("Guild scores", SettingKey::GuildScores.as_str())
             .add_string_choice("Analytics privacy", SettingKey::AnalyticsPrivacy.as_str())
             .required(true),
         )
@@ -120,8 +119,6 @@ pub fn register() -> CreateCommand {
             .add_string_choice("romaji", "romaji")
             .add_string_choice("english", "english")
             .add_string_choice("native", "native")
-            .add_string_choice("visible", "visible")
-            .add_string_choice("hidden", "hidden")
             .add_string_choice("standard", "standard")
             .add_string_choice("opted_out", "opted_out")
             .required(false),
@@ -534,9 +531,9 @@ mod tests {
     fn plans_user_write_with_valid_value() {
         let options = SettingsCommandOptions {
             action: SettingsAction::Set,
-            key: SettingKey::GuildScores,
+            key: SettingKey::AnalyticsPrivacy,
             scope: SettingScope::User,
-            value: Some("hidden".to_string()),
+            value: Some("opted_out".to_string()),
         };
         let context = SettingsContext {
             user_id: UserId::new(42),
@@ -551,7 +548,9 @@ mod tests {
         assert_eq!(request.target, SettingsWriteTarget::User(UserId::new(42)));
         assert_eq!(
             request.value,
-            SettingKey::GuildScores.parse_value("hidden").unwrap()
+            SettingKey::AnalyticsPrivacy
+                .parse_value("opted_out")
+                .unwrap()
         );
     }
 

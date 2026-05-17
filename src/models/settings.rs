@@ -50,21 +50,16 @@ impl fmt::Display for SettingSource {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum SettingKey {
     TitleDisplay,
-    GuildScores,
     AnalyticsPrivacy,
 }
 
-pub const ALL_SETTING_KEYS: [SettingKey; 3] = [
-    SettingKey::TitleDisplay,
-    SettingKey::GuildScores,
-    SettingKey::AnalyticsPrivacy,
-];
+pub const ALL_SETTING_KEYS: [SettingKey; 2] =
+    [SettingKey::TitleDisplay, SettingKey::AnalyticsPrivacy];
 
 impl SettingKey {
     pub fn parse(raw: &str) -> Option<Self> {
         match normalize_token(raw).as_str() {
             "title_display" | "title" | "titles" => Some(Self::TitleDisplay),
-            "guild_scores" | "guild_score" | "scores" => Some(Self::GuildScores),
             "analytics_privacy" | "analytics" | "privacy" => Some(Self::AnalyticsPrivacy),
             _ => None,
         }
@@ -73,7 +68,6 @@ impl SettingKey {
     pub fn as_str(self) -> &'static str {
         match self {
             Self::TitleDisplay => "title_display",
-            Self::GuildScores => "guild_scores",
             Self::AnalyticsPrivacy => "analytics_privacy",
         }
     }
@@ -81,7 +75,6 @@ impl SettingKey {
     pub fn label(self) -> &'static str {
         match self {
             Self::TitleDisplay => "Title display",
-            Self::GuildScores => "Guild scores",
             Self::AnalyticsPrivacy => "Analytics privacy",
         }
     }
@@ -89,7 +82,6 @@ impl SettingKey {
     pub fn description(self) -> &'static str {
         match self {
             Self::TitleDisplay => "Which AniList title variant Annie Mei should prefer.",
-            Self::GuildScores => "Whether guild member scores should be shown in media embeds.",
             Self::AnalyticsPrivacy => {
                 "Whether analytics should use the standard telemetry path or opt out where supported."
             }
@@ -99,7 +91,6 @@ impl SettingKey {
     pub fn default_value(self) -> SettingValue {
         match self {
             Self::TitleDisplay => SettingValue::TitleDisplay(TitleDisplayPreference::Matched),
-            Self::GuildScores => SettingValue::GuildScores(GuildScorePreference::Visible),
             Self::AnalyticsPrivacy => {
                 SettingValue::AnalyticsPrivacy(AnalyticsPrivacyPreference::Standard)
             }
@@ -109,7 +100,6 @@ impl SettingKey {
     pub fn allowed_values(self) -> &'static [&'static str] {
         match self {
             Self::TitleDisplay => &["matched", "romaji", "english", "native"],
-            Self::GuildScores => &["visible", "hidden"],
             Self::AnalyticsPrivacy => &["standard", "opted_out"],
         }
     }
@@ -128,15 +118,6 @@ impl SettingKey {
                 "romaji" => SettingValue::TitleDisplay(TitleDisplayPreference::Romaji),
                 "english" => SettingValue::TitleDisplay(TitleDisplayPreference::English),
                 "native" => SettingValue::TitleDisplay(TitleDisplayPreference::Native),
-                _ => return Err(SettingValidationError::new(self, raw)),
-            },
-            Self::GuildScores => match normalized.as_str() {
-                "visible" | "show" | "shown" | "enabled" | "on" | "true" => {
-                    SettingValue::GuildScores(GuildScorePreference::Visible)
-                }
-                "hidden" | "hide" | "disabled" | "off" | "false" => {
-                    SettingValue::GuildScores(GuildScorePreference::Hidden)
-                }
                 _ => return Err(SettingValidationError::new(self, raw)),
             },
             Self::AnalyticsPrivacy => match normalized.as_str() {
@@ -163,12 +144,6 @@ pub enum TitleDisplayPreference {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum GuildScorePreference {
-    Visible,
-    Hidden,
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum AnalyticsPrivacyPreference {
     Standard,
     OptedOut,
@@ -177,7 +152,6 @@ pub enum AnalyticsPrivacyPreference {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum SettingValue {
     TitleDisplay(TitleDisplayPreference),
-    GuildScores(GuildScorePreference),
     AnalyticsPrivacy(AnalyticsPrivacyPreference),
 }
 
@@ -185,7 +159,6 @@ impl SettingValue {
     pub fn key(self) -> SettingKey {
         match self {
             Self::TitleDisplay(_) => SettingKey::TitleDisplay,
-            Self::GuildScores(_) => SettingKey::GuildScores,
             Self::AnalyticsPrivacy(_) => SettingKey::AnalyticsPrivacy,
         }
     }
@@ -196,8 +169,6 @@ impl SettingValue {
             Self::TitleDisplay(TitleDisplayPreference::Romaji) => "romaji",
             Self::TitleDisplay(TitleDisplayPreference::English) => "english",
             Self::TitleDisplay(TitleDisplayPreference::Native) => "native",
-            Self::GuildScores(GuildScorePreference::Visible) => "visible",
-            Self::GuildScores(GuildScorePreference::Hidden) => "hidden",
             Self::AnalyticsPrivacy(AnalyticsPrivacyPreference::Standard) => "standard",
             Self::AnalyticsPrivacy(AnalyticsPrivacyPreference::OptedOut) => "opted_out",
         }
@@ -209,8 +180,6 @@ impl SettingValue {
             Self::TitleDisplay(TitleDisplayPreference::Romaji) => "Romaji title",
             Self::TitleDisplay(TitleDisplayPreference::English) => "English title",
             Self::TitleDisplay(TitleDisplayPreference::Native) => "native title",
-            Self::GuildScores(GuildScorePreference::Visible) => "show guild scores",
-            Self::GuildScores(GuildScorePreference::Hidden) => "hide guild scores",
             Self::AnalyticsPrivacy(AnalyticsPrivacyPreference::Standard) => "standard analytics",
             Self::AnalyticsPrivacy(AnalyticsPrivacyPreference::OptedOut) => {
                 "opted out of analytics"
@@ -306,7 +275,7 @@ mod tests {
             SettingKey::parse("title-display"),
             Some(SettingKey::TitleDisplay)
         );
-        assert_eq!(SettingKey::parse("scores"), Some(SettingKey::GuildScores));
+        assert_eq!(SettingKey::parse("scores"), None);
         assert_eq!(
             SettingKey::parse("privacy"),
             Some(SettingKey::AnalyticsPrivacy)
