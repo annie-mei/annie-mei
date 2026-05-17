@@ -71,5 +71,7 @@ reviews:
 
     - path: "migrations/**/*"
       instructions: |
-        The bot no longer manages database schema migrations (auth-service owns the schema).
-        These migration files are historical only.
+        The auth-service owns OAuth schema, but the bot may manage migrations for bot-owned
+        tables such as `user_settings` and `guild_settings`. Review migrations for clear
+        ownership boundaries, reversible down migrations, idempotent/safe DDL where practical,
+        and consistency with SQLx persistence helpers.
