@@ -168,7 +168,7 @@ pub fn plan_settings_command(
     }
 }
 
-#[instrument(name = "command.settings.format_layers", skip(layers))]
+#[instrument(name = "command.settings.format_layers", skip(layers, guild_id))]
 pub fn format_setting_layers(
     layers: ResolvedSettingLayers,
     guild_id: Option<GuildId>,
@@ -195,7 +195,7 @@ pub fn format_setting_layers(
     )
 }
 
-#[instrument(name = "command.settings.format_saved", skip(value))]
+#[instrument(name = "command.settings.format_saved", skip(target, value))]
 pub fn format_saved_setting(target: SettingsWriteTarget, value: SettingValue) -> String {
     let scope = match target {
         SettingsWriteTarget::User(_) => "user",
@@ -418,7 +418,10 @@ fn settings_help_message(prefix: &str) -> String {
     format!("{prefix} Available settings: {settings}.")
 }
 
-#[instrument(name = "command.settings.log_storage_error", skip(error, user_id))]
+#[instrument(
+    name = "command.settings.log_storage_error",
+    skip(error, user_id, guild_id)
+)]
 fn log_settings_storage_error(
     operation: &str,
     user_id: UserId,
