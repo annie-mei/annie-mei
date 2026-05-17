@@ -42,7 +42,13 @@ impl fmt::Display for SettingsStorageError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::Database(error) => write!(f, "database error: {error}"),
-            Self::InvalidStoredValue(error) => write!(f, "stored setting is invalid: {error}"),
+            Self::InvalidStoredValue(error) => {
+                write!(
+                    f,
+                    "stored setting is invalid for {}",
+                    error.setting_key.label()
+                )
+            }
         }
     }
 }
@@ -137,6 +143,9 @@ pub async fn resolve_setting_layers(
     setting_key: SettingKey,
 ) -> Result<ResolvedSettingLayers, SettingsStorageError> {
     let mut transaction = pool.begin().await?;
+    sqlx::query("SET TRANSACTION ISOLATION LEVEL REPEATABLE READ READ ONLY")
+        .execute(&mut *transaction)
+        .await?;
 
     let user_row = sqlx::query_as::<_, StoredSettingRow>(
         "SELECT setting_key, setting_value FROM user_settings \
@@ -217,5 +226,18 @@ mod tests {
             .expect_err("invalid stored value should fail");
 
         assert!(matches!(error, SettingsStorageError::InvalidStoredValue(_)));
+    }
+
+    #[test]
+    fn storage_error_display_redacts_invalid_stored_value() {
+        let error = SettingsStorageError::InvalidStoredValue(SettingValidationError {
+            setting_key: SettingKey::TitleDisplay,
+            raw_value: "unexpected-secret-value".to_string(),
+        });
+
+        let message = error.to_string();
+
+        assert!(message.contains("Title display"));
+        assert!(!message.contains("unexpected-secret-value"));
     }
 }

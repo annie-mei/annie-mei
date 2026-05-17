@@ -14,7 +14,7 @@ src/
 ├── models/          # Data types, DB models, API responses
 ├── utils/           # Shared utilities, API clients, DB helpers
 └── main.rs          # Bot entry point, event routing, startup/shutdown
-migrations/          # Historical Diesel migrations (schema owned by auth-service)
+migrations/          # SQL migrations for bot-owned tables; auth-service owns OAuth schema
 ```
 
 ## Conventions to Follow
