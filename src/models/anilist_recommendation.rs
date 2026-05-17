@@ -1,6 +1,7 @@
 use crate::{
     models::{
         anilist_common::{CoverImage, Tag, Title},
+        settings::TitleDisplayPreference,
         transformers::Transformers,
     },
     utils::{formatter::titlecase, statics::EMPTY_STR},
@@ -86,15 +87,39 @@ impl Recommendation {
 }
 
 impl RecommendedMedia {
-    pub fn display_title(&self) -> String {
-        titlecase(
-            self.title
-                .english
+    pub fn display_title(&self, title_preference: TitleDisplayPreference) -> String {
+        match title_preference {
+            TitleDisplayPreference::Matched | TitleDisplayPreference::English => titlecase(
+                self.title
+                    .english
+                    .as_deref()
+                    .or(self.title.romaji.as_deref())
+                    .or(self.title.native.as_deref())
+                    .unwrap_or_default(),
+            ),
+            TitleDisplayPreference::Romaji => titlecase(
+                self.title
+                    .romaji
+                    .as_deref()
+                    .or(self.title.english.as_deref())
+                    .or(self.title.native.as_deref())
+                    .unwrap_or_default(),
+            ),
+            TitleDisplayPreference::Native => self
+                .title
+                .native
                 .as_deref()
-                .or(self.title.romaji.as_deref())
-                .or(self.title.native.as_deref())
-                .unwrap_or_default(),
-        )
+                .map(ToOwned::to_owned)
+                .unwrap_or_else(|| {
+                    titlecase(
+                        self.title
+                            .romaji
+                            .as_deref()
+                            .or(self.title.english.as_deref())
+                            .unwrap_or_default(),
+                    )
+                }),
+        }
     }
 
     pub fn media_type(&self) -> &str {
@@ -315,7 +340,10 @@ mod tests {
         let recommendation = media.recommendations().next().unwrap();
         let recommended_media = recommendation.recommended_media().unwrap();
         assert_eq!(recommendation.rating_text(), "42");
-        assert_eq!(recommended_media.display_title(), "Samurai Champloo");
+        assert_eq!(
+            recommended_media.display_title(TitleDisplayPreference::Matched),
+            "Samurai Champloo"
+        );
         assert_eq!(recommended_media.media_type(), "anime");
     }
 }

@@ -3,6 +3,7 @@ use std::collections::HashMap;
 use crate::{
     models::{
         anilist_common::{CoverImage, Tag, TitleVariant},
+        settings::TitleDisplayPreference,
         user_media_list::MediaListData,
     },
     utils::{formatter::*, statics::EMPTY_STR},
@@ -10,6 +11,7 @@ use crate::{
 
 use html2md::parse_html;
 use serenity::all::{CreateEmbed, CreateEmbedFooter};
+use tracing::instrument;
 
 pub trait Transformers {
     fn get_id(&self) -> u32;
@@ -68,6 +70,29 @@ pub trait Transformers {
                 Some(title) => titlecase(title),
                 None => titlecase(self.get_english_title().unwrap_or_default()),
             },
+        }
+    }
+
+    fn transform_preferred_title(
+        &self,
+        title_variant: Option<TitleVariant>,
+        title_preference: TitleDisplayPreference,
+    ) -> String {
+        match effective_title_variant(title_variant, title_preference) {
+            TitleVariant::English => self.transform_english_title(),
+            TitleVariant::Native => self.transform_native_title(),
+            TitleVariant::Romaji => self.transform_romaji_title(),
+        }
+    }
+
+    fn transform_footer_title(
+        &self,
+        title_variant: Option<TitleVariant>,
+        title_preference: TitleDisplayPreference,
+    ) -> String {
+        match effective_title_variant(title_variant, title_preference) {
+            TitleVariant::English | TitleVariant::Native => self.transform_romaji_title(),
+            TitleVariant::Romaji => self.transform_english_title(),
         }
     }
 
@@ -161,29 +186,15 @@ pub trait Transformers {
         &self,
         guild_members_data: Option<HashMap<u64, MediaListData>>,
         title_variant: Option<TitleVariant>,
+        title_preference: TitleDisplayPreference,
     ) -> CreateEmbed {
         let is_anime = self.get_type() == "anime";
 
         // Surface whichever variant the user typed as the primary title;
         // park the other one in the footer. Default (no signal) keeps the
         // long-standing Romaji-as-title behaviour.
-        let (primary_title, footer_title) = match title_variant {
-            Some(TitleVariant::English) => (
-                self.transform_english_title(),
-                self.transform_romaji_title(),
-            ),
-            // Native primary pairs with Romaji in the footer: Romaji is the
-            // direct transliteration, so it acts as a pronunciation aid for
-            // the Native script. English is intentionally omitted here — it
-            // is the variant least related to a native-script search.
-            Some(TitleVariant::Native) => {
-                (self.transform_native_title(), self.transform_romaji_title())
-            }
-            Some(TitleVariant::Romaji) | None => (
-                self.transform_romaji_title(),
-                self.transform_english_title(),
-            ),
-        };
+        let primary_title = self.transform_preferred_title(title_variant, title_preference);
+        let footer_title = self.transform_footer_title(title_variant, title_preference);
 
         let mut embed = CreateEmbed::new()
             // General Embed Fields
@@ -255,5 +266,18 @@ pub trait Transformers {
             }
             None => embed,
         }
+    }
+}
+
+#[instrument(name = "transformers.effective_title_variant")]
+fn effective_title_variant(
+    title_variant: Option<TitleVariant>,
+    title_preference: TitleDisplayPreference,
+) -> TitleVariant {
+    match title_preference {
+        TitleDisplayPreference::Matched => title_variant.unwrap_or(TitleVariant::Romaji),
+        TitleDisplayPreference::Romaji => TitleVariant::Romaji,
+        TitleDisplayPreference::English => TitleVariant::English,
+        TitleDisplayPreference::Native => TitleVariant::Native,
     }
 }

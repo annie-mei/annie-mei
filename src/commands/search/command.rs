@@ -9,13 +9,14 @@ use crate::{
     },
     models::{
         anilist_anime::Anime, anilist_common::TitleVariant, anilist_manga::Manga,
-        transformers::Transformers,
+        settings::TitleDisplayPreference, transformers::Transformers,
     },
     utils::{
         channel::is_nsfw_channel,
         llm::{LlmError, get_gemini_client_from_context},
         posthog::LlmTelemetryContext,
         privacy::{configure_sentry_scope, hash_discord_id, hash_user_id},
+        settings::resolve_title_display_preference,
         statics::ENV,
         statics::NSFW_NOT_ALLOWED,
     },
@@ -257,22 +258,29 @@ async fn fetch_manga_candidates<S: MediaDataSource>(
 }
 
 #[instrument(name = "command.search.build_response", skip(result))]
-pub fn build_response(result: MediaSearchResult) -> CommandResponse {
+pub fn build_response(
+    result: MediaSearchResult,
+    title_preference: TitleDisplayPreference,
+) -> CommandResponse {
     match result {
         MediaSearchResult::Anime {
             anime,
             title_variant,
             ..
-        } => CommandResponse::Embed(Box::new(
-            anime.transform_response_embed(None, title_variant),
-        )),
+        } => CommandResponse::Embed(Box::new(anime.transform_response_embed(
+            None,
+            title_variant,
+            title_preference,
+        ))),
         MediaSearchResult::Manga {
             manga,
             title_variant,
             ..
-        } => CommandResponse::Embed(Box::new(
-            manga.transform_response_embed(None, title_variant),
-        )),
+        } => CommandResponse::Embed(Box::new(manga.transform_response_embed(
+            None,
+            title_variant,
+            title_preference,
+        ))),
         MediaSearchResult::NotFound => CommandResponse::Content(NOT_FOUND_SEARCH.to_string()),
     }
 }
@@ -368,7 +376,9 @@ pub async fn run(ctx: &Context, interaction: &mut CommandInteraction) {
         }
         MediaSearchResult::NotFound => None,
     };
-    let response = build_response(result);
+    let title_preference =
+        resolve_title_display_preference(ctx, user.id, interaction.guild_id).await;
+    let response = build_response(result, title_preference);
     let _result = match response {
         CommandResponse::Content(text) | CommandResponse::Message(text) => {
             let builder = EditInteractionResponse::new().content(match interpretation {

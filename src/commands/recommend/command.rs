@@ -11,6 +11,7 @@ use crate::{
         },
         media_response::FetchResponse as SearchResponse,
         media_type::MediaType,
+        settings::TitleDisplayPreference,
         transformers::Transformers,
     },
     utils::{
@@ -19,6 +20,7 @@ use crate::{
         formatter::{code, linker, remove_underscores_and_titlecase, titlecase},
         privacy::configure_sentry_scope,
         redis::{check_cache, try_to_cache_response},
+        settings::resolve_title_display_preference,
         statics::{EMPTY_STR, NOT_FOUND_ANIME, NOT_FOUND_MANGA, NSFW_NOT_ALLOWED},
     },
 };
@@ -95,6 +97,7 @@ pub fn handle_recommend(
     media: Option<RecommendationMedia>,
     media_type: MediaType,
     title_variant: Option<TitleVariant>,
+    title_preference: TitleDisplayPreference,
     allow_adult_media: bool,
 ) -> CommandResponse {
     let Some(media) = media else {
@@ -120,7 +123,7 @@ pub fn handle_recommend(
     if recommendations.is_empty() {
         return CommandResponse::Content(format!(
             "No recommendations found for {}.",
-            media_title(&media, title_variant)
+            media.transform_preferred_title(title_variant, title_preference)
         ));
     }
 
@@ -128,6 +131,7 @@ pub fn handle_recommend(
         &media,
         &recommendations,
         title_variant,
+        title_preference,
     )))
 }
 
@@ -172,7 +176,15 @@ pub async fn run(ctx: &Context, interaction: &mut CommandInteraction) {
     };
     let allow_adult_media =
         is_nsfw_channel(ctx, interaction.channel_id, interaction.guild_id).await;
-    let response = handle_recommend(media, media_type, title_variant, allow_adult_media);
+    let title_preference =
+        resolve_title_display_preference(ctx, interaction.user.id, interaction.guild_id).await;
+    let response = handle_recommend(
+        media,
+        media_type,
+        title_variant,
+        title_preference,
+        allow_adult_media,
+    );
 
     let _result = match response {
         CommandResponse::Content(text) | CommandResponse::Message(text) => {
@@ -315,12 +327,13 @@ fn recommendations_embed(
     media: &RecommendationMedia,
     recommendations: &[(&Recommendation, &RecommendedMedia)],
     title_variant: Option<TitleVariant>,
+    title_preference: TitleDisplayPreference,
 ) -> CreateEmbed {
     let mut embed = CreateEmbed::new()
         .color(media.transform_color())
         .title(format!(
             "Recommendations for {}",
-            media_title(media, title_variant)
+            media.transform_preferred_title(title_variant, title_preference)
         ))
         .url(media.transform_anilist())
         .footer(CreateEmbedFooter::new(format!(
@@ -335,7 +348,11 @@ fn recommendations_embed(
 
     for (index, (recommendation, recommended_media)) in recommendations.iter().enumerate() {
         embed = embed.field(
-            format!("{}. {}", index + 1, recommended_media.display_title()),
+            format!(
+                "{}. {}",
+                index + 1,
+                recommended_media.display_title(title_preference)
+            ),
             format_recommendation(recommendation, recommended_media),
             false,
         );
@@ -391,15 +408,6 @@ fn format_media_descriptor(recommended_media: &RecommendedMedia) -> String {
             remove_underscores_and_titlecase(format),
             remove_underscores_and_titlecase(status)
         ),
-    }
-}
-
-#[instrument(skip(media))]
-fn media_title(media: &RecommendationMedia, title_variant: Option<TitleVariant>) -> String {
-    match title_variant {
-        Some(TitleVariant::English) => media.transform_english_title(),
-        Some(TitleVariant::Native) => media.transform_native_title(),
-        Some(TitleVariant::Romaji) | None => media.transform_romaji_title(),
     }
 }
 
@@ -504,7 +512,13 @@ mod tests {
 
     #[test]
     fn not_found_returns_type_specific_message() {
-        let response = handle_recommend(None, MediaType::Manga, None, true);
+        let response = handle_recommend(
+            None,
+            MediaType::Manga,
+            None,
+            TitleDisplayPreference::Matched,
+            true,
+        );
 
         assert!(response.is_content());
         assert_eq!(response.unwrap_content(), NOT_FOUND_MANGA);
@@ -516,6 +530,7 @@ mod tests {
             Some(sample_media(true, false)),
             MediaType::Anime,
             None,
+            TitleDisplayPreference::Matched,
             false,
         );
 
@@ -529,6 +544,7 @@ mod tests {
             Some(sample_media(false, true)),
             MediaType::Anime,
             None,
+            TitleDisplayPreference::Matched,
             false,
         );
 
@@ -546,6 +562,7 @@ mod tests {
             Some(sample_media_without_recommendations()),
             MediaType::Manga,
             Some(TitleVariant::English),
+            TitleDisplayPreference::Matched,
             true,
         );
 
@@ -562,6 +579,7 @@ mod tests {
             Some(sample_media(false, false)),
             MediaType::Anime,
             Some(TitleVariant::English),
+            TitleDisplayPreference::Matched,
             false,
         );
 
@@ -576,5 +594,22 @@ mod tests {
                 .unwrap()
                 .contains("AniList rating: 42")
         );
+    }
+
+    #[test]
+    fn recommendations_use_configured_title_preference() {
+        let response = handle_recommend(
+            Some(sample_media(false, false)),
+            MediaType::Anime,
+            Some(TitleVariant::English),
+            TitleDisplayPreference::Native,
+            false,
+        );
+
+        assert!(response.is_embed());
+        let embed = response.unwrap_embed();
+        let value = serde_json::to_value(&embed).expect("embed serializes");
+        assert_eq!(value["title"], "Recommendations for カウボーイビバップ");
+        assert_eq!(value["fields"][0]["name"], "1. サムライチャンプルー");
     }
 }
