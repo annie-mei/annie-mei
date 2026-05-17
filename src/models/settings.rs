@@ -11,6 +11,12 @@ pub enum SettingScope {
     Guild,
 }
 
+pub const ALL_SETTING_SCOPES: [SettingScope; 3] = [
+    SettingScope::Effective,
+    SettingScope::User,
+    SettingScope::Guild,
+];
+
 impl SettingScope {
     pub fn parse(raw: &str) -> Option<Self> {
         match normalize_token(raw).as_str() {
@@ -26,6 +32,14 @@ impl SettingScope {
             Self::Effective => "effective",
             Self::User => "user",
             Self::Guild => "guild",
+        }
+    }
+
+    pub fn label(self) -> &'static str {
+        match self {
+            Self::Effective => "Effective",
+            Self::User => "User",
+            Self::Guild => "Guild",
         }
     }
 }

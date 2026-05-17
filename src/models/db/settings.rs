@@ -128,6 +128,53 @@ pub async fn set_guild_setting(
 }
 
 #[instrument(
+    name = "db.settings.get_user_setting",
+    skip(pool, user_discord_id),
+    fields(
+        discord_user_id = %hash_user_id(user_discord_id.get()),
+        setting_key = %setting_key.as_str()
+    )
+)]
+pub async fn get_user_setting(
+    pool: &DbPool,
+    user_discord_id: UserId,
+    setting_key: SettingKey,
+) -> Result<Option<SettingValue>, SettingsStorageError> {
+    let row = sqlx::query_as::<_, StoredSettingRow>(
+        "SELECT setting_key, setting_value FROM user_settings \
+         WHERE discord_user_id = $1 AND setting_key = $2",
+    )
+    .bind(user_discord_id.get().to_string())
+    .bind(setting_key.as_str())
+    .fetch_optional(pool)
+    .await?;
+
+    parse_optional_setting(row, setting_key)
+}
+
+#[instrument(
+    name = "db.settings.get_guild_setting",
+    skip(pool, guild_id),
+    fields(guild_id = %hash_discord_id(guild_id.get()), setting_key = %setting_key.as_str())
+)]
+pub async fn get_guild_setting(
+    pool: &DbPool,
+    guild_id: GuildId,
+    setting_key: SettingKey,
+) -> Result<Option<SettingValue>, SettingsStorageError> {
+    let row = sqlx::query_as::<_, StoredSettingRow>(
+        "SELECT setting_key, setting_value FROM guild_settings \
+         WHERE guild_id = $1 AND setting_key = $2",
+    )
+    .bind(guild_id.get().to_string())
+    .bind(setting_key.as_str())
+    .fetch_optional(pool)
+    .await?;
+
+    parse_optional_setting(row, setting_key)
+}
+
+#[instrument(
     name = "db.settings.resolve_setting_layers",
     skip(pool, user_discord_id, guild_id),
     fields(
