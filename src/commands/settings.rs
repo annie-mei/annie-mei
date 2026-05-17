@@ -235,7 +235,14 @@ pub async fn run(ctx: &Context, interaction: &mut CommandInteraction) {
             .and_then(|member| member.permissions),
     };
 
-    let plan = plan_settings_command(options, context);
+    let plan = match plan_settings_command(options, context) {
+        SettingsCommandPlan::Respond(response) => {
+            respond(interaction, ctx, response).await;
+            return;
+        }
+        plan => plan,
+    };
+
     let Some(database_pool) = get_pool_from_context(ctx).await else {
         respond(
             interaction,
