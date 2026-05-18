@@ -11,12 +11,27 @@ Runtime queries should use schema-qualified table names. Do not rely on `search_
 
 ## Migration history
 
-Each service should track SQLx migrations in its own schema:
+Each service should track new SQLx migrations in its own schema:
 
 - Auth-service startup moves existing public OAuth tables when safe, then sets `search_path` to `auth,public` before running migrations, so SQLx uses `auth._sqlx_migrations`.
-- Annie Mei migrations should be run with `search_path` set to `annie_mei,auth,public`, so SQLx uses `annie_mei._sqlx_migrations`.
+- Fresh Annie Mei installs can run migrations with `search_path` set to `annie_mei,auth,public`, so SQLx uses `annie_mei._sqlx_migrations`.
 
-Create `annie_mei` before running Annie Mei migrations if you want SQLx to create `annie_mei._sqlx_migrations`; SQLx creates/checks its migration table before it runs migration SQL. Do not reconcile or share `public._sqlx_migrations`; it may contain older migrations from either service.
+Create `annie_mei` before running Annie Mei migrations if you want SQLx to create `annie_mei._sqlx_migrations`; SQLx creates/checks its migration table before it runs migration SQL.
+
+For existing deployments with prior Annie Mei rows in `public._sqlx_migrations`, do not switch directly to `search_path=annie_mei,auth,public`. That makes SQLx replay historical migrations into `annie_mei` before the table-move migration runs, which can create duplicate empty tables and stop the migration. Instead, first apply the schema-move migration with the existing migration-history location, then seed `annie_mei._sqlx_migrations` with only Annie Mei migration rows before using schema-local migration history.
+
+Example SQLx-history cutover after the Annie Mei schema-move migration has run:
+
+```sql
+CREATE SCHEMA IF NOT EXISTS annie_mei;
+CREATE TABLE IF NOT EXISTS annie_mei._sqlx_migrations (LIKE public._sqlx_migrations INCLUDING ALL);
+
+INSERT INTO annie_mei._sqlx_migrations
+SELECT *
+FROM public._sqlx_migrations
+WHERE description IN ('create_settings_tables', 'move_settings_to_annie_mei_schema')
+ON CONFLICT (version) DO NOTHING;
+```
 
 ## Existing data move
 
@@ -53,22 +68,15 @@ The auth-service database role should own or fully manage objects in `auth`.
 
 1. Deploy auth-service schema changes first, or run its migrations manually, so `auth.oauth_credentials` and `auth.oauth_sessions` exist.
 2. Grant Annie Mei access to the `auth` schema and OAuth tables.
-3. Create the `annie_mei` schema before running Annie Mei migrations if this deployment should use `annie_mei._sqlx_migrations`.
-4. Run Annie Mei migrations with `search_path=annie_mei,auth,public`.
+3. For existing databases, run Annie Mei migrations once with the current migration-history location so the table-move migration can move `public.user_settings` and `public.guild_settings` before any historical migrations are replayed in `annie_mei`.
+4. If Annie Mei should use `annie_mei._sqlx_migrations` after that cutover, create `annie_mei._sqlx_migrations` from the existing Annie Mei migration rows only. Do not copy auth-service migration rows into Annie Mei's migration table.
 5. Deploy Annie Mei code that reads `auth.*` and writes `annie_mei.*`.
 
-For a short zero-downtime bridge for old bot reads, create compatibility views in `public`. Do not rely on these views for old auth-service writes that use `INSERT ... ON CONFLICT`; deploy auth-service before moving traffic that needs to write OAuth credentials. Drop the views after both services are schema-qualified.
-
-```sql
-CREATE OR REPLACE VIEW public.oauth_credentials AS SELECT * FROM auth.oauth_credentials;
-CREATE OR REPLACE VIEW public.oauth_sessions AS SELECT * FROM auth.oauth_sessions;
-```
-
-Avoid compatibility views for settings writes unless the deployment requires them and they are tested as updatable views.
+Avoid public compatibility views for this cutover. They can confuse startup duplicate checks and do not safely cover old write paths such as OAuth upserts.
 
 ## Rollback
 
-If schema-qualified code must be rolled back, either keep compatibility views in `public` or move tables back:
+If schema-qualified code must be rolled back, move tables back:
 
 ```sql
 ALTER TABLE IF EXISTS auth.oauth_credentials SET SCHEMA public;
