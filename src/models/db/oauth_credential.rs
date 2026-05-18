@@ -1,8 +1,8 @@
-//! Read-only access to the auth-service `oauth_credentials` table from the bot.
+//! Read-only access to the auth-service `auth.oauth_credentials` table from the bot.
 //!
 //! The auth-service (see `../auth/src/routes/authorized.rs`) is the source of
 //! truth for OAuth-linked AniList accounts. The bot shares the same Postgres
-//! database and reads `oauth_credentials` directly via raw SQL so commands like
+//! database and reads `auth.oauth_credentials` directly via raw SQL so commands like
 //! `/whoami` and the guild-overlay query can recognize users that linked
 //! through the OAuth flow.
 //!
@@ -11,7 +11,7 @@
 //! contract. The shared schema contract is documented in
 //! `docs/oauth-contract.md`.
 //!
-//! `oauth_credentials.discord_user_id` is `TEXT` and contains the raw Discord
+//! `auth.oauth_credentials.discord_user_id` is `TEXT` and contains the raw Discord
 //! snowflake string (`user.id.get().to_string()`); `anilist_id` is `BIGINT` and
 //! `anilist_username` is nullable `TEXT`.
 
@@ -81,7 +81,7 @@ impl OAuthCredential {
         pool: &DbPool,
     ) -> Result<Option<OAuthCredential>, sqlx::Error> {
         sqlx::query_as::<_, OAuthCredential>(
-            "SELECT discord_user_id, anilist_id, anilist_username FROM oauth_credentials WHERE discord_user_id = $1"
+            "SELECT discord_user_id, anilist_id, anilist_username FROM auth.oauth_credentials WHERE discord_user_id = $1"
         )
         .bind(user_discord_id.get().to_string())
         .fetch_optional(pool)
@@ -107,7 +107,7 @@ impl OAuthCredential {
             .collect();
 
         sqlx::query_as::<_, OAuthCredential>(
-            "SELECT discord_user_id, anilist_id, anilist_username FROM oauth_credentials \
+            "SELECT discord_user_id, anilist_id, anilist_username FROM auth.oauth_credentials \
              WHERE discord_user_id = ANY($1)",
         )
         .bind(ids)

@@ -88,7 +88,7 @@ pub async fn set_user_setting(
     value: SettingValue,
 ) -> Result<(), SettingsStorageError> {
     sqlx::query(
-        "INSERT INTO user_settings (discord_user_id, setting_key, setting_value) \
+        "INSERT INTO annie_mei.user_settings (discord_user_id, setting_key, setting_value) \
          VALUES ($1, $2, $3) \
          ON CONFLICT (discord_user_id, setting_key) DO UPDATE \
          SET setting_value = EXCLUDED.setting_value, updated_at = CURRENT_TIMESTAMP",
@@ -113,7 +113,7 @@ pub async fn set_guild_setting(
     value: SettingValue,
 ) -> Result<(), SettingsStorageError> {
     sqlx::query(
-        "INSERT INTO guild_settings (guild_id, setting_key, setting_value) \
+        "INSERT INTO annie_mei.guild_settings (guild_id, setting_key, setting_value) \
          VALUES ($1, $2, $3) \
          ON CONFLICT (guild_id, setting_key) DO UPDATE \
          SET setting_value = EXCLUDED.setting_value, updated_at = CURRENT_TIMESTAMP",
@@ -141,7 +141,7 @@ pub async fn get_user_setting(
     setting_key: SettingKey,
 ) -> Result<Option<SettingValue>, SettingsStorageError> {
     let row = sqlx::query_as::<_, StoredSettingRow>(
-        "SELECT setting_key, setting_value FROM user_settings \
+        "SELECT setting_key, setting_value FROM annie_mei.user_settings \
          WHERE discord_user_id = $1 AND setting_key = $2",
     )
     .bind(user_discord_id.get().to_string())
@@ -163,7 +163,7 @@ pub async fn get_guild_setting(
     setting_key: SettingKey,
 ) -> Result<Option<SettingValue>, SettingsStorageError> {
     let row = sqlx::query_as::<_, StoredSettingRow>(
-        "SELECT setting_key, setting_value FROM guild_settings \
+        "SELECT setting_key, setting_value FROM annie_mei.guild_settings \
          WHERE guild_id = $1 AND setting_key = $2",
     )
     .bind(guild_id.get().to_string())
@@ -195,7 +195,7 @@ pub async fn resolve_setting_layers(
         .await?;
 
     let user_row = sqlx::query_as::<_, StoredSettingRow>(
-        "SELECT setting_key, setting_value FROM user_settings \
+        "SELECT setting_key, setting_value FROM annie_mei.user_settings \
          WHERE discord_user_id = $1 AND setting_key = $2",
     )
     .bind(user_discord_id.get().to_string())
@@ -207,7 +207,7 @@ pub async fn resolve_setting_layers(
     let guild = match guild_id {
         Some(guild_id) => {
             let row = sqlx::query_as::<_, StoredSettingRow>(
-                "SELECT setting_key, setting_value FROM guild_settings \
+                "SELECT setting_key, setting_value FROM annie_mei.guild_settings \
                  WHERE guild_id = $1 AND setting_key = $2",
             )
             .bind(guild_id.get().to_string())

@@ -22,10 +22,11 @@ const CONFIRMATION_OPTION: &str = "confirmation";
 const CONFIRM_UNREGISTER: &str = "confirm";
 const CANCEL_UNREGISTER: &str = "cancel";
 const DELETE_OAUTH_CREDENTIALS_SQL: &str =
-    "DELETE FROM oauth_credentials WHERE discord_user_id = $1";
-const DELETE_OAUTH_SESSIONS_SQL: &str = "DELETE FROM oauth_sessions WHERE discord_user_id = $1";
-const OAUTH_CREDENTIALS_TABLE: &str = "oauth_credentials";
-const OAUTH_SESSIONS_TABLE: &str = "oauth_sessions";
+    "DELETE FROM auth.oauth_credentials WHERE discord_user_id = $1";
+const DELETE_OAUTH_SESSIONS_SQL: &str =
+    "DELETE FROM auth.oauth_sessions WHERE discord_user_id = $1";
+const OAUTH_CREDENTIALS_TABLE: &str = "auth.oauth_credentials";
+const OAUTH_SESSIONS_TABLE: &str = "auth.oauth_sessions";
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum UnregisterOutcome {
