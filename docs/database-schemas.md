@@ -29,7 +29,15 @@ CREATE TABLE IF NOT EXISTS annie_mei._sqlx_migrations (LIKE public._sqlx_migrati
 INSERT INTO annie_mei._sqlx_migrations
 SELECT *
 FROM public._sqlx_migrations
-WHERE description IN ('create_settings_tables', 'move_settings_to_annie_mei_schema')
+WHERE description IN (
+    'diesel_initial_setup',
+    'create_users',
+    'remove_unique_constraint_from_user',
+    'users_add_index_discord_id_anilist_id',
+    'drop_users_table',
+    'create_settings_tables',
+    'move_settings_to_annie_mei_schema'
+)
 ON CONFLICT (version) DO NOTHING;
 ```
 
@@ -66,11 +74,12 @@ The auth-service database role should own or fully manage objects in `auth`.
 
 ## Deployment order
 
-1. Deploy auth-service schema changes first, or run its migrations manually, so `auth.oauth_credentials` and `auth.oauth_sessions` exist.
-2. Grant Annie Mei access to the `auth` schema and OAuth tables.
-3. For existing databases, run Annie Mei migrations once with the current migration-history location so the table-move migration can move `public.user_settings` and `public.guild_settings` before any historical migrations are replayed in `annie_mei`.
-4. If Annie Mei should use `annie_mei._sqlx_migrations` after that cutover, create `annie_mei._sqlx_migrations` from the existing Annie Mei migration rows only. Do not copy auth-service migration rows into Annie Mei's migration table.
-5. Deploy Annie Mei code that reads `auth.*` and writes `annie_mei.*`.
+1. Drain or stop old auth-service instances before moving OAuth tables. Old auth-service code uses unqualified public table names and is not safe to overlap with the table move.
+2. Deploy auth-service schema changes first, or run its migrations manually, so `auth.oauth_credentials` and `auth.oauth_sessions` exist.
+3. Grant Annie Mei access to the `auth` schema and OAuth tables.
+4. For existing databases, run Annie Mei migrations once with the current migration-history location so the table-move migration can move `public.user_settings` and `public.guild_settings` before any historical migrations are replayed in `annie_mei`.
+5. If Annie Mei should use `annie_mei._sqlx_migrations` after that cutover, create `annie_mei._sqlx_migrations` from the existing Annie Mei migration rows only. Do not copy auth-service migration rows into Annie Mei's migration table.
+6. Deploy Annie Mei code that reads `auth.*` and writes `annie_mei.*`.
 
 Avoid public compatibility views for this cutover. They can confuse startup duplicate checks and do not safely cover old write paths such as OAuth upserts.
 
