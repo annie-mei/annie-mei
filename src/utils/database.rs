@@ -4,7 +4,7 @@ use serenity::{client::Context, prelude::TypeMapKey};
 use sqlx::{Pool, Postgres, postgres::PgPoolOptions};
 use std::env;
 use std::time::Duration;
-use tracing::{error, instrument};
+use tracing::{error, info, instrument};
 
 pub type DbPool = Pool<Postgres>;
 
@@ -35,6 +35,28 @@ pub async fn create_pool() -> DbPool {
             );
             panic!("Error creating pool for {redacted_url}: {error}")
         })
+}
+
+#[instrument(name = "db.run_migrations", skip(pool))]
+pub async fn run_migrations(pool: &DbPool) -> Result<(), sqlx::migrate::MigrateError> {
+    let schema_exists: Option<String> =
+        sqlx::query_scalar("SELECT to_regnamespace('annie_mei')::text")
+            .fetch_one(pool)
+            .await?;
+
+    if schema_exists.is_none() {
+        sqlx::query("CREATE SCHEMA annie_mei").execute(pool).await?;
+    }
+
+    let mut connection = pool.acquire().await?;
+    sqlx::query("SET search_path TO annie_mei, annie_auth, public")
+        .execute(&mut *connection)
+        .await?;
+
+    sqlx::migrate!("./migrations").run(&mut *connection).await?;
+
+    info!("Database migrations completed");
+    Ok(())
 }
 
 #[instrument(name = "db.pool_from_context", skip(ctx))]

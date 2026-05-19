@@ -22,7 +22,7 @@ use serenity::{
 
 use utils::{
     channel::is_nsfw_channel,
-    database::{DatabasePoolKey, create_pool},
+    database::{DatabasePoolKey, create_pool, run_migrations},
     llm::{GeminiClient, GeminiClientKey, configured_model_name},
     oauth::{OAuthContextConfigKey, load_context_config},
     posthog::{CommandTelemetryContext, PostHogClient},
@@ -276,6 +276,11 @@ async fn main() {
 
     info!("Initializing database connection pool");
     let database_pool = create_pool().await;
+
+    info!("Running database migrations");
+    run_migrations(&database_pool)
+        .await
+        .expect("Failed to run database migrations");
 
     info!("Loading OAuth configuration");
     let oauth_config = load_context_config().expect("Failed to load OAuth context config");

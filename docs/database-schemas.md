@@ -14,9 +14,9 @@ Runtime queries should use schema-qualified table names. Do not rely on `search_
 Each service should track new SQLx migrations in its own schema:
 
 - Auth-service startup creates and uses `annie_auth._sqlx_migrations` with `search_path=annie_auth,public`.
-- Future Annie Mei startup migrations should create/use `annie_mei._sqlx_migrations` with `search_path=annie_mei,annie_auth,public`.
+- Annie Mei startup migrations create/use `annie_mei._sqlx_migrations` with `search_path=annie_mei,annie_auth,public`.
 
-The current bot process does not run SQLx migrations at startup. Until ANNIE-190 adds startup migrations, deploys should ensure `annie_mei.user_settings` and `annie_mei.guild_settings` exist before settings commands are used.
+The bot creates the `annie_mei` schema before SQLx checks migration history so `annie_mei._sqlx_migrations` is schema-local and does not conflict with auth-service migration history.
 
 ## Destructive reset cutover
 
@@ -75,10 +75,9 @@ Use the real runtime role name for each environment. In local/Supabase developme
 2. Back up the database if any data should be recoverable.
 3. Run the destructive reset SQL for legacy OAuth tables and SQLx history.
 4. Deploy auth-service so startup creates fresh `annie_auth.*` tables and `annie_auth._sqlx_migrations`.
-5. Create or migrate bot-owned `annie_mei.*` settings tables.
-6. Grant cross-schema permissions for the runtime roles.
-7. Deploy Annie Mei code that reads `annie_auth.*` and writes `annie_mei.*`.
-8. Re-run `/register` for affected users because OAuth credentials were reset.
+5. Grant cross-schema permissions for the runtime roles.
+6. Deploy Annie Mei code; startup runs bot migrations to create `annie_mei.*` settings tables, reads `annie_auth.*`, and writes `annie_mei.*`.
+7. Re-run `/register` for affected users because OAuth credentials were reset.
 
 Avoid public compatibility views for this cutover. They can confuse schema checks and do not safely cover old write paths such as OAuth upserts.
 
