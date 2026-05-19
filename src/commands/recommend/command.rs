@@ -169,15 +169,16 @@ pub async fn run(ctx: &Context, interaction: &mut CommandInteraction) {
         "Got command 'recommend' with search_term: {search_term}"
     );
 
-    let fetch_result = fetch_recommendation_media(&search_term, media_type.clone()).await;
+    let (fetch_result, title_preference) = tokio::join!(
+        fetch_recommendation_media(&search_term, media_type.clone()),
+        resolve_title_display_preference(ctx, interaction.user.id, interaction.guild_id),
+    );
     let (media, title_variant) = match fetch_result {
         Some((media, variant)) => (Some(media), Some(variant)),
         None => (None, None),
     };
     let allow_adult_media =
         is_nsfw_channel(ctx, interaction.channel_id, interaction.guild_id).await;
-    let title_preference =
-        resolve_title_display_preference(ctx, interaction.user.id, interaction.guild_id).await;
     let response = handle_recommend(
         media,
         media_type,

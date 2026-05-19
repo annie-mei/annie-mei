@@ -102,7 +102,10 @@ pub async fn run(ctx: &Context, interaction: &mut CommandInteraction) {
 
     info!("Got command 'anime' with search_term: {search_term}");
 
-    let fetch_result: Option<(Anime, TitleVariant)> = AniListSource.fetch_anime(&search_term).await;
+    let (fetch_result, title_preference): (Option<(Anime, TitleVariant)>, TitleDisplayPreference) = tokio::join!(
+        AniListSource.fetch_anime(&search_term),
+        resolve_title_display_preference(ctx, user.id, interaction.guild_id),
+    );
     let (anime_result, title_variant): (Option<Anime>, Option<TitleVariant>) = match fetch_result {
         Some((anime, variant)) => (Some(anime), Some(variant)),
         None => (None, None),
@@ -135,8 +138,6 @@ pub async fn run(ctx: &Context, interaction: &mut CommandInteraction) {
     };
 
     // Delegate to the transport-agnostic core logic.
-    let title_preference =
-        resolve_title_display_preference(ctx, user.id, interaction.guild_id).await;
     let response = handle_anime(
         anime_result,
         guild_members_data,
