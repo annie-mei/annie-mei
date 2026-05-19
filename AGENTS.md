@@ -128,7 +128,7 @@ Notes:
 ### Database Changes
 
 The bot uses **SQLx** for database access. The auth-service owns OAuth schema;
-the bot reads from the auth-owned `auth.oauth_credentials` table and owns
+the bot reads from the auth-owned `annie_auth.oauth_credentials` table and owns
 Annie Mei-specific settings tables in the `annie_mei` schema, such as
 `user_settings` and `guild_settings`.
 
