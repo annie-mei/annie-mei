@@ -23,7 +23,10 @@ pub async fn resolve_title_display_preference(
     match resolve_setting_layers(&pool, user_id, guild_id, SettingKey::TitleDisplay).await {
         Ok(layers) => match layers.effective.value {
             SettingValue::TitleDisplay(preference) => preference,
-            SettingValue::AnalyticsPrivacy(_) => default_title_display_preference(),
+            SettingValue::AnalyticsPrivacy(_) => {
+                warn!("Unexpected analytics privacy value for title display key; using default");
+                default_title_display_preference()
+            }
         },
         Err(error) => {
             warn!(error = %error, "Failed to resolve title display preference; using default");
