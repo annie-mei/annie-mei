@@ -1,6 +1,6 @@
 [package]
 name = "annie-mei"
-version = "3.0.0"
+version = "3.0.1"
 edition = "2024"
 license = "GPL-3.0-or-later"
 rust-version = "1.95"
@@ -21,7 +21,7 @@ base64 = "0.22"
 blake3 = "1.8.5"
 chrono = "0.4.44"
 clap = { version = "4", features = ["derive"] }
-sqlx = { version = "0.8", default-features = false, features = ["runtime-tokio", "postgres", "chrono", "macros", "tls-rustls"] }
+sqlx = { version = "0.8", default-features = false, features = ["runtime-tokio", "postgres", "chrono", "macros", "migrate", "tls-rustls"] }
 getrandom = "0.4"
 hmac = "0.13"
 html2md = "0.2.15"

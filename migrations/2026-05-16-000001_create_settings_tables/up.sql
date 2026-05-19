@@ -1,6 +1,8 @@
 -- Store configurable bot options as one validated setting value per subject.
 -- Discord snowflakes are stored as TEXT so they round-trip without lossy casts.
-CREATE TABLE user_settings (
+CREATE SCHEMA IF NOT EXISTS annie_mei;
+
+CREATE TABLE IF NOT EXISTS annie_mei.user_settings (
     discord_user_id TEXT NOT NULL,
     setting_key TEXT NOT NULL,
     setting_value TEXT NOT NULL,
@@ -9,7 +11,7 @@ CREATE TABLE user_settings (
     PRIMARY KEY (discord_user_id, setting_key)
 );
 
-CREATE TABLE guild_settings (
+CREATE TABLE IF NOT EXISTS annie_mei.guild_settings (
     guild_id TEXT NOT NULL,
     setting_key TEXT NOT NULL,
     setting_value TEXT NOT NULL,
