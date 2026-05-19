@@ -39,9 +39,7 @@ pub async fn create_pool() -> DbPool {
 
 #[instrument(name = "db.run_migrations", skip(pool))]
 pub async fn run_migrations(pool: &DbPool) -> Result<(), sqlx::migrate::MigrateError> {
-    sqlx::query("CREATE SCHEMA IF NOT EXISTS annie_mei")
-        .execute(pool)
-        .await?;
+    ensure_annie_mei_schema(pool).await?;
 
     let mut connection = pool.acquire().await?;
     sqlx::query("SET search_path TO annie_mei, annie_auth, public")
@@ -56,6 +54,24 @@ pub async fn run_migrations(pool: &DbPool) -> Result<(), sqlx::migrate::MigrateE
 
     info!("Database migrations completed");
     Ok(())
+}
+
+#[instrument(name = "db.ensure_annie_mei_schema", skip(pool))]
+async fn ensure_annie_mei_schema(pool: &DbPool) -> Result<(), sqlx::Error> {
+    let schema_exists: Option<String> =
+        sqlx::query_scalar("SELECT to_regnamespace('annie_mei')::text")
+            .fetch_one(pool)
+            .await?;
+
+    if schema_exists.is_some() {
+        return Ok(());
+    }
+
+    match sqlx::query("CREATE SCHEMA annie_mei").execute(pool).await {
+        Ok(_) => Ok(()),
+        Err(sqlx::Error::Database(error)) if error.code().as_deref() == Some("42P06") => Ok(()),
+        Err(error) => Err(error),
+    }
 }
 
 #[instrument(name = "db.pool_from_context", skip(ctx))]
