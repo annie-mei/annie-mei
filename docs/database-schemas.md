@@ -16,7 +16,7 @@ Each service should track new SQLx migrations in its own schema:
 - Auth-service startup creates and uses `annie_auth._sqlx_migrations` with `search_path=annie_auth,public`.
 - Annie Mei startup migrations create/use `annie_mei._sqlx_migrations` with `search_path=annie_mei,annie_auth,public`.
 
-The bot creates the `annie_mei` schema before SQLx checks migration history so `annie_mei._sqlx_migrations` is schema-local and does not conflict with auth-service migration history.
+The bot creates the `annie_mei` schema before SQLx checks migration history so `annie_mei._sqlx_migrations` is schema-local and does not conflict with auth-service migration history. Bot migrations must use SQLx root-level file names like `YYYYMMDDHHMMSS_description.up.sql`; Diesel-style migration directories are ignored by SQLx.
 
 ## Destructive reset cutover
 
