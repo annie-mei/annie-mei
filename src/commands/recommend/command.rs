@@ -351,7 +351,7 @@ fn recommendations_embed(
             format!(
                 "{}. {}",
                 index + 1,
-                recommended_media.display_title(title_preference)
+                recommended_media.display_title(title_variant, title_preference)
             ),
             format_recommendation(recommendation, recommended_media),
             false,
