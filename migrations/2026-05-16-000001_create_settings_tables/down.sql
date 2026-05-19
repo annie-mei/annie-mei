@@ -1,2 +1,2 @@
-DROP TABLE IF EXISTS guild_settings;
-DROP TABLE IF EXISTS user_settings;
+DROP TABLE IF EXISTS annie_mei.guild_settings;
+DROP TABLE IF EXISTS annie_mei.user_settings;
