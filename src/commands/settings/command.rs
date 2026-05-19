@@ -5,7 +5,10 @@ use crate::{
             ResolvedSettingLayers, SettingsStorageError, get_guild_setting, get_user_setting,
             resolve_setting_layers, set_guild_setting, set_user_setting,
         },
-        settings::{ALL_SETTING_KEYS, ALL_SETTING_SCOPES, SettingKey, SettingScope, SettingValue},
+        settings::{
+            ALL_SETTING_KEYS, ALL_SETTING_SCOPES, GuildScoresPreference, SettingKey, SettingScope,
+            SettingValue,
+        },
     },
     utils::{
         database::{DbPool, get_pool_from_context},
@@ -404,6 +407,10 @@ fn plan_settings_write(
         }
     };
 
+    if let Err(message) = validate_value_for_scope(options.scope, value) {
+        return SettingsCommandPlan::Respond(CommandResponse::Content(message));
+    }
+
     match options.scope {
         SettingScope::Effective => SettingsCommandPlan::Respond(CommandResponse::Content(
             "`effective` is read-only because it is resolved from user, guild, and default settings. Choose `user` or `guild` when setting a value."
@@ -431,6 +438,21 @@ fn plan_settings_write(
                 value,
             })
         }
+    }
+}
+
+#[instrument(name = "command.settings.validate_value_for_scope", skip(value))]
+fn validate_value_for_scope(scope: SettingScope, value: SettingValue) -> Result<(), String> {
+    match (scope, value) {
+        (SettingScope::User, SettingValue::GuildScores(GuildScoresPreference::Disabled)) => Err(
+            "Use `opted_out` to exclude yourself from guild scores, or `enabled` to participate. `disabled` is only for guild settings."
+                .to_string(),
+        ),
+        (SettingScope::Guild, SettingValue::GuildScores(GuildScoresPreference::OptedOut)) => Err(
+            "Use `disabled` to turn guild scores off for the server, or `enabled` to allow participating users. `opted_out` is only for user settings."
+                .to_string(),
+        ),
+        _ => Ok(()),
     }
 }
 
@@ -711,6 +733,52 @@ mod tests {
         };
 
         assert_eq!(request.target, SettingsWriteTarget::Guild(GuildId::new(7)));
+    }
+
+    #[test]
+    fn rejects_user_guild_scores_disabled_value() {
+        let options = SettingsCommandOptions {
+            action: SettingsAction::Set,
+            key: SettingKey::GuildScores,
+            scope: SettingScope::User,
+            value: Some("disabled".to_string()),
+        };
+        let context = SettingsContext {
+            user_id: UserId::new(42),
+            guild_id: Some(GuildId::new(7)),
+            member_permissions: None,
+        };
+
+        let SettingsCommandPlan::Respond(response) = plan_settings_command(options, context) else {
+            panic!("expected response")
+        };
+
+        let content = response.unwrap_content();
+        assert!(content.contains("opted_out"));
+        assert!(content.contains("only for guild settings"));
+    }
+
+    #[test]
+    fn rejects_guild_guild_scores_opted_out_value() {
+        let options = SettingsCommandOptions {
+            action: SettingsAction::Set,
+            key: SettingKey::GuildScores,
+            scope: SettingScope::Guild,
+            value: Some("opted_out".to_string()),
+        };
+        let context = SettingsContext {
+            user_id: UserId::new(42),
+            guild_id: Some(GuildId::new(7)),
+            member_permissions: Some(Permissions::MANAGE_GUILD),
+        };
+
+        let SettingsCommandPlan::Respond(response) = plan_settings_command(options, context) else {
+            panic!("expected response")
+        };
+
+        let content = response.unwrap_content();
+        assert!(content.contains("disabled"));
+        assert!(content.contains("only for user settings"));
     }
 
     #[test]

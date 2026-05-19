@@ -291,6 +291,10 @@ pub struct ScopedSettingValues {
 
 #[instrument(name = "settings.resolve", skip(values), fields(setting_key = %key.as_str()))]
 pub fn resolve_setting(key: SettingKey, values: ScopedSettingValues) -> ResolvedSetting {
+    if key == SettingKey::GuildScores {
+        return resolve_guild_scores_setting(values);
+    }
+
     if let Some(value) = values.user {
         return ResolvedSetting {
             key,
@@ -310,6 +314,47 @@ pub fn resolve_setting(key: SettingKey, values: ScopedSettingValues) -> Resolved
     ResolvedSetting {
         key,
         value: key.default_value(),
+        source: SettingSource::Default,
+    }
+}
+
+#[instrument(name = "settings.resolve_guild_scores", skip(values))]
+fn resolve_guild_scores_setting(values: ScopedSettingValues) -> ResolvedSetting {
+    if let Some(SettingValue::GuildScores(GuildScoresPreference::Disabled)) = values.guild {
+        return ResolvedSetting {
+            key: SettingKey::GuildScores,
+            value: SettingValue::GuildScores(GuildScoresPreference::Disabled),
+            source: SettingSource::Guild,
+        };
+    }
+
+    if let Some(SettingValue::GuildScores(GuildScoresPreference::OptedOut)) = values.user {
+        return ResolvedSetting {
+            key: SettingKey::GuildScores,
+            value: SettingValue::GuildScores(GuildScoresPreference::OptedOut),
+            source: SettingSource::User,
+        };
+    }
+
+    if let Some(value @ SettingValue::GuildScores(_)) = values.user {
+        return ResolvedSetting {
+            key: SettingKey::GuildScores,
+            value,
+            source: SettingSource::User,
+        };
+    }
+
+    if let Some(value @ SettingValue::GuildScores(_)) = values.guild {
+        return ResolvedSetting {
+            key: SettingKey::GuildScores,
+            value,
+            source: SettingSource::Guild,
+        };
+    }
+
+    ResolvedSetting {
+        key: SettingKey::GuildScores,
+        value: SettingKey::GuildScores.default_value(),
         source: SettingSource::Default,
     }
 }
@@ -418,6 +463,37 @@ mod tests {
         assert_eq!(
             default_resolved.value,
             SettingKey::TitleDisplay.default_value()
+        );
+    }
+
+    #[test]
+    fn resolve_setting_uses_guild_scores_precedence() {
+        let resolved = resolve_setting(
+            SettingKey::GuildScores,
+            ScopedSettingValues {
+                user: Some(SettingValue::GuildScores(GuildScoresPreference::Enabled)),
+                guild: Some(SettingValue::GuildScores(GuildScoresPreference::Disabled)),
+            },
+        );
+
+        assert_eq!(resolved.source, SettingSource::Guild);
+        assert_eq!(
+            resolved.value,
+            SettingValue::GuildScores(GuildScoresPreference::Disabled)
+        );
+
+        let resolved = resolve_setting(
+            SettingKey::GuildScores,
+            ScopedSettingValues {
+                user: Some(SettingValue::GuildScores(GuildScoresPreference::OptedOut)),
+                guild: Some(SettingValue::GuildScores(GuildScoresPreference::Enabled)),
+            },
+        );
+
+        assert_eq!(resolved.source, SettingSource::User);
+        assert_eq!(
+            resolved.value,
+            SettingValue::GuildScores(GuildScoresPreference::OptedOut)
         );
     }
 
