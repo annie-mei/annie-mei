@@ -29,6 +29,15 @@ struct UserSettingRow {
     setting_value: String,
 }
 
+impl fmt::Debug for UserSettingRow {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("UserSettingRow")
+            .field("discord_user_id", &"[REDACTED]")
+            .field("setting_value", &"[REDACTED]")
+            .finish()
+    }
+}
+
 impl fmt::Debug for StoredSettingRow {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("StoredSettingRow")
@@ -284,6 +293,21 @@ fn parse_optional_setting(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn user_setting_row_debug_redacts_sensitive_fields() {
+        let row = UserSettingRow {
+            discord_user_id: "123456789".to_string(),
+            setting_value: "opted_out".to_string(),
+        };
+
+        let debug = format!("{row:?}");
+
+        assert!(debug.contains("UserSettingRow"));
+        assert!(debug.contains("[REDACTED]"));
+        assert!(!debug.contains("123456789"));
+        assert!(!debug.contains("opted_out"));
+    }
 
     #[test]
     fn stored_setting_debug_redacts_value() {
