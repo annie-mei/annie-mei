@@ -1,6 +1,7 @@
 use crate::{
     models::{
-        anilist_common::{CoverImage, Tag, Title},
+        anilist_common::{CoverImage, Tag, Title, TitleVariant},
+        settings::TitleDisplayPreference,
         transformers::Transformers,
     },
     utils::{formatter::titlecase, statics::EMPTY_STR},
@@ -86,7 +87,26 @@ impl Recommendation {
 }
 
 impl RecommendedMedia {
-    pub fn display_title(&self) -> String {
+    pub fn display_title(
+        &self,
+        title_variant: Option<TitleVariant>,
+        title_preference: TitleDisplayPreference,
+    ) -> String {
+        match title_preference {
+            TitleDisplayPreference::Matched => {
+                match title_variant.unwrap_or(TitleVariant::Romaji) {
+                    TitleVariant::English => self.english_display_title(),
+                    TitleVariant::Romaji => self.romaji_display_title(),
+                    TitleVariant::Native => self.native_display_title(),
+                }
+            }
+            TitleDisplayPreference::English => self.english_display_title(),
+            TitleDisplayPreference::Romaji => self.romaji_display_title(),
+            TitleDisplayPreference::Native => self.native_display_title(),
+        }
+    }
+
+    fn english_display_title(&self) -> String {
         titlecase(
             self.title
                 .english
@@ -95,6 +115,33 @@ impl RecommendedMedia {
                 .or(self.title.native.as_deref())
                 .unwrap_or_default(),
         )
+    }
+
+    fn romaji_display_title(&self) -> String {
+        titlecase(
+            self.title
+                .romaji
+                .as_deref()
+                .or(self.title.english.as_deref())
+                .or(self.title.native.as_deref())
+                .unwrap_or_default(),
+        )
+    }
+
+    fn native_display_title(&self) -> String {
+        self.title
+            .native
+            .as_deref()
+            .map(ToOwned::to_owned)
+            .unwrap_or_else(|| {
+                titlecase(
+                    self.title
+                        .romaji
+                        .as_deref()
+                        .or(self.title.english.as_deref())
+                        .unwrap_or_default(),
+                )
+            })
     }
 
     pub fn media_type(&self) -> &str {
@@ -254,6 +301,37 @@ mod tests {
     use super::*;
 
     #[test]
+    fn matched_recommendation_title_uses_search_variant() {
+        let media = RecommendedMedia {
+            media_type: Some("ANIME".to_string()),
+            is_adult: Some(false),
+            title: Title {
+                romaji: Some("Sousou no Frieren".to_string()),
+                english: Some("Frieren: Beyond Journey's End".to_string()),
+                native: Some("葬送のフリーレン".to_string()),
+            },
+            format: Some("TV".to_string()),
+            status: Some("FINISHED".to_string()),
+            genres: vec!["Adventure".to_string()],
+            average_score: Some(88),
+            site_url: "https://anilist.co/anime/154587".to_string(),
+        };
+
+        assert_eq!(
+            media.display_title(Some(TitleVariant::Romaji), TitleDisplayPreference::Matched),
+            "Sousou No Frieren"
+        );
+        assert_eq!(
+            media.display_title(Some(TitleVariant::English), TitleDisplayPreference::Matched),
+            "Frieren: Beyond Journey's End"
+        );
+        assert_eq!(
+            media.display_title(Some(TitleVariant::Native), TitleDisplayPreference::Matched),
+            "葬送のフリーレン"
+        );
+    }
+
+    #[test]
     fn deserializes_recommendation_media_response() {
         let response: RecommendationMediaResponse = serde_json::from_value(serde_json::json!({
             "data": {
@@ -315,7 +393,10 @@ mod tests {
         let recommendation = media.recommendations().next().unwrap();
         let recommended_media = recommendation.recommended_media().unwrap();
         assert_eq!(recommendation.rating_text(), "42");
-        assert_eq!(recommended_media.display_title(), "Samurai Champloo");
+        assert_eq!(
+            recommended_media.display_title(None, TitleDisplayPreference::Matched),
+            "Samurai Champloo"
+        );
         assert_eq!(recommended_media.media_type(), "anime");
     }
 }

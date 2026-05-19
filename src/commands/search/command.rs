@@ -9,13 +9,14 @@ use crate::{
     },
     models::{
         anilist_anime::Anime, anilist_common::TitleVariant, anilist_manga::Manga,
-        transformers::Transformers,
+        settings::TitleDisplayPreference, transformers::Transformers,
     },
     utils::{
         channel::is_nsfw_channel,
         llm::{LlmError, get_gemini_client_from_context},
         posthog::LlmTelemetryContext,
         privacy::{configure_sentry_scope, hash_discord_id, hash_user_id},
+        settings::resolve_title_display_preference,
         statics::ENV,
         statics::NSFW_NOT_ALLOWED,
     },
@@ -257,22 +258,29 @@ async fn fetch_manga_candidates<S: MediaDataSource>(
 }
 
 #[instrument(name = "command.search.build_response", skip(result))]
-pub fn build_response(result: MediaSearchResult) -> CommandResponse {
+pub fn build_response(
+    result: MediaSearchResult,
+    title_preference: TitleDisplayPreference,
+) -> CommandResponse {
     match result {
         MediaSearchResult::Anime {
             anime,
             title_variant,
             ..
-        } => CommandResponse::Embed(Box::new(
-            anime.transform_response_embed(None, title_variant),
-        )),
+        } => CommandResponse::Embed(Box::new(anime.transform_response_embed(
+            None,
+            title_variant,
+            title_preference,
+        ))),
         MediaSearchResult::Manga {
             manga,
             title_variant,
             ..
-        } => CommandResponse::Embed(Box::new(
-            manga.transform_response_embed(None, title_variant),
-        )),
+        } => CommandResponse::Embed(Box::new(manga.transform_response_embed(
+            None,
+            title_variant,
+            title_preference,
+        ))),
         MediaSearchResult::NotFound => CommandResponse::Content(NOT_FOUND_SEARCH.to_string()),
     }
 }
@@ -305,42 +313,48 @@ pub async fn run(ctx: &Context, interaction: &mut CommandInteraction) {
 
     info!("Got command 'search'");
 
-    let intent = match get_gemini_client_from_context(ctx).await {
-        Some(client) => {
-            let telemetry_context = LlmTelemetryContext {
-                distinct_id: Some(hash_user_id(user.id.get()).to_string()),
-                guild_id: interaction
-                    .guild_id
-                    .map(|guild_id| hash_discord_id(guild_id.get()).to_string()),
-                command: Some("search".to_string()),
-                environment: std::env::var(ENV).ok(),
-                input: Some(json!([
-                    { "role": "system", "content": SEARCH_SYSTEM_PROMPT },
-                    { "role": "user", "content": query },
-                ])),
-            };
-            let user_message = format_intent_user_message(&query);
+    let search_result_future = async {
+        let intent = match get_gemini_client_from_context(ctx).await {
+            Some(client) => {
+                let telemetry_context = LlmTelemetryContext {
+                    distinct_id: Some(hash_user_id(user.id.get()).to_string()),
+                    guild_id: interaction
+                        .guild_id
+                        .map(|guild_id| hash_discord_id(guild_id.get()).to_string()),
+                    command: Some("search".to_string()),
+                    environment: std::env::var(ENV).ok(),
+                    input: Some(json!([
+                        { "role": "system", "content": SEARCH_SYSTEM_PROMPT },
+                        { "role": "user", "content": query },
+                    ])),
+                };
+                let user_message = format_intent_user_message(&query);
 
-            match client
-                .chat_with_telemetry_context(&user_message, telemetry_context)
-                .await
-                .map_err(SearchIntentError::Llm)
-                .and_then(|response| parse_search_intent_json(&response))
-            {
-                Ok(intent) => intent,
-                Err(error) => {
-                    warn!(error = %error, "Natural-language search parsing failed; falling back to raw query");
-                    fallback_intent(&query)
+                match client
+                    .chat_with_telemetry_context(&user_message, telemetry_context)
+                    .await
+                    .map_err(SearchIntentError::Llm)
+                    .and_then(|response| parse_search_intent_json(&response))
+                {
+                    Ok(intent) => intent,
+                    Err(error) => {
+                        warn!(error = %error, "Natural-language search parsing failed; falling back to raw query");
+                        fallback_intent(&query)
+                    }
                 }
             }
-        }
-        None => {
-            warn!("LLM client unavailable; falling back to raw query");
-            fallback_intent(&query)
-        }
-    };
+            None => {
+                warn!("LLM client unavailable; falling back to raw query");
+                fallback_intent(&query)
+            }
+        };
 
-    let result = fetch_search_result(&AniListSource, intent).await;
+        fetch_search_result(&AniListSource, intent).await
+    };
+    let (result, title_preference) = tokio::join!(
+        search_result_future,
+        resolve_title_display_preference(ctx, user.id, interaction.guild_id),
+    );
 
     match &result {
         MediaSearchResult::Anime { anime, .. }
@@ -368,7 +382,7 @@ pub async fn run(ctx: &Context, interaction: &mut CommandInteraction) {
         }
         MediaSearchResult::NotFound => None,
     };
-    let response = build_response(result);
+    let response = build_response(result, title_preference);
     let _result = match response {
         CommandResponse::Content(text) | CommandResponse::Message(text) => {
             let builder = EditInteractionResponse::new().content(match interpretation {

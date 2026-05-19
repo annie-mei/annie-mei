@@ -6,15 +6,23 @@
 //! ## Example: testing the core handler directly
 //!
 //! ```ignore
-//! use crate::commands::{anime::command::handle_anime, response::CommandResponse};
+//! use crate::{
+//!     commands::{anime::command::handle_anime, response::CommandResponse},
+//!     models::settings::TitleDisplayPreference,
+//! };
 //!
 //! // Not-found path — no anime, no guild data, no variant signal.
-//! let response = handle_anime(None, None, None);
+//! let response = handle_anime(None, None, None, TitleDisplayPreference::Matched);
 //! assert!(response.is_content());
 //!
 //! // Success path — pass a pre-built Anime, optional guild data, and the
 //! // matched title variant (so the embed surfaces the user's typed variant).
-//! let response = handle_anime(Some(sample_anime), Some(guild_data), Some(title_variant));
+//! let response = handle_anime(
+//!     Some(sample_anime),
+//!     Some(guild_data),
+//!     Some(title_variant),
+//!     TitleDisplayPreference::Matched,
+//! );
 //! assert!(response.is_embed());
 //! ```
 

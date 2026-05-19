@@ -7,13 +7,14 @@ use crate::{
         traits::{AniListSource, MediaDataSource},
     },
     models::{
-        anilist_anime::Anime, anilist_common::TitleVariant, transformers::Transformers,
-        user_media_list::MediaListData,
+        anilist_anime::Anime, anilist_common::TitleVariant, settings::TitleDisplayPreference,
+        transformers::Transformers, user_media_list::MediaListData,
     },
     utils::{
         channel::is_nsfw_channel,
         guild::{get_current_guild_members, get_guild_data_for_media},
         privacy::configure_sentry_scope,
+        settings::resolve_title_display_preference,
         statics::{NOT_FOUND_ANIME, NSFW_NOT_ALLOWED},
     },
 };
@@ -55,11 +56,16 @@ pub fn handle_anime(
     anime: Option<Anime>,
     guild_members_data: Option<HashMap<u64, MediaListData>>,
     title_variant: Option<TitleVariant>,
+    title_preference: TitleDisplayPreference,
 ) -> CommandResponse {
     match anime {
         None => CommandResponse::Content(NOT_FOUND_ANIME.to_string()),
         Some(anime_response) => {
-            let embed = anime_response.transform_response_embed(guild_members_data, title_variant);
+            let embed = anime_response.transform_response_embed(
+                guild_members_data,
+                title_variant,
+                title_preference,
+            );
             CommandResponse::Embed(Box::new(embed))
         }
     }
@@ -96,7 +102,10 @@ pub async fn run(ctx: &Context, interaction: &mut CommandInteraction) {
 
     info!("Got command 'anime' with search_term: {search_term}");
 
-    let fetch_result: Option<(Anime, TitleVariant)> = AniListSource.fetch_anime(&search_term).await;
+    let (fetch_result, title_preference): (Option<(Anime, TitleVariant)>, TitleDisplayPreference) = tokio::join!(
+        AniListSource.fetch_anime(&search_term),
+        resolve_title_display_preference(ctx, user.id, interaction.guild_id),
+    );
     let (anime_result, title_variant): (Option<Anime>, Option<TitleVariant>) = match fetch_result {
         Some((anime, variant)) => (Some(anime), Some(variant)),
         None => (None, None),
@@ -129,7 +138,12 @@ pub async fn run(ctx: &Context, interaction: &mut CommandInteraction) {
     };
 
     // Delegate to the transport-agnostic core logic.
-    let response = handle_anime(anime_result, guild_members_data, title_variant);
+    let response = handle_anime(
+        anime_result,
+        guild_members_data,
+        title_variant,
+        title_preference,
+    );
 
     // Map the CommandResponse to the appropriate Discord API call.
     let _result = match response {
@@ -197,9 +211,13 @@ mod tests {
         .expect("sample anime JSON should deserialize")
     }
 
+    fn matched_title_preference() -> TitleDisplayPreference {
+        TitleDisplayPreference::Matched
+    }
+
     #[test]
     fn anime_not_found_returns_content_with_message() {
-        let response = handle_anime(None, None, None);
+        let response = handle_anime(None, None, None, matched_title_preference());
 
         assert!(response.is_content(), "expected Content variant");
         assert_eq!(response.unwrap_content(), NOT_FOUND_ANIME);
@@ -207,7 +225,7 @@ mod tests {
 
     #[test]
     fn anime_success_returns_embed() {
-        let response = handle_anime(Some(sample_anime()), None, None);
+        let response = handle_anime(Some(sample_anime()), None, None, matched_title_preference());
 
         assert!(
             response.is_embed(),
@@ -220,7 +238,7 @@ mod tests {
 
     #[test]
     fn anime_success_with_no_guild_data_still_returns_embed() {
-        let response = handle_anime(Some(sample_anime()), None, None);
+        let response = handle_anime(Some(sample_anime()), None, None, matched_title_preference());
 
         assert!(response.is_embed());
     }
@@ -264,6 +282,43 @@ mod tests {
         .expect("sample anime JSON should deserialize")
     }
 
+    fn anime_without_english_or_native_title() -> Anime {
+        serde_json::from_value(serde_json::json!({
+            "type": "ANIME",
+            "id": 1,
+            "idMal": null,
+            "isAdult": false,
+            "title": {
+                "romaji": "Haibane Renmei",
+                "english": null,
+                "native": null
+            },
+            "synonyms": [],
+            "season": null,
+            "seasonYear": null,
+            "format": "TV",
+            "status": "FINISHED",
+            "episodes": 13,
+            "duration": 24,
+            "genres": [],
+            "source": null,
+            "coverImage": {
+                "extraLarge": null,
+                "large": null,
+                "medium": null,
+                "color": null
+            },
+            "averageScore": null,
+            "studios": { "edges": [], "nodes": [] },
+            "siteUrl": "https://anilist.co/anime/1",
+            "externalLinks": [],
+            "trailer": null,
+            "description": "",
+            "tags": []
+        }))
+        .expect("sample anime JSON should deserialize")
+    }
+
     fn embed_title_and_footer(response: CommandResponse) -> (String, String) {
         let embed = response.unwrap_embed();
         let value = serde_json::to_value(&embed).expect("embed serializes");
@@ -281,6 +336,7 @@ mod tests {
             Some(anime_with_distinct_titles()),
             None,
             Some(TitleVariant::English),
+            matched_title_preference(),
         );
 
         let (title, footer) = embed_title_and_footer(response);
@@ -294,6 +350,7 @@ mod tests {
             Some(anime_with_distinct_titles()),
             None,
             Some(TitleVariant::Romaji),
+            matched_title_preference(),
         );
 
         let (title, footer) = embed_title_and_footer(response);
@@ -303,10 +360,71 @@ mod tests {
 
     #[test]
     fn no_variant_signal_preserves_legacy_romaji_title_english_footer() {
-        let response = handle_anime(Some(anime_with_distinct_titles()), None, None);
+        let response = handle_anime(
+            Some(anime_with_distinct_titles()),
+            None,
+            None,
+            matched_title_preference(),
+        );
 
         let (title, footer) = embed_title_and_footer(response);
         assert_eq!(title, "Shingeki No Kyojin");
         assert_eq!(footer, "Attack on Titan");
+    }
+
+    #[test]
+    fn english_preference_overrides_matched_variant() {
+        let response = handle_anime(
+            Some(anime_with_distinct_titles()),
+            None,
+            Some(TitleVariant::Romaji),
+            TitleDisplayPreference::English,
+        );
+
+        let (title, footer) = embed_title_and_footer(response);
+        assert_eq!(title, "Attack on Titan");
+        assert_eq!(footer, "Shingeki No Kyojin");
+    }
+
+    #[test]
+    fn romaji_preference_overrides_matched_variant() {
+        let response = handle_anime(
+            Some(anime_with_distinct_titles()),
+            None,
+            Some(TitleVariant::English),
+            TitleDisplayPreference::Romaji,
+        );
+
+        let (title, footer) = embed_title_and_footer(response);
+        assert_eq!(title, "Shingeki No Kyojin");
+        assert_eq!(footer, "Attack on Titan");
+    }
+
+    #[test]
+    fn native_preference_uses_native_title() {
+        let response = handle_anime(
+            Some(anime_with_distinct_titles()),
+            None,
+            Some(TitleVariant::English),
+            TitleDisplayPreference::Native,
+        );
+
+        let (title, footer) = embed_title_and_footer(response);
+        assert_eq!(title, "進撃の巨人");
+        assert_eq!(footer, "Shingeki No Kyojin");
+    }
+
+    #[test]
+    fn preferred_title_falls_back_when_variant_is_unavailable() {
+        let response = handle_anime(
+            Some(anime_without_english_or_native_title()),
+            None,
+            Some(TitleVariant::English),
+            TitleDisplayPreference::Native,
+        );
+
+        let (title, footer) = embed_title_and_footer(response);
+        assert_eq!(title, "Haibane Renmei");
+        assert_eq!(footer, "Haibane Renmei");
     }
 }
