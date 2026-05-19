@@ -39,14 +39,9 @@ pub async fn create_pool() -> DbPool {
 
 #[instrument(name = "db.run_migrations", skip(pool))]
 pub async fn run_migrations(pool: &DbPool) -> Result<(), sqlx::migrate::MigrateError> {
-    let schema_exists: Option<String> =
-        sqlx::query_scalar("SELECT to_regnamespace('annie_mei')::text")
-            .fetch_one(pool)
-            .await?;
-
-    if schema_exists.is_none() {
-        sqlx::query("CREATE SCHEMA annie_mei").execute(pool).await?;
-    }
+    sqlx::query("CREATE SCHEMA IF NOT EXISTS annie_mei")
+        .execute(pool)
+        .await?;
 
     let mut connection = pool.acquire().await?;
     sqlx::query("SET search_path TO annie_mei, annie_auth, public")
@@ -54,6 +49,10 @@ pub async fn run_migrations(pool: &DbPool) -> Result<(), sqlx::migrate::MigrateE
         .await?;
 
     sqlx::migrate!("./migrations").run(&mut *connection).await?;
+
+    sqlx::query("RESET search_path")
+        .execute(&mut *connection)
+        .await?;
 
     info!("Database migrations completed");
     Ok(())
