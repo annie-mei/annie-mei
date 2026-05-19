@@ -1,6 +1,6 @@
 //! SQLx persistence helpers for user and guild settings.
 
-use std::fmt;
+use std::{collections::HashMap, fmt};
 
 use serenity::model::prelude::{GuildId, UserId};
 use sqlx::FromRow;
@@ -21,6 +21,12 @@ use crate::{
 pub struct StoredSettingRow {
     pub setting_key: String,
     pub setting_value: String,
+}
+
+#[derive(Clone, PartialEq, Eq, FromRow)]
+struct UserSettingRow {
+    discord_user_id: String,
+    setting_value: String,
 }
 
 impl fmt::Debug for StoredSettingRow {
@@ -172,6 +178,37 @@ pub async fn get_guild_setting(
     .await?;
 
     parse_optional_setting(row, setting_key)
+}
+
+#[instrument(
+    name = "db.settings.get_user_settings_for_discord_ids",
+    skip(pool, user_discord_ids),
+    fields(user_count = user_discord_ids.len(), setting_key = %setting_key.as_str())
+)]
+pub async fn get_user_settings_for_discord_ids(
+    pool: &DbPool,
+    user_discord_ids: &[String],
+    setting_key: SettingKey,
+) -> Result<HashMap<String, SettingValue>, SettingsStorageError> {
+    if user_discord_ids.is_empty() {
+        return Ok(HashMap::new());
+    }
+
+    let rows = sqlx::query_as::<_, UserSettingRow>(
+        "SELECT discord_user_id, setting_value FROM annie_mei.user_settings \
+         WHERE discord_user_id = ANY($1) AND setting_key = $2",
+    )
+    .bind(user_discord_ids)
+    .bind(setting_key.as_str())
+    .fetch_all(pool)
+    .await?;
+
+    rows.into_iter()
+        .map(|row| {
+            let value = setting_key.parse_value(&row.setting_value)?;
+            Ok((row.discord_user_id, value))
+        })
+        .collect()
 }
 
 #[instrument(
