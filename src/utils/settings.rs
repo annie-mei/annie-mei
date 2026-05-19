@@ -32,6 +32,7 @@ pub async fn resolve_title_display_preference(
     }
 }
 
+#[instrument(name = "settings.default_title_display")]
 fn default_title_display_preference() -> TitleDisplayPreference {
     match SettingKey::TitleDisplay.default_value() {
         SettingValue::TitleDisplay(preference) => preference,
