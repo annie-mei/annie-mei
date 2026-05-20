@@ -16,7 +16,7 @@ use crate::{
         llm::{LlmError, get_gemini_client_from_context},
         posthog::LlmTelemetryContext,
         privacy::{configure_sentry_scope, hash_discord_id, hash_user_id},
-        settings::resolve_title_display_preference,
+        settings::{resolve_analytics_privacy_preference, resolve_title_display_preference},
         statics::ENV,
         statics::NSFW_NOT_ALLOWED,
     },
@@ -316,17 +316,27 @@ pub async fn run(ctx: &Context, interaction: &mut CommandInteraction) {
     let search_result_future = async {
         let intent = match get_gemini_client_from_context(ctx).await {
             Some(client) => {
+                let analytics_privacy = resolve_analytics_privacy_preference(ctx, user.id).await;
+                let analytics_opted_out = analytics_privacy.opted_out();
                 let telemetry_context = LlmTelemetryContext {
-                    distinct_id: Some(hash_user_id(user.id.get()).to_string()),
-                    guild_id: interaction
-                        .guild_id
-                        .map(|guild_id| hash_discord_id(guild_id.get()).to_string()),
+                    distinct_id: (!analytics_opted_out)
+                        .then(|| hash_user_id(user.id.get()).to_string()),
+                    guild_id: (!analytics_opted_out)
+                        .then(|| {
+                            interaction
+                                .guild_id
+                                .map(|guild_id| hash_discord_id(guild_id.get()).to_string())
+                        })
+                        .flatten(),
                     command: Some("search".to_string()),
                     environment: std::env::var(ENV).ok(),
-                    input: Some(json!([
-                        { "role": "system", "content": SEARCH_SYSTEM_PROMPT },
-                        { "role": "user", "content": query },
-                    ])),
+                    input: (!analytics_opted_out).then(|| {
+                        json!([
+                            { "role": "system", "content": SEARCH_SYSTEM_PROMPT },
+                            { "role": "user", "content": query },
+                        ])
+                    }),
+                    capture_content: !analytics_opted_out,
                 };
                 let user_message = format_intent_user_message(&query);
 

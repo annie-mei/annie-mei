@@ -27,6 +27,7 @@ use utils::{
     oauth::{OAuthContextConfigKey, load_context_config},
     posthog::{CommandTelemetryContext, PostHogClient},
     privacy::{hash_discord_id, hash_user_id, redact_url_credentials},
+    settings::resolve_analytics_privacy_preference,
     statics::{DISCORD_TOKEN, ENV, SENTRY_DSN, SENTRY_TRACES_SAMPLE_RATE},
     tls::install_rustls_crypto_provider,
 };
@@ -142,10 +143,8 @@ impl Handler {
         };
 
         let ctx = ctx.clone();
-        let distinct_id = Some(hash_user_id(command.user.id.get()).to_string());
-        let guild_id = command
-            .guild_id
-            .map(|guild_id| hash_discord_id(guild_id.get()).to_string());
+        let user_id = command.user.id;
+        let raw_guild_id = command.guild_id;
         let command_name = command.data.name.clone();
         let environment = self.environment.clone();
         let is_dm = command.guild_id.is_none();
@@ -154,6 +153,16 @@ impl Handler {
 
         tokio::spawn(
             async move {
+                let analytics_privacy = resolve_analytics_privacy_preference(&ctx, user_id).await;
+                let analytics_opted_out = analytics_privacy.opted_out();
+                let distinct_id =
+                    (!analytics_opted_out).then(|| hash_user_id(user_id.get()).to_string());
+                let guild_id = (!analytics_opted_out)
+                    .then(|| {
+                        raw_guild_id.map(|guild_id| hash_discord_id(guild_id.get()).to_string())
+                    })
+                    .flatten();
+
                 let event = posthog.build_command_hit_event(&CommandTelemetryContext {
                     distinct_id,
                     guild_id,

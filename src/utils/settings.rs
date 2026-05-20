@@ -3,10 +3,10 @@ use tracing::{instrument, warn};
 
 use crate::{
     models::{
-        db::settings::{get_guild_setting, resolve_setting_layers},
+        db::settings::{get_guild_setting, get_user_setting, resolve_setting_layers},
         settings::{
-            SettingKey, SettingValue, TitleDisplayPreference, guild_scores_enabled,
-            user_participates_in_guild_scores,
+            AnalyticsPrivacyPreference, SettingKey, SettingValue, TitleDisplayPreference,
+            guild_scores_enabled, user_participates_in_guild_scores,
         },
     },
     utils::database::{DbPool, get_pool_from_context},
@@ -38,12 +38,46 @@ pub async fn resolve_title_display_preference(
     }
 }
 
+#[instrument(name = "settings.resolve_analytics_privacy", skip(ctx, user_id))]
+pub async fn resolve_analytics_privacy_preference(
+    ctx: &Context,
+    user_id: UserId,
+) -> AnalyticsPrivacyPreference {
+    let Some(pool) = get_pool_from_context(ctx).await else {
+        warn!("Database pool unavailable; using opt-out analytics privacy mode");
+        return AnalyticsPrivacyPreference::OptedOut;
+    };
+
+    match get_user_setting(&pool, user_id, SettingKey::AnalyticsPrivacy).await {
+        Ok(Some(SettingValue::AnalyticsPrivacy(preference))) => preference,
+        Ok(Some(_)) => {
+            warn!("Unexpected non-analytics value for analytics privacy key; using opt-out mode");
+            AnalyticsPrivacyPreference::OptedOut
+        }
+        Ok(None) => default_analytics_privacy_preference(),
+        Err(error) => {
+            warn!(error = %error, "Failed to resolve analytics privacy preference; using opt-out mode");
+            AnalyticsPrivacyPreference::OptedOut
+        }
+    }
+}
+
 #[instrument(name = "settings.default_title_display")]
 fn default_title_display_preference() -> TitleDisplayPreference {
     match SettingKey::TitleDisplay.default_value() {
         SettingValue::TitleDisplay(preference) => preference,
         SettingValue::AnalyticsPrivacy(_) | SettingValue::GuildScores(_) => {
             TitleDisplayPreference::Matched
+        }
+    }
+}
+
+#[instrument(name = "settings.default_analytics_privacy")]
+pub fn default_analytics_privacy_preference() -> AnalyticsPrivacyPreference {
+    match SettingKey::AnalyticsPrivacy.default_value() {
+        SettingValue::AnalyticsPrivacy(preference) => preference,
+        SettingValue::TitleDisplay(_) | SettingValue::GuildScores(_) => {
+            AnalyticsPrivacyPreference::OptedOut
         }
     }
 }
@@ -72,4 +106,17 @@ pub async fn resolve_guild_scores_enabled_with_pool(
 #[instrument(name = "settings.participates_in_guild_scores", skip(value))]
 pub fn participates_in_guild_scores(value: Option<SettingValue>) -> bool {
     user_participates_in_guild_scores(value)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn analytics_privacy_default_is_standard_participation() {
+        assert_eq!(
+            default_analytics_privacy_preference(),
+            AnalyticsPrivacyPreference::Standard
+        );
+    }
 }

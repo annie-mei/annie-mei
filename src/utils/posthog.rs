@@ -33,6 +33,8 @@ pub struct LlmTelemetryContext {
     pub environment: Option<String>,
     /// Optional display-friendly input for LLM Analytics when content capture is enabled.
     pub input: Option<Value>,
+    /// Whether this call may send raw prompt/output content when global content capture is enabled.
+    pub capture_content: bool,
 }
 
 /// Per-command context that is safe to send to PostHog.
@@ -346,7 +348,7 @@ pub fn build_ai_generation_event(
         properties.insert("success".to_string(), json!(true));
     }
 
-    if capture_content {
+    if capture_content && context.capture_content {
         if let Some(input) = input {
             properties.insert("$ai_input".to_string(), input);
         }

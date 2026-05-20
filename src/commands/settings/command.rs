@@ -454,6 +454,10 @@ fn validate_value_for_scope(scope: SettingScope, value: SettingValue) -> Result<
             "Use `opted_out` to exclude yourself from guild scores, or `enabled` to participate. `disabled` is only for guild settings."
                 .to_string(),
         ),
+        (SettingScope::Guild, SettingValue::AnalyticsPrivacy(_)) => Err(
+            "Analytics privacy is a user-level setting. Choose the `user` scope to update your own analytics preference."
+                .to_string(),
+        ),
         (SettingScope::Guild, SettingValue::GuildScores(GuildScoresPreference::OptedOut)) => Err(
             "Use `disabled` to turn guild scores off for the server, or `enabled` to allow participating users. `opted_out` is only for user settings."
                 .to_string(),
@@ -697,9 +701,9 @@ mod tests {
     fn allows_guild_write_with_manage_guild_permission() {
         let options = SettingsCommandOptions {
             action: SettingsAction::Set,
-            key: SettingKey::AnalyticsPrivacy,
+            key: SettingKey::TitleDisplay,
             scope: SettingScope::Guild,
-            value: Some("opted_out".to_string()),
+            value: Some("romaji".to_string()),
         };
         let context = SettingsContext {
             user_id: UserId::new(42),
@@ -714,9 +718,7 @@ mod tests {
         assert_eq!(request.target, SettingsWriteTarget::Guild(GuildId::new(7)));
         assert_eq!(
             request.value,
-            SettingKey::AnalyticsPrivacy
-                .parse_value("opted_out")
-                .unwrap()
+            SettingKey::TitleDisplay.parse_value("romaji").unwrap()
         );
     }
 
@@ -724,9 +726,9 @@ mod tests {
     fn allows_guild_write_with_administrator_permission() {
         let options = SettingsCommandOptions {
             action: SettingsAction::Set,
-            key: SettingKey::AnalyticsPrivacy,
+            key: SettingKey::TitleDisplay,
             scope: SettingScope::Guild,
-            value: Some("opted_out".to_string()),
+            value: Some("romaji".to_string()),
         };
         let context = SettingsContext {
             user_id: UserId::new(42),
@@ -739,6 +741,27 @@ mod tests {
         };
 
         assert_eq!(request.target, SettingsWriteTarget::Guild(GuildId::new(7)));
+    }
+
+    #[test]
+    fn rejects_guild_analytics_privacy_value() {
+        let options = SettingsCommandOptions {
+            action: SettingsAction::Set,
+            key: SettingKey::AnalyticsPrivacy,
+            scope: SettingScope::Guild,
+            value: Some("opted_out".to_string()),
+        };
+        let context = SettingsContext {
+            user_id: UserId::new(42),
+            guild_id: Some(GuildId::new(7)),
+            member_permissions: Some(Permissions::MANAGE_GUILD),
+        };
+
+        let SettingsCommandPlan::Respond(response) = plan_settings_command(options, context) else {
+            panic!("expected response")
+        };
+
+        assert!(response.unwrap_content().contains("user-level setting"));
     }
 
     #[test]
