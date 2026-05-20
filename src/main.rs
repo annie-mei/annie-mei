@@ -11,7 +11,9 @@ use tracing::{Instrument, info, info_span, instrument, warn};
 use tracing_subscriber::{EnvFilter, prelude::*, util::SubscriberInitExt};
 
 use serenity::{
-    all::{CreateEmbed, CreateMessage},
+    all::{
+        CreateEmbed, CreateInteractionResponse, CreateInteractionResponseMessage, CreateMessage,
+    },
     async_trait,
     builder::CreateCommand,
     client::{Client, Context, EventHandler},
@@ -59,49 +61,82 @@ struct Handler {
 impl EventHandler for Handler {
     #[instrument(name = "discord.interaction_create", skip_all)]
     async fn interaction_create(&self, ctx: Context, interaction: Interaction) {
-        if let Interaction::Command(mut command) = interaction {
-            let guild_id = command
-                .guild_id
-                .map(|guild_id| hash_discord_id(guild_id.get()).to_string());
-            let command_span = info_span!(
-                "discord.command",
-                command_name = %command.data.name,
-                user_id = %hash_user_id(command.user.id.get()),
-                guild_id = guild_id.as_deref()
-            );
+        match interaction {
+            Interaction::Command(mut command) => {
+                let guild_id = command
+                    .guild_id
+                    .map(|guild_id| hash_discord_id(guild_id.get()).to_string());
+                let command_span = info_span!(
+                    "discord.command",
+                    command_name = %command.data.name,
+                    user_id = %hash_user_id(command.user.id.get()),
+                    guild_id = guild_id.as_deref()
+                );
 
-            async {
-                info!("Received command interaction");
-                self.capture_command_hit(&ctx, &command);
+                async {
+                    info!("Received command interaction");
+                    self.capture_command_hit(&ctx, &command);
 
-                match command.data.name.as_str() {
-                    "ping" => commands::ping::run(&ctx, &command).await,
-                    "help" => commands::help::run(&ctx, &command).await,
-                    "songs" => commands::songs::command::run(&ctx, &mut command).await,
-                    "manga" => commands::manga::command::run(&ctx, &mut command).await,
-                    "anime" => commands::anime::command::run(&ctx, &mut command).await,
-                    "search" => commands::search::command::run(&ctx, &mut command).await,
-                    "recommend" => commands::recommend::command::run(&ctx, &mut command).await,
-                    "character" => commands::character::command::run(&ctx, &mut command).await,
-                    "register" => commands::register::command::run(&ctx, &mut command).await,
-                    "unregister" => commands::unregister::run(&ctx, &mut command).await,
-                    "whoami" => commands::whoami::run(&ctx, &mut command).await,
-                    "settings" => commands::settings::run(&ctx, &mut command).await,
-                    _ => {
-                        let embed = CreateEmbed::new()
-                            .title("Error")
-                            .description("Not implemented");
-                        let builder = CreateMessage::new().embed(embed);
-                        let msg = command.channel_id.send_message(&ctx.http, builder).await;
-                        if let Err(why) = msg {
-                            println!("Error sending message: {why:?}");
-                            info!("Cannot respond to slash command: {why}");
+                    match command.data.name.as_str() {
+                        "ping" => commands::ping::run(&ctx, &command).await,
+                        "help" => commands::help::run(&ctx, &command).await,
+                        "songs" => commands::songs::command::run(&ctx, &mut command).await,
+                        "manga" => commands::manga::command::run(&ctx, &mut command).await,
+                        "anime" => commands::anime::command::run(&ctx, &mut command).await,
+                        "search" => commands::search::command::run(&ctx, &mut command).await,
+                        "recommend" => commands::recommend::command::run(&ctx, &mut command).await,
+                        "character" => commands::character::command::run(&ctx, &mut command).await,
+                        "register" => commands::register::command::run(&ctx, &mut command).await,
+                        "unregister" => commands::unregister::run(&ctx, &mut command).await,
+                        "whoami" => commands::whoami::run(&ctx, &mut command).await,
+                        "settings" => commands::settings::run(&ctx, &mut command).await,
+                        _ => {
+                            let embed = CreateEmbed::new()
+                                .title("Error")
+                                .description("Not implemented");
+                            let builder = CreateMessage::new().embed(embed);
+                            let msg = command.channel_id.send_message(&ctx.http, builder).await;
+                            if let Err(why) = msg {
+                                println!("Error sending message: {why:?}");
+                                info!("Cannot respond to slash command: {why}");
+                            }
                         }
-                    }
-                };
+                    };
+                }
+                .instrument(command_span)
+                .await;
             }
-            .instrument(command_span)
-            .await;
+            Interaction::Component(mut component) => {
+                let guild_id = component
+                    .guild_id
+                    .map(|guild_id| hash_discord_id(guild_id.get()).to_string());
+                let component_span = info_span!(
+                    "discord.component",
+                    custom_id = %component.data.custom_id,
+                    user_id = %hash_user_id(component.user.id.get()),
+                    guild_id = guild_id.as_deref()
+                );
+
+                async {
+                    info!("Received component interaction");
+
+                    if commands::settings::is_settings_component(&component.data.custom_id) {
+                        commands::settings::handle_component(&ctx, &mut component).await;
+                    } else {
+                        let builder = CreateInteractionResponse::Message(
+                            CreateInteractionResponseMessage::new()
+                                .content(
+                                    "I don't recognize that control. Please run the command again.",
+                                )
+                                .ephemeral(true),
+                        );
+                        let _ = component.create_response(&ctx.http, builder).await;
+                    }
+                }
+                .instrument(component_span)
+                .await;
+            }
+            _ => {}
         }
     }
 
