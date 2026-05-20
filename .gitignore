@@ -30,3 +30,4 @@ target/
 opencode.json*
 slate.json*
 .factory/settings.json
+.antigravitycli/
