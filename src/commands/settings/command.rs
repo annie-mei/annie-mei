@@ -196,6 +196,14 @@ pub fn plan_settings_command(
     context: SettingsContext,
 ) -> SettingsCommandPlan {
     match options.action {
+        SettingsAction::Get
+            if options.key == SettingKey::AnalyticsPrivacy
+                && options.scope == SettingScope::Guild =>
+        {
+            SettingsCommandPlan::Respond(CommandResponse::Content(
+                analytics_privacy_user_scope_message().to_string(),
+            ))
+        }
         SettingsAction::Get => SettingsCommandPlan::Read(SettingsReadRequest {
             user_id: context.user_id,
             guild_id: context.guild_id,
@@ -447,6 +455,11 @@ fn plan_settings_write(
     }
 }
 
+#[instrument(name = "command.settings.analytics_privacy_user_scope_message")]
+fn analytics_privacy_user_scope_message() -> &'static str {
+    "Analytics privacy is a user-level setting. Choose the `user` scope to view or update your own analytics preference."
+}
+
 #[instrument(name = "command.settings.validate_value_for_scope", skip(value))]
 fn validate_value_for_scope(scope: SettingScope, value: SettingValue) -> Result<(), String> {
     match (scope, value) {
@@ -454,10 +467,9 @@ fn validate_value_for_scope(scope: SettingScope, value: SettingValue) -> Result<
             "Use `opted_out` to exclude yourself from guild scores, or `enabled` to participate. `disabled` is only for guild settings."
                 .to_string(),
         ),
-        (SettingScope::Guild, SettingValue::AnalyticsPrivacy(_)) => Err(
-            "Analytics privacy is a user-level setting. Choose the `user` scope to update your own analytics preference."
-                .to_string(),
-        ),
+        (SettingScope::Guild, SettingValue::AnalyticsPrivacy(_)) => {
+            Err(analytics_privacy_user_scope_message().to_string())
+        }
         (SettingScope::Guild, SettingValue::GuildScores(GuildScoresPreference::OptedOut)) => Err(
             "Use `disabled` to turn guild scores off for the server, or `enabled` to allow participating users. `opted_out` is only for user settings."
                 .to_string(),
@@ -626,6 +638,29 @@ mod tests {
         assert!(content.contains("User: `romaji`"));
         assert!(!content.contains("Guild: `english`"));
         assert!(!content.contains("Effective: `romaji`"));
+    }
+
+    #[test]
+    fn rejects_guild_analytics_privacy_read() {
+        let options = SettingsCommandOptions {
+            action: SettingsAction::Get,
+            key: SettingKey::AnalyticsPrivacy,
+            scope: SettingScope::Guild,
+            value: None,
+        };
+        let context = SettingsContext {
+            user_id: UserId::new(42),
+            guild_id: Some(GuildId::new(7)),
+            member_permissions: Some(Permissions::MANAGE_GUILD),
+        };
+
+        let SettingsCommandPlan::Respond(response) = plan_settings_command(options, context) else {
+            panic!("expected response")
+        };
+
+        let content = response.unwrap_content();
+        assert!(content.contains("user-level setting"));
+        assert!(content.contains("view or update"));
     }
 
     #[test]
