@@ -490,8 +490,8 @@ impl GeminiClient {
             return;
         };
 
-        let capture_content = context.is_some();
         let context = context.unwrap_or_default();
+        let capture_content = context.capture_content;
         let display_input = context.input.clone();
         let trace_id = Uuid::new_v4().to_string();
         let input = capture_content.then(|| {

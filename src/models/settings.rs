@@ -104,7 +104,7 @@ impl SettingKey {
         match self {
             Self::TitleDisplay => "Which AniList title variant Annie Mei should prefer.",
             Self::AnalyticsPrivacy => {
-                "Whether analytics should use the standard telemetry path or opt out where supported."
+                "Whether user-level analytics may include raw user-provided content. The default is `standard`; `opted_out` disables raw query, prompt, and output capture in supported analytics/observability while keeping pseudonymous operational telemetry."
             }
             Self::GuildScores => {
                 "Whether guild score displays are enabled for a server and whether a user participates. Guild disabled wins over user participation; users who opt out are excluded."
@@ -185,6 +185,12 @@ pub enum TitleDisplayPreference {
 pub enum AnalyticsPrivacyPreference {
     Standard,
     OptedOut,
+}
+
+impl AnalyticsPrivacyPreference {
+    pub fn opted_out(self) -> bool {
+        matches!(self, Self::OptedOut)
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -295,6 +301,10 @@ pub fn resolve_setting(key: SettingKey, values: ScopedSettingValues) -> Resolved
         return resolve_guild_scores_setting(values);
     }
 
+    if key == SettingKey::AnalyticsPrivacy {
+        return resolve_user_only_setting(key, values.user);
+    }
+
     if let Some(value) = values.user {
         return ResolvedSetting {
             key,
@@ -308,6 +318,23 @@ pub fn resolve_setting(key: SettingKey, values: ScopedSettingValues) -> Resolved
             key,
             value,
             source: SettingSource::Guild,
+        };
+    }
+
+    ResolvedSetting {
+        key,
+        value: key.default_value(),
+        source: SettingSource::Default,
+    }
+}
+
+#[instrument(name = "settings.resolve_user_only", skip(user))]
+fn resolve_user_only_setting(key: SettingKey, user: Option<SettingValue>) -> ResolvedSetting {
+    if let Some(value) = user {
+        return ResolvedSetting {
+            key,
+            value,
+            source: SettingSource::User,
         };
     }
 
@@ -470,6 +497,38 @@ mod tests {
             default_resolved.value,
             SettingKey::TitleDisplay.default_value()
         );
+    }
+
+    #[test]
+    fn resolve_analytics_privacy_uses_user_value_or_explicit_default() {
+        let guild = SettingKey::AnalyticsPrivacy.parse_value("opted_out").ok();
+        let user = SettingKey::AnalyticsPrivacy.parse_value("standard").ok();
+
+        let user_resolved = resolve_setting(
+            SettingKey::AnalyticsPrivacy,
+            ScopedSettingValues { user, guild },
+        );
+        assert_eq!(user_resolved.source, SettingSource::User);
+        assert_eq!(
+            user_resolved.value,
+            SettingValue::AnalyticsPrivacy(AnalyticsPrivacyPreference::Standard)
+        );
+
+        let default_resolved = resolve_setting(
+            SettingKey::AnalyticsPrivacy,
+            ScopedSettingValues { user: None, guild },
+        );
+        assert_eq!(default_resolved.source, SettingSource::Default);
+        assert_eq!(
+            default_resolved.value,
+            SettingValue::AnalyticsPrivacy(AnalyticsPrivacyPreference::Standard)
+        );
+    }
+
+    #[test]
+    fn analytics_privacy_opted_out_helper_identifies_opt_out() {
+        assert!(!AnalyticsPrivacyPreference::Standard.opted_out());
+        assert!(AnalyticsPrivacyPreference::OptedOut.opted_out());
     }
 
     #[test]
