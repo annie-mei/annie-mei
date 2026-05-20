@@ -309,25 +309,25 @@ pub async fn run(ctx: &Context, interaction: &mut CommandInteraction) {
         return;
     }
 
-    configure_sentry_scope("Search", user.id.get(), Some(json!(query.clone())));
+    let analytics_privacy = resolve_analytics_privacy_preference(ctx, user.id).await;
+    let analytics_opted_out = analytics_privacy.opted_out();
+
+    configure_sentry_scope(
+        "Search",
+        user.id.get(),
+        (!analytics_opted_out).then(|| json!(query.clone())),
+    );
 
     info!("Got command 'search'");
 
     let search_result_future = async {
         let intent = match get_gemini_client_from_context(ctx).await {
             Some(client) => {
-                let analytics_privacy = resolve_analytics_privacy_preference(ctx, user.id).await;
-                let analytics_opted_out = analytics_privacy.opted_out();
                 let telemetry_context = LlmTelemetryContext {
-                    distinct_id: (!analytics_opted_out)
-                        .then(|| hash_user_id(user.id.get()).to_string()),
-                    guild_id: (!analytics_opted_out)
-                        .then(|| {
-                            interaction
-                                .guild_id
-                                .map(|guild_id| hash_discord_id(guild_id.get()).to_string())
-                        })
-                        .flatten(),
+                    distinct_id: Some(hash_user_id(user.id.get()).to_string()),
+                    guild_id: interaction
+                        .guild_id
+                        .map(|guild_id| hash_discord_id(guild_id.get()).to_string()),
                     command: Some("search".to_string()),
                     environment: std::env::var(ENV).ok(),
                     input: (!analytics_opted_out).then(|| {
