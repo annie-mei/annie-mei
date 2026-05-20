@@ -329,6 +329,19 @@ pub fn build_ai_generation_event(
         properties.insert("guild_id".to_string(), json!(guild_id));
     }
 
+    properties.insert(
+        "analytics_privacy".to_string(),
+        json!(if context.capture_content {
+            "standard"
+        } else {
+            "opted_out"
+        }),
+    );
+    properties.insert(
+        "llm_content_captured".to_string(),
+        json!(capture_content && context.capture_content),
+    );
+
     if let Some(tokens) = input_tokens {
         properties.insert("$ai_input_tokens".to_string(), json!(tokens));
     }

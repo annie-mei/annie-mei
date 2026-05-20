@@ -104,7 +104,7 @@ impl SettingKey {
         match self {
             Self::TitleDisplay => "Which AniList title variant Annie Mei should prefer.",
             Self::AnalyticsPrivacy => {
-                "Whether user-level analytics use the standard telemetry path. The default is `standard`; `opted_out` disables raw prompt/output capture and stable user correlation in supported analytics while keeping aggregate operational telemetry."
+                "Whether user-level analytics may include raw user-provided content. The default is `standard`; `opted_out` disables raw query, prompt, and output capture in supported analytics/observability while keeping pseudonymous operational telemetry."
             }
             Self::GuildScores => {
                 "Whether guild score displays are enabled for a server and whether a user participates. Guild disabled wins over user participation; users who opt out are excluded."

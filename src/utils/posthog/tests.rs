@@ -39,6 +39,8 @@ fn ai_generation_payload_excludes_content_by_default() {
     assert_eq!(properties["environment"], "test");
     assert_eq!(properties["$ai_model"], "gemini-2.0-flash");
     assert_eq!(properties["$ai_provider"], "gemini");
+    assert_eq!(properties["analytics_privacy"], "opted_out");
+    assert!(!properties["llm_content_captured"].as_bool().unwrap());
     assert_eq!(properties["$ai_input_tokens"], 10);
     assert_eq!(properties["$ai_output_tokens"], 20);
     assert_eq!(properties["$ai_total_tokens"], 30);
@@ -68,6 +70,8 @@ fn ai_generation_payload_includes_content_when_enabled() {
     );
 
     let properties = event["properties"].as_object().unwrap();
+    assert_eq!(properties["analytics_privacy"], "standard");
+    assert!(properties["llm_content_captured"].as_bool().unwrap());
     assert_eq!(properties["$ai_input"][0]["content"], "raw prompt");
     assert_eq!(properties["$ai_output_choices"][0]["content"], "raw output");
 }
@@ -99,8 +103,8 @@ fn ai_generation_payload_records_errors_without_content() {
 #[test]
 fn ai_generation_payload_respects_context_privacy_opt_out() {
     let context = LlmTelemetryContext {
-        distinct_id: None,
-        guild_id: None,
+        distinct_id: Some("user_hash".to_string()),
+        guild_id: Some("guild_hash".to_string()),
         command: Some("search".to_string()),
         environment: Some("test".to_string()),
         input: Some(json!([{ "role": "user", "content": "raw prompt" }])),
@@ -124,9 +128,11 @@ fn ai_generation_payload_respects_context_privacy_opt_out() {
     );
 
     let properties = event["properties"].as_object().unwrap();
-    assert_eq!(event["distinct_id"], "annie-mei-unknown-user");
-    assert_eq!(properties["distinct_id"], "annie-mei-unknown-user");
-    assert!(!properties.contains_key("guild_id"));
+    assert_eq!(event["distinct_id"], "user_hash");
+    assert_eq!(properties["distinct_id"], "user_hash");
+    assert_eq!(properties["guild_id"], "guild_hash");
+    assert_eq!(properties["analytics_privacy"], "opted_out");
+    assert!(!properties["llm_content_captured"].as_bool().unwrap());
     assert!(!properties.contains_key("$ai_input"));
     assert!(!properties.contains_key("$ai_output_choices"));
 }
