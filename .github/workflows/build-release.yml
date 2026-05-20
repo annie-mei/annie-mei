@@ -203,24 +203,26 @@ jobs:
               echo "Missing mei.jpg"
               exit 1
             fi
-            # Backup current binary
+            # Backup current binary and version marker
             cp annie-mei annie-mei.backup || true
+            cp VERSION VERSION.backup || true
             # Stop, replace, start
             sudo systemctl stop annie-mei
             mv annie-mei.new/annie-mei annie-mei
             cp annie-mei.new/mei.jpg mei.jpg
             rm -rf annie-mei.new
+            printf '%s\t%s\n' "${{ needs.build.outputs.tag_name }}" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" > VERSION
             sudo systemctl start annie-mei
             # Verify service started
             sleep 2
             sudo systemctl is-active annie-mei || {
               echo "Service failed to start, rolling back"
               mv annie-mei.backup annie-mei
+              cp VERSION.backup VERSION || true
               sudo systemctl start annie-mei
               exit 1
             }
-            rm -f annie-mei.backup
-            printf '%s\t%s\n' "${{ needs.build.outputs.tag_name }}" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" > VERSION
+            rm -f annie-mei.backup VERSION.backup
           EOF
       - name: Verify /healthz over Cloudflare
         run: |
