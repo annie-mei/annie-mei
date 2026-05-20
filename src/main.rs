@@ -34,6 +34,7 @@ use utils::{
 /// Annie Mei Discord Bot
 #[derive(Parser)]
 #[command(name = "annie-mei")]
+#[command(version = env!("CARGO_PKG_VERSION"))]
 #[command(about = "A Discord bot for anime and manga information", long_about = None)]
 struct Cli {
     #[command(subcommand)]
@@ -184,6 +185,8 @@ async fn main() {
     }
 
     // Default: run the bot
+    info!(version = env!("CARGO_PKG_VERSION"), "Annie Mei starting");
+
     install_rustls_crypto_provider();
 
     let environment = env::var(ENV).expect("Expected an environment in the environment");
