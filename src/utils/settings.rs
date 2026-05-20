@@ -3,13 +3,13 @@ use tracing::{instrument, warn};
 
 use crate::{
     models::{
-        db::settings::resolve_setting_layers,
+        db::settings::{get_guild_setting, resolve_setting_layers},
         settings::{
             SettingKey, SettingValue, TitleDisplayPreference, guild_scores_enabled,
             user_participates_in_guild_scores,
         },
     },
-    utils::database::get_pool_from_context,
+    utils::database::{DbPool, get_pool_from_context},
 };
 
 #[instrument(name = "settings.resolve_title_display", skip(ctx, user_id, guild_id))]
@@ -48,20 +48,19 @@ fn default_title_display_preference() -> TitleDisplayPreference {
     }
 }
 
-#[instrument(name = "settings.resolve_guild_scores_enabled", skip(ctx, guild_id))]
-pub async fn resolve_guild_scores_enabled(ctx: &Context, guild_id: Option<GuildId>) -> bool {
+#[instrument(
+    name = "settings.resolve_guild_scores_enabled_with_pool",
+    skip(pool, guild_id)
+)]
+pub async fn resolve_guild_scores_enabled_with_pool(
+    pool: &DbPool,
+    guild_id: Option<GuildId>,
+) -> bool {
     let Some(guild_id) = guild_id else {
         return false;
     };
 
-    let Some(pool) = get_pool_from_context(ctx).await else {
-        warn!("Database pool unavailable; disabling guild scores for privacy");
-        return false;
-    };
-
-    match crate::models::db::settings::get_guild_setting(&pool, guild_id, SettingKey::GuildScores)
-        .await
-    {
+    match get_guild_setting(pool, guild_id, SettingKey::GuildScores).await {
         Ok(value) => guild_scores_enabled(value),
         Err(error) => {
             warn!(error = %error, "Failed to resolve guild scores setting; disabling for privacy");

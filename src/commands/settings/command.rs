@@ -407,20 +407,26 @@ fn plan_settings_write(
         }
     };
 
-    if let Err(message) = validate_value_for_scope(options.scope, value) {
-        return SettingsCommandPlan::Respond(CommandResponse::Content(message));
-    }
-
     match options.scope {
         SettingScope::Effective => SettingsCommandPlan::Respond(CommandResponse::Content(
             "`effective` is read-only because it is resolved from user, guild, and default settings. Choose `user` or `guild` when setting a value."
                 .to_string(),
         )),
-        SettingScope::User => SettingsCommandPlan::Write(SettingsWriteRequest {
-            target: SettingsWriteTarget::User(context.user_id),
-            value,
-        }),
+        SettingScope::User => {
+            if let Err(message) = validate_value_for_scope(options.scope, value) {
+                return SettingsCommandPlan::Respond(CommandResponse::Content(message));
+            }
+
+            SettingsCommandPlan::Write(SettingsWriteRequest {
+                target: SettingsWriteTarget::User(context.user_id),
+                value,
+            })
+        },
         SettingScope::Guild => {
+            if let Err(message) = validate_value_for_scope(options.scope, value) {
+                return SettingsCommandPlan::Respond(CommandResponse::Content(message));
+            }
+
             let Some(guild_id) = context.guild_id else {
                 return SettingsCommandPlan::Respond(CommandResponse::Content(
                     "Guild settings can only be changed from inside a server.".to_string(),

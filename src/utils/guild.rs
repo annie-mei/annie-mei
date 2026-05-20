@@ -10,7 +10,7 @@ use crate::{
     utils::{
         database::get_pool_from_context,
         requests::anilist::send_request,
-        settings::{participates_in_guild_scores, resolve_guild_scores_enabled},
+        settings::{participates_in_guild_scores, resolve_guild_scores_enabled_with_pool},
     },
 };
 
@@ -89,15 +89,15 @@ pub async fn get_guild_data_for_media<T: Transformers>(
     guild_id: Option<GuildId>,
     guild_members: Vec<UserId>,
 ) -> HashMap<u64, MediaListData> {
-    if !resolve_guild_scores_enabled(ctx, guild_id).await {
-        info!("Guild scores are disabled for this interaction");
-        return HashMap::new();
-    }
-
     let Some(database_pool) = get_pool_from_context(ctx).await else {
         error!("Database pool is not available in Serenity context");
         return HashMap::new();
     };
+
+    if !resolve_guild_scores_enabled_with_pool(&database_pool, guild_id).await {
+        info!("Guild scores are disabled for this interaction");
+        return HashMap::new();
+    }
 
     let anilist_users =
         match OAuthCredential::get_by_discord_ids(guild_members, &database_pool).await {
