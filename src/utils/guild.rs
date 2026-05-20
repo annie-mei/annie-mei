@@ -2,16 +2,22 @@ use std::collections::HashMap;
 
 use crate::{
     models::{
-        db::oauth_credential::OAuthCredential, transformers::Transformers,
+        db::{oauth_credential::OAuthCredential, settings::get_user_settings_for_discord_ids},
+        settings::SettingKey,
+        transformers::Transformers,
         user_media_list::MediaListData,
     },
-    utils::{database::get_pool_from_context, requests::anilist::send_request},
+    utils::{
+        database::get_pool_from_context,
+        requests::anilist::send_request,
+        settings::{participates_in_guild_scores, resolve_guild_scores_enabled_with_pool},
+    },
 };
 
 use serenity::{
     all::CommandInteraction,
     client::Context,
-    model::prelude::{Guild, UserId},
+    model::prelude::{Guild, GuildId, UserId},
 };
 
 use serde::Deserialize;
@@ -80,12 +86,18 @@ pub fn get_current_guild_members(ctx: &Context, interaction: &CommandInteraction
 pub async fn get_guild_data_for_media<T: Transformers>(
     ctx: &Context,
     media: &T,
+    guild_id: Option<GuildId>,
     guild_members: Vec<UserId>,
 ) -> HashMap<u64, MediaListData> {
     let Some(database_pool) = get_pool_from_context(ctx).await else {
         error!("Database pool is not available in Serenity context");
         return HashMap::new();
     };
+
+    if !resolve_guild_scores_enabled_with_pool(&database_pool, guild_id).await {
+        info!("Guild scores are disabled for this interaction");
+        return HashMap::new();
+    }
 
     let anilist_users =
         match OAuthCredential::get_by_discord_ids(guild_members, &database_pool).await {
@@ -96,7 +108,45 @@ pub async fn get_guild_data_for_media<T: Transformers>(
             }
         };
 
-    get_guild_anilist_data(anilist_users, media.get_id(), media.get_type().to_owned()).await
+    let participating_users =
+        match filter_guild_score_participants(anilist_users, &database_pool).await {
+            Ok(users) => users,
+            Err(err) => {
+                error!(error = %err, "Failed to resolve guild score opt-outs");
+                return HashMap::new();
+            }
+        };
+
+    get_guild_anilist_data(
+        participating_users,
+        media.get_id(),
+        media.get_type().to_owned(),
+    )
+    .await
+}
+
+#[instrument(name = "guild.filter_score_participants", skip(guild_members, database_pool), fields(member_count = guild_members.len()))]
+async fn filter_guild_score_participants(
+    guild_members: Vec<OAuthCredential>,
+    database_pool: &crate::utils::database::DbPool,
+) -> Result<Vec<OAuthCredential>, crate::models::db::settings::SettingsStorageError> {
+    let discord_user_ids = guild_members
+        .iter()
+        .map(|credential| credential.discord_user_id.clone())
+        .collect::<Vec<_>>();
+    let user_settings = get_user_settings_for_discord_ids(
+        database_pool,
+        &discord_user_ids,
+        SettingKey::GuildScores,
+    )
+    .await?;
+
+    Ok(guild_members
+        .into_iter()
+        .filter(|credential| {
+            participates_in_guild_scores(user_settings.get(&credential.discord_user_id).copied())
+        })
+        .collect())
 }
 
 #[instrument(name = "guild.fetch_anilist_data", skip(guild_members, media_type), fields(member_count = guild_members.len(), media_id = media_id, media_type = %media_type))]
@@ -170,7 +220,21 @@ async fn get_guild_anilist_data(
 #[cfg(test)]
 mod tests {
     use super::build_batch_media_list_query;
-    use crate::models::db::oauth_credential::OAuthCredential;
+    use crate::models::{
+        db::oauth_credential::OAuthCredential,
+        settings::{GuildScoresPreference, SettingValue, user_participates_in_guild_scores},
+    };
+
+    #[test]
+    fn guild_score_participation_defaults_to_include_and_honors_opt_out() {
+        assert!(user_participates_in_guild_scores(None));
+        assert!(user_participates_in_guild_scores(Some(
+            SettingValue::GuildScores(GuildScoresPreference::Enabled)
+        )));
+        assert!(!user_participates_in_guild_scores(Some(
+            SettingValue::GuildScores(GuildScoresPreference::OptedOut)
+        )));
+    }
 
     #[test]
     fn build_batch_media_list_query_adds_one_lookup_per_user() {

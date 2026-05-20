@@ -130,7 +130,13 @@ pub async fn run(ctx: &Context, interaction: &mut CommandInteraction) {
                 info!("No users found in guild");
                 None
             } else {
-                let data = get_guild_data_for_media(ctx, manga_response, guild_members).await;
+                let data = get_guild_data_for_media(
+                    ctx,
+                    manga_response,
+                    interaction.guild_id,
+                    guild_members,
+                )
+                .await;
                 info!("Guild members data: {} entries", data.len());
                 if data.is_empty() { None } else { Some(data) }
             }

@@ -1,6 +1,6 @@
 //! SQLx persistence helpers for user and guild settings.
 
-use std::fmt;
+use std::{collections::HashMap, fmt};
 
 use serenity::model::prelude::{GuildId, UserId};
 use sqlx::FromRow;
@@ -21,6 +21,21 @@ use crate::{
 pub struct StoredSettingRow {
     pub setting_key: String,
     pub setting_value: String,
+}
+
+#[derive(Clone, PartialEq, Eq, FromRow)]
+struct UserSettingRow {
+    discord_user_id: String,
+    setting_value: String,
+}
+
+impl fmt::Debug for UserSettingRow {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("UserSettingRow")
+            .field("discord_user_id", &"[REDACTED]")
+            .field("setting_value", &"[REDACTED]")
+            .finish()
+    }
 }
 
 impl fmt::Debug for StoredSettingRow {
@@ -175,6 +190,37 @@ pub async fn get_guild_setting(
 }
 
 #[instrument(
+    name = "db.settings.get_user_settings_for_discord_ids",
+    skip(pool, user_discord_ids),
+    fields(user_count = user_discord_ids.len(), setting_key = %setting_key.as_str())
+)]
+pub async fn get_user_settings_for_discord_ids(
+    pool: &DbPool,
+    user_discord_ids: &[String],
+    setting_key: SettingKey,
+) -> Result<HashMap<String, SettingValue>, SettingsStorageError> {
+    if user_discord_ids.is_empty() {
+        return Ok(HashMap::new());
+    }
+
+    let rows = sqlx::query_as::<_, UserSettingRow>(
+        "SELECT discord_user_id, setting_value FROM annie_mei.user_settings \
+         WHERE discord_user_id = ANY($1) AND setting_key = $2",
+    )
+    .bind(user_discord_ids)
+    .bind(setting_key.as_str())
+    .fetch_all(pool)
+    .await?;
+
+    rows.into_iter()
+        .map(|row| {
+            let value = setting_key.parse_value(&row.setting_value)?;
+            Ok((row.discord_user_id, value))
+        })
+        .collect()
+}
+
+#[instrument(
     name = "db.settings.resolve_setting_layers",
     skip(pool, user_discord_id, guild_id),
     fields(
@@ -247,6 +293,21 @@ fn parse_optional_setting(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn user_setting_row_debug_redacts_sensitive_fields() {
+        let row = UserSettingRow {
+            discord_user_id: "123456789".to_string(),
+            setting_value: "opted_out".to_string(),
+        };
+
+        let debug = format!("{row:?}");
+
+        assert!(debug.contains("UserSettingRow"));
+        assert!(debug.contains("[REDACTED]"));
+        assert!(!debug.contains("123456789"));
+        assert!(!debug.contains("opted_out"));
+    }
 
     #[test]
     fn stored_setting_debug_redacts_value() {

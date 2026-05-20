@@ -65,16 +65,21 @@ impl fmt::Display for SettingSource {
 pub enum SettingKey {
     TitleDisplay,
     AnalyticsPrivacy,
+    GuildScores,
 }
 
-pub const ALL_SETTING_KEYS: [SettingKey; 2] =
-    [SettingKey::TitleDisplay, SettingKey::AnalyticsPrivacy];
+pub const ALL_SETTING_KEYS: [SettingKey; 3] = [
+    SettingKey::TitleDisplay,
+    SettingKey::AnalyticsPrivacy,
+    SettingKey::GuildScores,
+];
 
 impl SettingKey {
     pub fn parse(raw: &str) -> Option<Self> {
         match normalize_token(raw).as_str() {
             "title_display" | "title" | "titles" => Some(Self::TitleDisplay),
             "analytics_privacy" | "analytics" | "privacy" => Some(Self::AnalyticsPrivacy),
+            "guild_scores" | "guild_score" | "scores" => Some(Self::GuildScores),
             _ => None,
         }
     }
@@ -83,6 +88,7 @@ impl SettingKey {
         match self {
             Self::TitleDisplay => "title_display",
             Self::AnalyticsPrivacy => "analytics_privacy",
+            Self::GuildScores => "guild_scores",
         }
     }
 
@@ -90,6 +96,7 @@ impl SettingKey {
         match self {
             Self::TitleDisplay => "Title display",
             Self::AnalyticsPrivacy => "Analytics privacy",
+            Self::GuildScores => "Guild scores",
         }
     }
 
@@ -98,6 +105,9 @@ impl SettingKey {
             Self::TitleDisplay => "Which AniList title variant Annie Mei should prefer.",
             Self::AnalyticsPrivacy => {
                 "Whether analytics should use the standard telemetry path or opt out where supported."
+            }
+            Self::GuildScores => {
+                "Whether guild score displays are enabled for a server and whether a user participates. Guild disabled wins over user participation; users who opt out are excluded."
             }
         }
     }
@@ -108,6 +118,7 @@ impl SettingKey {
             Self::AnalyticsPrivacy => {
                 SettingValue::AnalyticsPrivacy(AnalyticsPrivacyPreference::Standard)
             }
+            Self::GuildScores => SettingValue::GuildScores(GuildScoresPreference::Enabled),
         }
     }
 
@@ -115,6 +126,7 @@ impl SettingKey {
         match self {
             Self::TitleDisplay => &["matched", "romaji", "english", "native"],
             Self::AnalyticsPrivacy => &["standard", "opted_out"],
+            Self::GuildScores => &["enabled", "disabled", "opted_out"],
         }
     }
 
@@ -143,6 +155,18 @@ impl SettingKey {
                 }
                 _ => return Err(SettingValidationError::new(self, raw)),
             },
+            Self::GuildScores => match normalized.as_str() {
+                "enabled" | "enable" | "on" | "default" | "participating" => {
+                    SettingValue::GuildScores(GuildScoresPreference::Enabled)
+                }
+                "disabled" | "disable" | "off" => {
+                    SettingValue::GuildScores(GuildScoresPreference::Disabled)
+                }
+                "opted_out" | "optout" | "private" | "excluded" => {
+                    SettingValue::GuildScores(GuildScoresPreference::OptedOut)
+                }
+                _ => return Err(SettingValidationError::new(self, raw)),
+            },
         };
 
         Ok(value)
@@ -164,9 +188,17 @@ pub enum AnalyticsPrivacyPreference {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum GuildScoresPreference {
+    Enabled,
+    Disabled,
+    OptedOut,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum SettingValue {
     TitleDisplay(TitleDisplayPreference),
     AnalyticsPrivacy(AnalyticsPrivacyPreference),
+    GuildScores(GuildScoresPreference),
 }
 
 impl SettingValue {
@@ -174,6 +206,7 @@ impl SettingValue {
         match self {
             Self::TitleDisplay(_) => SettingKey::TitleDisplay,
             Self::AnalyticsPrivacy(_) => SettingKey::AnalyticsPrivacy,
+            Self::GuildScores(_) => SettingKey::GuildScores,
         }
     }
 
@@ -185,6 +218,9 @@ impl SettingValue {
             Self::TitleDisplay(TitleDisplayPreference::Native) => "native",
             Self::AnalyticsPrivacy(AnalyticsPrivacyPreference::Standard) => "standard",
             Self::AnalyticsPrivacy(AnalyticsPrivacyPreference::OptedOut) => "opted_out",
+            Self::GuildScores(GuildScoresPreference::Enabled) => "enabled",
+            Self::GuildScores(GuildScoresPreference::Disabled) => "disabled",
+            Self::GuildScores(GuildScoresPreference::OptedOut) => "opted_out",
         }
     }
 
@@ -198,6 +234,9 @@ impl SettingValue {
             Self::AnalyticsPrivacy(AnalyticsPrivacyPreference::OptedOut) => {
                 "opted out of analytics"
             }
+            Self::GuildScores(GuildScoresPreference::Enabled) => "guild scores enabled",
+            Self::GuildScores(GuildScoresPreference::Disabled) => "guild scores disabled",
+            Self::GuildScores(GuildScoresPreference::OptedOut) => "opted out of guild scores",
         }
     }
 }
@@ -252,6 +291,10 @@ pub struct ScopedSettingValues {
 
 #[instrument(name = "settings.resolve", skip(values), fields(setting_key = %key.as_str()))]
 pub fn resolve_setting(key: SettingKey, values: ScopedSettingValues) -> ResolvedSetting {
+    if key == SettingKey::GuildScores {
+        return resolve_guild_scores_setting(values);
+    }
+
     if let Some(value) = values.user {
         return ResolvedSetting {
             key,
@@ -275,6 +318,73 @@ pub fn resolve_setting(key: SettingKey, values: ScopedSettingValues) -> Resolved
     }
 }
 
+#[instrument(name = "settings.resolve_guild_scores", skip(values))]
+fn resolve_guild_scores_setting(values: ScopedSettingValues) -> ResolvedSetting {
+    if matches!(
+        values.guild,
+        Some(SettingValue::GuildScores(GuildScoresPreference::Disabled))
+    ) {
+        return ResolvedSetting {
+            key: SettingKey::GuildScores,
+            value: SettingValue::GuildScores(GuildScoresPreference::Disabled),
+            source: SettingSource::Guild,
+        };
+    }
+
+    if matches!(
+        values.user,
+        Some(SettingValue::GuildScores(GuildScoresPreference::OptedOut))
+    ) {
+        return ResolvedSetting {
+            key: SettingKey::GuildScores,
+            value: SettingValue::GuildScores(GuildScoresPreference::OptedOut),
+            source: SettingSource::User,
+        };
+    }
+
+    if let Some(value @ SettingValue::GuildScores(_)) = values.user {
+        return ResolvedSetting {
+            key: SettingKey::GuildScores,
+            value,
+            source: SettingSource::User,
+        };
+    }
+
+    if let Some(value @ SettingValue::GuildScores(_)) = values.guild {
+        return ResolvedSetting {
+            key: SettingKey::GuildScores,
+            value,
+            source: SettingSource::Guild,
+        };
+    }
+
+    ResolvedSetting {
+        key: SettingKey::GuildScores,
+        value: SettingKey::GuildScores.default_value(),
+        source: SettingSource::Default,
+    }
+}
+
+#[instrument(name = "settings.guild_scores_enabled", skip(guild_value))]
+pub fn guild_scores_enabled(guild_value: Option<SettingValue>) -> bool {
+    match guild_value {
+        Some(SettingValue::GuildScores(GuildScoresPreference::Disabled)) => false,
+        Some(SettingValue::GuildScores(GuildScoresPreference::OptedOut)) => false,
+        Some(SettingValue::GuildScores(GuildScoresPreference::Enabled)) | None => true,
+        Some(_) => true,
+    }
+}
+
+#[instrument(name = "settings.user_participates_in_guild_scores", skip(user_value))]
+pub fn user_participates_in_guild_scores(user_value: Option<SettingValue>) -> bool {
+    match user_value {
+        Some(SettingValue::GuildScores(GuildScoresPreference::OptedOut)) => false,
+        Some(SettingValue::GuildScores(GuildScoresPreference::Disabled)) => false,
+        Some(SettingValue::GuildScores(GuildScoresPreference::Enabled)) | None => true,
+        Some(_) => true,
+    }
+}
+
 fn normalize_token(raw: &str) -> String {
     raw.trim().to_ascii_lowercase().replace([' ', '-'], "_")
 }
@@ -289,7 +399,7 @@ mod tests {
             SettingKey::parse("title-display"),
             Some(SettingKey::TitleDisplay)
         );
-        assert_eq!(SettingKey::parse("scores"), None);
+        assert_eq!(SettingKey::parse("scores"), Some(SettingKey::GuildScores));
         assert_eq!(
             SettingKey::parse("privacy"),
             Some(SettingKey::AnalyticsPrivacy)
@@ -360,5 +470,64 @@ mod tests {
             default_resolved.value,
             SettingKey::TitleDisplay.default_value()
         );
+    }
+
+    #[test]
+    fn resolve_setting_uses_guild_scores_precedence() {
+        let resolved = resolve_setting(
+            SettingKey::GuildScores,
+            ScopedSettingValues {
+                user: Some(SettingValue::GuildScores(GuildScoresPreference::Enabled)),
+                guild: Some(SettingValue::GuildScores(GuildScoresPreference::Disabled)),
+            },
+        );
+
+        assert_eq!(resolved.source, SettingSource::Guild);
+        assert_eq!(
+            resolved.value,
+            SettingValue::GuildScores(GuildScoresPreference::Disabled)
+        );
+
+        let resolved = resolve_setting(
+            SettingKey::GuildScores,
+            ScopedSettingValues {
+                user: Some(SettingValue::GuildScores(GuildScoresPreference::OptedOut)),
+                guild: Some(SettingValue::GuildScores(GuildScoresPreference::Enabled)),
+            },
+        );
+
+        assert_eq!(resolved.source, SettingSource::User);
+        assert_eq!(
+            resolved.value,
+            SettingValue::GuildScores(GuildScoresPreference::OptedOut)
+        );
+    }
+
+    #[test]
+    fn guild_scores_default_enabled_with_guild_disable_precedence() {
+        assert!(guild_scores_enabled(None));
+        assert!(guild_scores_enabled(Some(SettingValue::GuildScores(
+            GuildScoresPreference::Enabled
+        ))));
+        assert!(!guild_scores_enabled(Some(SettingValue::GuildScores(
+            GuildScoresPreference::Disabled
+        ))));
+        assert!(!guild_scores_enabled(Some(SettingValue::GuildScores(
+            GuildScoresPreference::OptedOut
+        ))));
+    }
+
+    #[test]
+    fn guild_scores_user_opt_out_excludes_participant() {
+        assert!(user_participates_in_guild_scores(None));
+        assert!(user_participates_in_guild_scores(Some(
+            SettingValue::GuildScores(GuildScoresPreference::Enabled)
+        )));
+        assert!(!user_participates_in_guild_scores(Some(
+            SettingValue::GuildScores(GuildScoresPreference::OptedOut)
+        )));
+        assert!(!user_participates_in_guild_scores(Some(
+            SettingValue::GuildScores(GuildScoresPreference::Disabled)
+        )));
     }
 }
