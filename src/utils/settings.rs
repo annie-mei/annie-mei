@@ -70,6 +70,7 @@ pub async fn resolve_guild_scores_enabled(ctx: &Context, guild_id: Option<GuildI
     }
 }
 
+#[instrument(name = "settings.participates_in_guild_scores", skip(value))]
 pub fn participates_in_guild_scores(value: Option<SettingValue>) -> bool {
     user_participates_in_guild_scores(value)
 }
