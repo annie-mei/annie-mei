@@ -88,7 +88,7 @@ pub fn register() -> CreateCommand {
 
 #[instrument(name = "command.settings.is_component")]
 pub fn is_settings_component(custom_id: &str) -> bool {
-    custom_id.starts_with(&format!("{SETTINGS_COMPONENT_PREFIX}:"))
+    custom_id.starts_with(concat!("settings", ":"))
 }
 
 #[instrument(name = "command.settings.overview_custom_id")]
