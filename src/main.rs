@@ -185,8 +185,6 @@ async fn main() {
     }
 
     // Default: run the bot
-    info!(version = env!("CARGO_PKG_VERSION"), "Annie Mei starting");
-
     install_rustls_crypto_provider();
 
     let environment = env::var(ENV).expect("Expected an environment in the environment");
@@ -247,6 +245,7 @@ async fn main() {
 
     subscriber.with(sentry_tracing::layer()).init();
 
+    info!(version = env!("CARGO_PKG_VERSION"), "Annie Mei starting");
     info!(model = %configured_model_name(), "LLM model configured");
     let posthog_client = PostHogClient::from_env().map(Arc::new);
     let gemini_client = match GeminiClient::from_env_with_system_prompt(
