@@ -374,9 +374,7 @@ fn format_summary(
 
 #[instrument(name = "command.settings.format_optional_layer", skip(value))]
 fn format_optional_layer(value: Option<SettingValue>) -> String {
-    value
-        .map(format_setting_value)
-        .unwrap_or_else(|| "not set".to_string())
+    value.map_or_else(|| "not set".to_string(), format_setting_value)
 }
 
 #[instrument(name = "command.settings.format_guild_layer", skip(value))]
