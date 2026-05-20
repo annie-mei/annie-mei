@@ -320,7 +320,10 @@ pub fn resolve_setting(key: SettingKey, values: ScopedSettingValues) -> Resolved
 
 #[instrument(name = "settings.resolve_guild_scores", skip(values))]
 fn resolve_guild_scores_setting(values: ScopedSettingValues) -> ResolvedSetting {
-    if let Some(SettingValue::GuildScores(GuildScoresPreference::Disabled)) = values.guild {
+    if matches!(
+        values.guild,
+        Some(SettingValue::GuildScores(GuildScoresPreference::Disabled))
+    ) {
         return ResolvedSetting {
             key: SettingKey::GuildScores,
             value: SettingValue::GuildScores(GuildScoresPreference::Disabled),
@@ -328,7 +331,10 @@ fn resolve_guild_scores_setting(values: ScopedSettingValues) -> ResolvedSetting 
         };
     }
 
-    if let Some(SettingValue::GuildScores(GuildScoresPreference::OptedOut)) = values.user {
+    if matches!(
+        values.user,
+        Some(SettingValue::GuildScores(GuildScoresPreference::OptedOut))
+    ) {
         return ResolvedSetting {
             key: SettingKey::GuildScores,
             value: SettingValue::GuildScores(GuildScoresPreference::OptedOut),
