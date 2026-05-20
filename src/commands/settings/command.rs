@@ -1,6 +1,6 @@
 use crate::{
     models::{
-        db::settings::{ResolvedSettingLayers, SettingsStorageError, resolve_setting_layers},
+        db::settings::{ResolvedSettingLayers, SettingsStorageError, resolve_all_setting_layers},
         settings::{
             ALL_SETTING_KEYS, GuildScoresPreference, SettingKey, SettingScope, SettingValue,
         },
@@ -298,13 +298,11 @@ async fn load_settings_panel(
     guild_id: Option<GuildId>,
     category: SettingsPanelCategory,
 ) -> Result<SettingsPanel, SettingsStorageError> {
-    let mut summaries = Vec::with_capacity(ALL_SETTING_KEYS.len());
-
-    for key in ALL_SETTING_KEYS {
-        summaries.push(SettingSummary {
-            layers: resolve_setting_layers(pool, user_id, guild_id, key).await?,
-        });
-    }
+    let summaries = resolve_all_setting_layers(pool, user_id, guild_id, &ALL_SETTING_KEYS)
+        .await?
+        .into_iter()
+        .map(|layers| SettingSummary { layers })
+        .collect();
 
     Ok(plan_settings_panel(category, guild_id.is_some(), summaries))
 }
