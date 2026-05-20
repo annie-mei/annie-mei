@@ -25,9 +25,11 @@ If you choose to link your AniList account with `/register`, Annie Mei and its a
 
 AniList linking is optional. Commands that do not require an AniList link can still be used without linking an account.
 
-### Logs, diagnostics, and error reports
+### Logs, diagnostics, analytics, and error reports
 
-Annie Mei may collect operational logs, diagnostics, and error reports to keep the service reliable and investigate failures. Discord user IDs are hashed or fingerprinted before being attached to application logs or Sentry diagnostics. Error reports may include command names, high-level execution context, and sanitized error details. Credential-bearing URLs are redacted before being sent to application logs or Sentry.
+Annie Mei may collect operational logs, diagnostics, analytics, and error reports to keep the service reliable, understand feature usage, and investigate failures. Discord user IDs and guild IDs are hashed or fingerprinted before being attached to application logs, Sentry diagnostics, or analytics events. Error reports and analytics events may include command names, high-level execution context, bot version, environment, latency, success or failure status, model names, and token counts.
+
+Some features, such as `/search`, use an LLM provider to interpret user-provided search text. When LLM analytics content capture is enabled, analytics events may include the LLM input or output needed to debug and improve that feature, such as the search query, prompt payload, or model response.
 
 ### Cache and infrastructure data
 
@@ -51,7 +53,9 @@ Annie Mei uses third-party services to operate and provide features, including:
 - Discord for bot interactions.
 - AniList for anime, manga, character, user, and OAuth data.
 - MyAnimeList and Spotify for theme song metadata and links.
+- Gemini or another configured LLM provider for natural-language search interpretation.
 - Sentry for error reporting and diagnostics.
+- PostHog for product and LLM analytics when configured.
 - Postgres hosting, Redis hosting, secret management, and deployment providers for infrastructure operations.
 
 These services process data under their own terms and privacy policies.
@@ -70,7 +74,9 @@ Annie Mei does not sell personal information. Information is shared only as need
 
 You can avoid optional AniList account processing by not using `/register`. If you have linked an AniList account, you can use `/unregister confirmation:Confirm unlink` in Discord to unlink your AniList account from Annie Mei's bot features and delete active stored AniList OAuth credentials associated with your Discord account. You may also revoke Annie Mei's access from AniList where supported.
 
-Unlinking in Discord may not remove retained operational logs, diagnostics, caches, or backups. To request deletion of any remaining stored Annie Mei account-link data, open an issue at:
+You can use `/settings` to view or update your user-level `analytics_privacy` preference. The default `standard` setting allows supported analytics to include raw user-provided content, such as LLM search queries, prompt payloads, or model outputs, when content capture is enabled. Setting `analytics_privacy` to `opted_out` disables raw query, prompt, and LLM output capture in supported analytics and observability paths. Annie Mei may still collect pseudonymous operational telemetry for opted-out users, including hashed Discord user or guild IDs, command names, success or failure status, latency, model names, token counts, bot version, and environment.
+
+Unlinking in Discord or opting out of analytics content capture may not remove retained operational logs, diagnostics, analytics events, caches, or backups. To request deletion of any remaining stored Annie Mei account-link data, open an issue at:
 
 https://github.com/annie-mei/annie-mei/issues
 
