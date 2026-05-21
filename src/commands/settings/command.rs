@@ -24,6 +24,7 @@ use serenity::{
 use tracing::{error, instrument};
 
 const SETTINGS_COMPONENT_PREFIX: &str = "settings";
+const SETTINGS_COMPONENT_ID_PREFIX: &str = "settings:";
 const OVERVIEW_COMPONENT: &str = "overview";
 const CATEGORY_COMPONENT: &str = "category";
 
@@ -88,7 +89,7 @@ pub fn register() -> CreateCommand {
 
 #[instrument(name = "command.settings.is_component")]
 pub fn is_settings_component(custom_id: &str) -> bool {
-    custom_id.starts_with(concat!("settings", ":"))
+    custom_id.starts_with(SETTINGS_COMPONENT_ID_PREFIX)
 }
 
 #[instrument(name = "command.settings.overview_custom_id")]
