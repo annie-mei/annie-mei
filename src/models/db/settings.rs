@@ -97,6 +97,7 @@ pub struct ResolvedSettingLayers {
         setting_key = %value.key().as_str()
     )
 )]
+#[allow(dead_code)]
 pub async fn set_user_setting(
     pool: &DbPool,
     user_discord_id: UserId,
@@ -122,6 +123,7 @@ pub async fn set_user_setting(
     skip(pool, guild_id, value),
     fields(guild_id = %hash_discord_id(guild_id.get()), setting_key = %value.key().as_str())
 )]
+#[allow(dead_code)]
 pub async fn set_guild_setting(
     pool: &DbPool,
     guild_id: GuildId,
@@ -221,6 +223,79 @@ pub async fn get_user_settings_for_discord_ids(
 }
 
 #[instrument(
+    name = "db.settings.resolve_all_setting_layers",
+    skip(pool, user_discord_id, guild_id, setting_keys),
+    fields(
+        discord_user_id = %hash_user_id(user_discord_id.get()),
+        guild_id = guild_id.map(|id| hash_discord_id(id.get()).to_string()),
+        setting_count = setting_keys.len()
+    )
+)]
+pub async fn resolve_all_setting_layers(
+    pool: &DbPool,
+    user_discord_id: UserId,
+    guild_id: Option<GuildId>,
+    setting_keys: &[SettingKey],
+) -> Result<Vec<ResolvedSettingLayers>, SettingsStorageError> {
+    if setting_keys.is_empty() {
+        return Ok(Vec::new());
+    }
+
+    let setting_key_names = setting_keys
+        .iter()
+        .map(|key| key.as_str().to_string())
+        .collect::<Vec<_>>();
+
+    let mut transaction = pool.begin().await?;
+    sqlx::query("SET TRANSACTION ISOLATION LEVEL REPEATABLE READ READ ONLY")
+        .execute(&mut *transaction)
+        .await?;
+
+    let user_rows = sqlx::query_as::<_, StoredSettingRow>(
+        "SELECT setting_key, setting_value FROM annie_mei.user_settings \
+         WHERE discord_user_id = $1 AND setting_key = ANY($2)",
+    )
+    .bind(user_discord_id.get().to_string())
+    .bind(&setting_key_names)
+    .fetch_all(&mut *transaction)
+    .await?;
+    let user_values = parse_stored_settings(user_rows)?;
+
+    let guild_values = match guild_id {
+        Some(guild_id) => {
+            let guild_rows = sqlx::query_as::<_, StoredSettingRow>(
+                "SELECT setting_key, setting_value FROM annie_mei.guild_settings \
+                 WHERE guild_id = $1 AND setting_key = ANY($2)",
+            )
+            .bind(guild_id.get().to_string())
+            .bind(&setting_key_names)
+            .fetch_all(&mut *transaction)
+            .await?;
+
+            parse_stored_settings(guild_rows)?
+        }
+        None => Vec::new(),
+    };
+
+    transaction.commit().await?;
+
+    Ok(setting_keys
+        .iter()
+        .map(|key| {
+            let user = setting_value_for_key(&user_values, *key);
+            let guild = setting_value_for_key(&guild_values, *key);
+            let effective = resolve_scoped_setting(*key, ScopedSettingValues { user, guild });
+
+            ResolvedSettingLayers {
+                user,
+                guild,
+                effective,
+            }
+        })
+        .collect())
+}
+
+#[instrument(
     name = "db.settings.resolve_setting_layers",
     skip(pool, user_discord_id, guild_id),
     fields(
@@ -235,46 +310,38 @@ pub async fn resolve_setting_layers(
     guild_id: Option<GuildId>,
     setting_key: SettingKey,
 ) -> Result<ResolvedSettingLayers, SettingsStorageError> {
-    let mut transaction = pool.begin().await?;
-    sqlx::query("SET TRANSACTION ISOLATION LEVEL REPEATABLE READ READ ONLY")
-        .execute(&mut *transaction)
-        .await?;
+    let layers =
+        resolve_all_setting_layers(pool, user_discord_id, guild_id, &[setting_key]).await?;
 
-    let user_row = sqlx::query_as::<_, StoredSettingRow>(
-        "SELECT setting_key, setting_value FROM annie_mei.user_settings \
-         WHERE discord_user_id = $1 AND setting_key = $2",
-    )
-    .bind(user_discord_id.get().to_string())
-    .bind(setting_key.as_str())
-    .fetch_optional(&mut *transaction)
-    .await?;
-    let user = parse_optional_setting(user_row, setting_key)?;
+    Ok(layers
+        .into_iter()
+        .next()
+        .expect("single-key resolve should return one layer"))
+}
 
-    let guild = match guild_id {
-        Some(guild_id) => {
-            let row = sqlx::query_as::<_, StoredSettingRow>(
-                "SELECT setting_key, setting_value FROM annie_mei.guild_settings \
-                 WHERE guild_id = $1 AND setting_key = $2",
-            )
-            .bind(guild_id.get().to_string())
-            .bind(setting_key.as_str())
-            .fetch_optional(&mut *transaction)
-            .await?;
+#[instrument(name = "db.settings.parse_stored_settings", skip(rows))]
+fn parse_stored_settings(
+    rows: Vec<StoredSettingRow>,
+) -> Result<Vec<(SettingKey, SettingValue)>, SettingsStorageError> {
+    rows.into_iter()
+        .filter_map(|row| {
+            SettingKey::parse(&row.setting_key).map(|key| {
+                key.parse_value(&row.setting_value)
+                    .map(|value| (key, value))
+                    .map_err(Into::into)
+            })
+        })
+        .collect()
+}
 
-            parse_optional_setting(row, setting_key)?
-        }
-        None => None,
-    };
-
-    transaction.commit().await?;
-
-    let effective = resolve_scoped_setting(setting_key, ScopedSettingValues { user, guild });
-
-    Ok(ResolvedSettingLayers {
-        user,
-        guild,
-        effective,
-    })
+#[instrument(name = "db.settings.setting_value_for_key", skip(values))]
+fn setting_value_for_key(
+    values: &[(SettingKey, SettingValue)],
+    setting_key: SettingKey,
+) -> Option<SettingValue> {
+    values
+        .iter()
+        .find_map(|(key, value)| (*key == setting_key).then_some(*value))
 }
 
 #[instrument(name = "db.settings.parse_optional_setting", skip(row), fields(setting_key = %setting_key.as_str()))]
