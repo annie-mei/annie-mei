@@ -21,7 +21,7 @@ use serenity::{
     builder::CreateCommand,
     client::Context,
 };
-use tracing::{error, instrument};
+use tracing::{error, instrument, warn};
 
 const SETTINGS_COMPONENT_PREFIX: &str = "settings";
 const SETTINGS_COMPONENT_ID_PREFIX: &str = "settings:";
@@ -235,11 +235,15 @@ pub async fn handle_component(ctx: &Context, interaction: &mut ComponentInteract
         return;
     };
 
-    if interaction
+    if let Err(error) = interaction
         .create_response(&ctx.http, CreateInteractionResponse::Acknowledge)
         .await
-        .is_err()
     {
+        warn!(
+            error = %error,
+            custom_id = %interaction.data.custom_id,
+            "Failed to acknowledge settings component interaction"
+        );
         return;
     }
 
