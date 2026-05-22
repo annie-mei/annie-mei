@@ -168,7 +168,6 @@ pub enum SettingValue {
 }
 
 impl SettingValue {
-    #[allow(dead_code)]
     pub fn key(self) -> SettingKey {
         match self {
             Self::TitleDisplay(_) => SettingKey::TitleDisplay,
