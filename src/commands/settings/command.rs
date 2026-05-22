@@ -1,6 +1,9 @@
 use crate::{
     models::{
-        db::settings::{ResolvedSettingLayers, SettingsStorageError, resolve_all_setting_layers},
+        db::settings::{
+            ResolvedSettingLayers, SettingsStorageError, resolve_all_setting_layers,
+            set_guild_setting, set_user_setting,
+        },
         settings::{ALL_SETTING_KEYS, SettingKey, SettingValue},
     },
     utils::{
@@ -12,9 +15,10 @@ use crate::{
 
 use serenity::{
     all::{
-        ButtonStyle, CommandInteraction, ComponentInteraction, CreateActionRow, CreateButton,
-        CreateInteractionResponse, CreateInteractionResponseMessage, EditInteractionResponse,
-        GuildId, UserId,
+        ButtonStyle, CommandInteraction, ComponentInteraction, ComponentInteractionDataKind,
+        CreateActionRow, CreateButton, CreateInteractionResponse, CreateInteractionResponseMessage,
+        CreateSelectMenu, CreateSelectMenuKind, CreateSelectMenuOption, EditInteractionResponse,
+        GuildId, Permissions, UserId,
     },
     builder::CreateCommand,
     client::Context,
@@ -25,6 +29,7 @@ const SETTINGS_COMPONENT_PREFIX: &str = "settings";
 const SETTINGS_COMPONENT_ID_PREFIX: &str = "settings:";
 const OVERVIEW_COMPONENT: &str = "overview";
 const CATEGORY_COMPONENT: &str = "category";
+const SET_COMPONENT: &str = "set";
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum SettingsPanelCategory {
@@ -41,6 +46,7 @@ pub struct SettingSummary {
 pub struct SettingsPanel {
     pub category: SettingsPanelCategory,
     pub guild_available: bool,
+    pub can_manage_guild: bool,
     pub summaries: Vec<SettingSummary>,
 }
 
@@ -48,6 +54,7 @@ pub struct SettingsPanel {
 pub enum SettingsComponentId {
     Overview,
     Category(SettingKey),
+    Set(SettingScope, SettingKey),
 }
 
 impl SettingsComponentId {
@@ -55,8 +62,52 @@ impl SettingsComponentId {
         match self {
             Self::Overview => SettingsPanelCategory::Overview,
             Self::Category(key) => SettingsPanelCategory::Setting(*key),
+            Self::Set(_, key) => SettingsPanelCategory::Setting(*key),
         }
     }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SettingScope {
+    User,
+    Guild,
+}
+
+impl SettingScope {
+    fn parse(raw: &str) -> Option<Self> {
+        match raw {
+            "user" => Some(Self::User),
+            "guild" => Some(Self::Guild),
+            _ => None,
+        }
+    }
+
+    fn as_str(self) -> &'static str {
+        match self {
+            Self::User => "user",
+            Self::Guild => "guild",
+        }
+    }
+
+    fn label(self) -> &'static str {
+        match self {
+            Self::User => "user setting",
+            Self::Guild => "server setting",
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SettingsWritePlan {
+    User(SettingValue),
+    Guild(SettingValue),
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum SettingsWriteError {
+    MissingGuild,
+    MissingManageGuild,
+    InvalidValue(String),
 }
 
 pub fn register() -> CreateCommand {
@@ -81,6 +132,15 @@ pub fn settings_category_custom_id(key: SettingKey) -> String {
     )
 }
 
+#[instrument(name = "command.settings.set_custom_id", fields(scope = %scope.as_str(), setting_key = %key.as_str()))]
+pub fn settings_set_custom_id(scope: SettingScope, key: SettingKey) -> String {
+    format!(
+        "{SETTINGS_COMPONENT_PREFIX}:{SET_COMPONENT}:{}:{}",
+        scope.as_str(),
+        key.as_str()
+    )
+}
+
 #[instrument(name = "command.settings.parse_component_id")]
 pub fn parse_settings_component_id(custom_id: &str) -> Option<SettingsComponentId> {
     let parts = custom_id.split(':').collect::<Vec<_>>();
@@ -90,7 +150,48 @@ pub fn parse_settings_component_id(custom_id: &str) -> Option<SettingsComponentI
         [SETTINGS_COMPONENT_PREFIX, CATEGORY_COMPONENT, raw_key] => {
             SettingKey::parse(raw_key).map(SettingsComponentId::Category)
         }
+        [SETTINGS_COMPONENT_PREFIX, SET_COMPONENT, raw_scope, raw_key] => {
+            let scope = SettingScope::parse(raw_scope)?;
+            let key = SettingKey::parse(raw_key)?;
+            Some(SettingsComponentId::Set(scope, key))
+        }
         _ => None,
+    }
+}
+
+#[instrument(name = "command.settings.plan_write")]
+pub fn plan_settings_write(
+    scope: SettingScope,
+    key: SettingKey,
+    raw_value: &str,
+    guild_available: bool,
+    can_manage_guild: bool,
+) -> Result<SettingsWritePlan, SettingsWriteError> {
+    let value = key
+        .parse_value(raw_value)
+        .map_err(|error| SettingsWriteError::InvalidValue(error.to_string()))?;
+
+    let Some(allowed_values) = allowed_values_for_scope(scope, key) else {
+        return Err(SettingsWriteError::InvalidValue(format!(
+            "{} does not support a {}.",
+            key.label(),
+            scope.label()
+        )));
+    };
+
+    if !allowed_values.contains(&value.as_storage_value()) {
+        return Err(SettingsWriteError::InvalidValue(format!(
+            "{} cannot be saved as a {}.",
+            format_setting_value(value),
+            scope.label()
+        )));
+    }
+
+    match scope {
+        SettingScope::User => Ok(SettingsWritePlan::User(value)),
+        SettingScope::Guild if !guild_available => Err(SettingsWriteError::MissingGuild),
+        SettingScope::Guild if !can_manage_guild => Err(SettingsWriteError::MissingManageGuild),
+        SettingScope::Guild => Ok(SettingsWritePlan::Guild(value)),
     }
 }
 
@@ -98,11 +199,13 @@ pub fn parse_settings_component_id(custom_id: &str) -> Option<SettingsComponentI
 pub fn plan_settings_panel(
     category: SettingsPanelCategory,
     guild_available: bool,
+    can_manage_guild: bool,
     summaries: Vec<SettingSummary>,
 ) -> SettingsPanel {
     SettingsPanel {
         category,
         guild_available,
+        can_manage_guild,
         summaries,
     }
 }
@@ -112,6 +215,17 @@ pub fn render_settings_panel(panel: &SettingsPanel) -> String {
     match panel.category {
         SettingsPanelCategory::Overview => render_overview_panel(panel),
         SettingsPanelCategory::Setting(key) => render_category_panel(panel, key),
+    }
+}
+
+#[instrument(
+    name = "command.settings.render_panel_with_notice",
+    skip(panel, notice)
+)]
+fn render_settings_panel_with_notice(panel: &SettingsPanel, notice: Option<&str>) -> String {
+    match notice {
+        Some(notice) => format!("{}\n\n{}", bold(notice), render_settings_panel(panel)),
+        None => render_settings_panel(panel),
     }
 }
 
@@ -137,6 +251,7 @@ pub async fn run(ctx: &Context, interaction: &mut CommandInteraction) {
         &database_pool,
         user.id,
         interaction.guild_id,
+        can_manage_guild_settings_for_command(interaction),
         SettingsPanelCategory::Overview,
     )
     .await
@@ -160,7 +275,7 @@ pub async fn run(ctx: &Context, interaction: &mut CommandInteraction) {
         interaction,
         ctx,
         render_settings_panel(&response),
-        settings_panel_components(response.category),
+        settings_panel_components(&response),
     )
     .await;
 }
@@ -203,10 +318,100 @@ pub async fn handle_component(ctx: &Context, interaction: &mut ComponentInteract
     };
 
     let category = component_id.panel_category();
+    let notice = match component_id {
+        SettingsComponentId::Overview | SettingsComponentId::Category(_) => None,
+        SettingsComponentId::Set(scope, key) => {
+            let Some(raw_value) = selected_string_value(interaction) else {
+                respond_to_component(
+                    interaction,
+                    ctx,
+                    "I couldn't read that settings value. Please try again.".to_string(),
+                    Vec::new(),
+                )
+                .await;
+                return;
+            };
+
+            match plan_settings_write(
+                scope,
+                key,
+                raw_value,
+                interaction.guild_id.is_some(),
+                can_manage_guild_settings(interaction),
+            ) {
+                Ok(SettingsWritePlan::User(value)) => {
+                    if let Err(error) =
+                        set_user_setting(&database_pool, interaction.user.id, value).await
+                    {
+                        log_settings_storage_error(
+                            "set_user",
+                            interaction.user.id,
+                            interaction.guild_id,
+                            &error,
+                        );
+                        respond_to_component(
+                            interaction,
+                            ctx,
+                            "I hit an internal error while saving your setting. Please try again later."
+                                .to_string(),
+                            Vec::new(),
+                        )
+                        .await;
+                        return;
+                    }
+
+                    Some(format!(
+                        "Saved {} as your {}.",
+                        format_setting_value(value),
+                        key.label()
+                    ))
+                }
+                Ok(SettingsWritePlan::Guild(value)) => {
+                    let Some(guild_id) = interaction.guild_id else {
+                        respond_to_component(
+                            interaction,
+                            ctx,
+                            settings_write_error_message(SettingsWriteError::MissingGuild),
+                            Vec::new(),
+                        )
+                        .await;
+                        return;
+                    };
+
+                    if let Err(error) = set_guild_setting(&database_pool, guild_id, value).await {
+                        log_settings_storage_error(
+                            "set_guild",
+                            interaction.user.id,
+                            interaction.guild_id,
+                            &error,
+                        );
+                        respond_to_component(
+                            interaction,
+                            ctx,
+                            "I hit an internal error while saving the server setting. Please try again later."
+                                .to_string(),
+                            Vec::new(),
+                        )
+                        .await;
+                        return;
+                    }
+
+                    Some(format!(
+                        "Saved {} as this server's {}.",
+                        format_setting_value(value),
+                        key.label()
+                    ))
+                }
+                Err(error) => Some(settings_write_error_message(error)),
+            }
+        }
+    };
+
     let response = match load_settings_panel(
         &database_pool,
         interaction.user.id,
         interaction.guild_id,
+        can_manage_guild_settings(interaction),
         category,
     )
     .await
@@ -234,8 +439,8 @@ pub async fn handle_component(ctx: &Context, interaction: &mut ComponentInteract
     respond_to_component(
         interaction,
         ctx,
-        render_settings_panel(&response),
-        settings_panel_components(response.category),
+        render_settings_panel_with_notice(&response, notice.as_deref()),
+        settings_panel_components(&response),
     )
     .await;
 }
@@ -245,6 +450,7 @@ async fn load_settings_panel(
     pool: &DbPool,
     user_id: UserId,
     guild_id: Option<GuildId>,
+    can_manage_guild: bool,
     category: SettingsPanelCategory,
 ) -> Result<SettingsPanel, SettingsStorageError> {
     let summaries = resolve_all_setting_layers(pool, user_id, guild_id, &ALL_SETTING_KEYS)
@@ -253,14 +459,19 @@ async fn load_settings_panel(
         .map(|layers| SettingSummary { layers })
         .collect();
 
-    Ok(plan_settings_panel(category, guild_id.is_some(), summaries))
+    Ok(plan_settings_panel(
+        category,
+        guild_id.is_some(),
+        can_manage_guild,
+        summaries,
+    ))
 }
 
 #[instrument(name = "command.settings.render_overview", skip(panel))]
 fn render_overview_panel(panel: &SettingsPanel) -> String {
     let mut sections = vec![
         format!("{}", bold("Settings")),
-        "Read-only summary of your current Annie Mei preferences. Use the buttons below to inspect each category; changing values will be added in a later update.".to_string(),
+        "Summary of your current Annie Mei preferences. Use the buttons below to inspect and edit each category.".to_string(),
     ];
 
     sections.extend(
@@ -286,7 +497,7 @@ fn render_category_panel(panel: &SettingsPanel, key: SettingKey) -> String {
     format!(
         "{}\n{}\n\n{}",
         bold("Settings"),
-        "Read-only category details. Use Overview to return to the full settings summary.",
+        "Use the menus below to update this category. Use Overview to return to the full settings summary.",
         format_summary(summary, panel.guild_available, true),
     )
 }
@@ -361,9 +572,10 @@ fn format_allowed_values(key: SettingKey) -> String {
         .join(", ")
 }
 
-#[instrument(name = "command.settings.components")]
-fn settings_panel_components(active: SettingsPanelCategory) -> Vec<CreateActionRow> {
-    vec![CreateActionRow::Buttons(vec![
+#[instrument(name = "command.settings.components", skip(panel))]
+fn settings_panel_components(panel: &SettingsPanel) -> Vec<CreateActionRow> {
+    let active = panel.category;
+    let mut rows = vec![CreateActionRow::Buttons(vec![
         panel_button(
             SettingsPanelCategory::Overview,
             "Overview",
@@ -388,7 +600,123 @@ fn settings_panel_components(active: SettingsPanelCategory) -> Vec<CreateActionR
             settings_category_custom_id(SettingKey::GuildScores),
             active,
         ),
-    ])]
+    ])];
+
+    if let SettingsPanelCategory::Setting(key) = active
+        && let Some(summary) = panel
+            .summaries
+            .iter()
+            .find(|summary| summary.layers.effective.key == key)
+    {
+        rows.push(setting_select_row(
+            SettingScope::User,
+            key,
+            summary.layers.user,
+        ));
+
+        if guild_select_available(key, panel.guild_available, panel.can_manage_guild) {
+            rows.push(setting_select_row(
+                SettingScope::Guild,
+                key,
+                summary.layers.guild,
+            ));
+        }
+    }
+
+    rows
+}
+
+#[instrument(name = "command.settings.setting_select_row", skip(selected))]
+fn setting_select_row(
+    scope: SettingScope,
+    key: SettingKey,
+    selected: Option<SettingValue>,
+) -> CreateActionRow {
+    let options = allowed_values_for_scope(scope, key)
+        .unwrap_or(&[])
+        .iter()
+        .filter_map(|raw_value| setting_select_option(key, raw_value, selected))
+        .collect::<Vec<_>>();
+
+    CreateActionRow::SelectMenu(
+        CreateSelectMenu::new(
+            settings_set_custom_id(scope, key),
+            CreateSelectMenuKind::String { options },
+        )
+        .placeholder(format!("Set {} {}", scope.as_str(), key.label()))
+        .min_values(1)
+        .max_values(1),
+    )
+}
+
+#[instrument(name = "command.settings.setting_select_option", skip(selected))]
+fn setting_select_option(
+    key: SettingKey,
+    raw_value: &str,
+    selected: Option<SettingValue>,
+) -> Option<CreateSelectMenuOption> {
+    let value = key.parse_value(raw_value).ok()?;
+    Some(
+        CreateSelectMenuOption::new(value.display_label(), value.as_storage_value())
+            .default_selection(selected == Some(value)),
+    )
+}
+
+#[instrument(name = "command.settings.guild_select_available")]
+fn guild_select_available(key: SettingKey, guild_available: bool, can_manage_guild: bool) -> bool {
+    guild_available && can_manage_guild && key != SettingKey::AnalyticsPrivacy
+}
+
+#[instrument(name = "command.settings.allowed_values_for_scope")]
+fn allowed_values_for_scope(
+    scope: SettingScope,
+    key: SettingKey,
+) -> Option<&'static [&'static str]> {
+    match (scope, key) {
+        (SettingScope::User, SettingKey::GuildScores) => Some(&["enabled", "opted_out"]),
+        (SettingScope::Guild, SettingKey::GuildScores) => Some(&["enabled", "disabled"]),
+        (SettingScope::Guild, SettingKey::AnalyticsPrivacy) => None,
+        _ => Some(key.allowed_values()),
+    }
+}
+
+#[instrument(name = "command.settings.selected_string_value", skip(interaction))]
+fn selected_string_value(interaction: &ComponentInteraction) -> Option<&str> {
+    match &interaction.data.kind {
+        ComponentInteractionDataKind::StringSelect { values } => values.first().map(String::as_str),
+        _ => None,
+    }
+}
+
+#[instrument(name = "command.settings.can_manage_guild", skip(interaction))]
+fn can_manage_guild_settings(interaction: &ComponentInteraction) -> bool {
+    interaction
+        .member
+        .as_ref()
+        .and_then(|member| member.permissions)
+        .is_some_and(|permissions| permissions.contains(Permissions::MANAGE_GUILD))
+}
+
+#[instrument(name = "command.settings.can_manage_guild_command", skip(interaction))]
+fn can_manage_guild_settings_for_command(interaction: &CommandInteraction) -> bool {
+    interaction
+        .member
+        .as_ref()
+        .and_then(|member| member.permissions)
+        .is_some_and(|permissions| permissions.contains(Permissions::MANAGE_GUILD))
+}
+
+#[instrument(name = "command.settings.write_error_message")]
+fn settings_write_error_message(error: SettingsWriteError) -> String {
+    match error {
+        SettingsWriteError::MissingGuild => {
+            "Server settings can only be changed from inside a server.".to_string()
+        }
+        SettingsWriteError::MissingManageGuild => {
+            "You need the Manage Server permission to change server settings.".to_string()
+        }
+        SettingsWriteError::InvalidValue(message) => message,
+    }
 }
 
 #[instrument(name = "command.settings.panel_button")]
@@ -545,6 +873,16 @@ mod tests {
             None
         );
         assert_eq!(
+            parse_settings_component_id(&settings_set_custom_id(
+                SettingScope::Guild,
+                SettingKey::TitleDisplay
+            )),
+            Some(SettingsComponentId::Set(
+                SettingScope::Guild,
+                SettingKey::TitleDisplay
+            ))
+        );
+        assert_eq!(
             parse_settings_component_id("search:category:guild_scores"),
             None
         );
@@ -559,7 +897,12 @@ mod tests {
 
     #[test]
     fn overview_renders_current_effective_settings() {
-        let panel = plan_settings_panel(SettingsPanelCategory::Overview, true, test_summaries());
+        let panel = plan_settings_panel(
+            SettingsPanelCategory::Overview,
+            true,
+            true,
+            test_summaries(),
+        );
         let content = render_settings_panel(&panel);
 
         assert!(content.contains("**Settings**"));
@@ -574,7 +917,12 @@ mod tests {
 
     #[test]
     fn overview_marks_guild_settings_unavailable_in_dms() {
-        let panel = plan_settings_panel(SettingsPanelCategory::Overview, false, test_summaries());
+        let panel = plan_settings_panel(
+            SettingsPanelCategory::Overview,
+            false,
+            false,
+            test_summaries(),
+        );
         let content = render_settings_panel(&panel);
 
         assert!(content.contains("Guild: not available in DMs"));
@@ -585,13 +933,200 @@ mod tests {
         let panel = plan_settings_panel(
             SettingsPanelCategory::Setting(SettingKey::GuildScores),
             true,
+            true,
             test_summaries(),
         );
         let content = render_settings_panel(&panel);
 
-        assert!(content.contains("Read-only category details"));
+        assert!(content.contains("Use the menus below to update this category"));
         assert!(content.contains("**Guild scores**"));
         assert!(content.contains("Allowed values: `enabled`, `disabled`, `opted_out`"));
         assert!(!content.contains("**Title display**"));
+    }
+
+    #[test]
+    fn category_components_include_edit_selects_for_title_user_and_guild_scopes() {
+        let panel = plan_settings_panel(
+            SettingsPanelCategory::Setting(SettingKey::TitleDisplay),
+            true,
+            true,
+            test_summaries(),
+        );
+
+        let value = serde_json::to_value(settings_panel_components(&panel))
+            .expect("components should serialize");
+
+        assert_eq!(value.as_array().expect("rows").len(), 3);
+        assert!(value.to_string().contains(&settings_set_custom_id(
+            SettingScope::User,
+            SettingKey::TitleDisplay
+        )));
+        assert!(value.to_string().contains(&settings_set_custom_id(
+            SettingScope::Guild,
+            SettingKey::TitleDisplay
+        )));
+        assert!(!value.to_string().contains("\"description\""));
+    }
+
+    #[test]
+    fn category_components_hide_guild_scope_without_manage_server() {
+        let panel = plan_settings_panel(
+            SettingsPanelCategory::Setting(SettingKey::TitleDisplay),
+            true,
+            false,
+            test_summaries(),
+        );
+
+        let value = serde_json::to_value(settings_panel_components(&panel))
+            .expect("components should serialize");
+
+        assert_eq!(value.as_array().expect("rows").len(), 2);
+        assert!(value.to_string().contains(&settings_set_custom_id(
+            SettingScope::User,
+            SettingKey::TitleDisplay
+        )));
+        assert!(!value.to_string().contains(&settings_set_custom_id(
+            SettingScope::Guild,
+            SettingKey::TitleDisplay
+        )));
+    }
+
+    #[test]
+    fn analytics_privacy_components_only_include_user_scope() {
+        let panel = plan_settings_panel(
+            SettingsPanelCategory::Setting(SettingKey::AnalyticsPrivacy),
+            true,
+            true,
+            test_summaries(),
+        );
+
+        let value = serde_json::to_value(settings_panel_components(&panel))
+            .expect("components should serialize");
+
+        assert_eq!(value.as_array().expect("rows").len(), 2);
+        assert!(value.to_string().contains(&settings_set_custom_id(
+            SettingScope::User,
+            SettingKey::AnalyticsPrivacy
+        )));
+        assert!(
+            !value
+                .to_string()
+                .contains("settings:set:guild:analytics_privacy")
+        );
+    }
+
+    #[test]
+    fn guild_scores_scope_values_prevent_invalid_combinations() {
+        assert_eq!(
+            allowed_values_for_scope(SettingScope::User, SettingKey::GuildScores),
+            Some(&["enabled", "opted_out"][..])
+        );
+        assert_eq!(
+            allowed_values_for_scope(SettingScope::Guild, SettingKey::GuildScores),
+            Some(&["enabled", "disabled"][..])
+        );
+        assert_eq!(
+            allowed_values_for_scope(SettingScope::Guild, SettingKey::AnalyticsPrivacy),
+            None
+        );
+    }
+
+    #[test]
+    fn plans_user_setting_writes_for_title_privacy_and_guild_score_participation() {
+        assert_eq!(
+            plan_settings_write(
+                SettingScope::User,
+                SettingKey::TitleDisplay,
+                "native",
+                false,
+                false,
+            ),
+            Ok(SettingsWritePlan::User(SettingValue::TitleDisplay(
+                TitleDisplayPreference::Native
+            )))
+        );
+        assert_eq!(
+            plan_settings_write(
+                SettingScope::User,
+                SettingKey::AnalyticsPrivacy,
+                "opted_out",
+                false,
+                false,
+            ),
+            Ok(SettingsWritePlan::User(SettingValue::AnalyticsPrivacy(
+                AnalyticsPrivacyPreference::OptedOut
+            )))
+        );
+        assert_eq!(
+            plan_settings_write(
+                SettingScope::User,
+                SettingKey::GuildScores,
+                "enabled",
+                true,
+                false,
+            ),
+            Ok(SettingsWritePlan::User(SettingValue::GuildScores(
+                GuildScoresPreference::Enabled
+            )))
+        );
+    }
+
+    #[test]
+    fn guild_setting_writes_require_server_and_manage_server_permission() {
+        assert_eq!(
+            plan_settings_write(
+                SettingScope::Guild,
+                SettingKey::TitleDisplay,
+                "english",
+                false,
+                true,
+            ),
+            Err(SettingsWriteError::MissingGuild)
+        );
+        assert_eq!(
+            plan_settings_write(
+                SettingScope::Guild,
+                SettingKey::TitleDisplay,
+                "english",
+                true,
+                false,
+            ),
+            Err(SettingsWriteError::MissingManageGuild)
+        );
+        assert_eq!(
+            plan_settings_write(
+                SettingScope::Guild,
+                SettingKey::GuildScores,
+                "disabled",
+                true,
+                true,
+            ),
+            Ok(SettingsWritePlan::Guild(SettingValue::GuildScores(
+                GuildScoresPreference::Disabled
+            )))
+        );
+    }
+
+    #[test]
+    fn rejects_invalid_scope_value_combinations_with_clear_messages() {
+        let user_disabled = plan_settings_write(
+            SettingScope::User,
+            SettingKey::GuildScores,
+            "disabled",
+            true,
+            false,
+        )
+        .expect_err("users should not set guild-score disabled");
+        let guild_opted_out = plan_settings_write(
+            SettingScope::Guild,
+            SettingKey::GuildScores,
+            "opted_out",
+            true,
+            true,
+        )
+        .expect_err("guilds should not set opted_out");
+
+        assert!(settings_write_error_message(user_disabled).contains("user setting"));
+        assert!(settings_write_error_message(guild_opted_out).contains("server setting"));
     }
 }

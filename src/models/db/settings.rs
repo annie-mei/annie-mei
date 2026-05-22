@@ -97,7 +97,6 @@ pub struct ResolvedSettingLayers {
         setting_key = %value.key().as_str()
     )
 )]
-#[allow(dead_code)]
 pub async fn set_user_setting(
     pool: &DbPool,
     user_discord_id: UserId,
@@ -123,7 +122,6 @@ pub async fn set_user_setting(
     skip(pool, guild_id, value),
     fields(guild_id = %hash_discord_id(guild_id.get()), setting_key = %value.key().as_str())
 )]
-#[allow(dead_code)]
 pub async fn set_guild_setting(
     pool: &DbPool,
     guild_id: GuildId,
