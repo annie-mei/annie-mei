@@ -46,6 +46,7 @@ pub struct SettingSummary {
 pub struct SettingsPanel {
     pub category: SettingsPanelCategory,
     pub guild_available: bool,
+    pub can_manage_guild: bool,
     pub summaries: Vec<SettingSummary>,
 }
 
@@ -190,11 +191,13 @@ pub fn plan_settings_write(
 pub fn plan_settings_panel(
     category: SettingsPanelCategory,
     guild_available: bool,
+    can_manage_guild: bool,
     summaries: Vec<SettingSummary>,
 ) -> SettingsPanel {
     SettingsPanel {
         category,
         guild_available,
+        can_manage_guild,
         summaries,
     }
 }
@@ -240,6 +243,7 @@ pub async fn run(ctx: &Context, interaction: &mut CommandInteraction) {
         &database_pool,
         user.id,
         interaction.guild_id,
+        can_manage_guild_settings_for_command(interaction),
         SettingsPanelCategory::Overview,
     )
     .await
@@ -399,6 +403,7 @@ pub async fn handle_component(ctx: &Context, interaction: &mut ComponentInteract
         &database_pool,
         interaction.user.id,
         interaction.guild_id,
+        can_manage_guild_settings(interaction),
         category,
     )
     .await
@@ -437,6 +442,7 @@ async fn load_settings_panel(
     pool: &DbPool,
     user_id: UserId,
     guild_id: Option<GuildId>,
+    can_manage_guild: bool,
     category: SettingsPanelCategory,
 ) -> Result<SettingsPanel, SettingsStorageError> {
     let summaries = resolve_all_setting_layers(pool, user_id, guild_id, &ALL_SETTING_KEYS)
@@ -445,7 +451,12 @@ async fn load_settings_panel(
         .map(|layers| SettingSummary { layers })
         .collect();
 
-    Ok(plan_settings_panel(category, guild_id.is_some(), summaries))
+    Ok(plan_settings_panel(
+        category,
+        guild_id.is_some(),
+        can_manage_guild,
+        summaries,
+    ))
 }
 
 #[instrument(name = "command.settings.render_overview", skip(panel))]
@@ -595,7 +606,7 @@ fn settings_panel_components(panel: &SettingsPanel) -> Vec<CreateActionRow> {
             summary.layers.user,
         ));
 
-        if guild_select_available(key, panel.guild_available) {
+        if guild_select_available(key, panel.guild_available, panel.can_manage_guild) {
             rows.push(setting_select_row(
                 SettingScope::Guild,
                 key,
@@ -638,14 +649,13 @@ fn setting_select_option(
     let value = key.parse_value(raw_value).ok()?;
     Some(
         CreateSelectMenuOption::new(value.display_label(), value.as_storage_value())
-            .description(raw_value)
             .default_selection(selected == Some(value)),
     )
 }
 
 #[instrument(name = "command.settings.guild_select_available")]
-fn guild_select_available(key: SettingKey, guild_available: bool) -> bool {
-    guild_available && key != SettingKey::AnalyticsPrivacy
+fn guild_select_available(key: SettingKey, guild_available: bool, can_manage_guild: bool) -> bool {
+    guild_available && can_manage_guild && key != SettingKey::AnalyticsPrivacy
 }
 
 #[instrument(name = "command.settings.allowed_values_for_scope")]
@@ -668,6 +678,15 @@ fn selected_string_value(interaction: &ComponentInteraction) -> Option<&str> {
 
 #[instrument(name = "command.settings.can_manage_guild", skip(interaction))]
 fn can_manage_guild_settings(interaction: &ComponentInteraction) -> bool {
+    interaction
+        .member
+        .as_ref()
+        .and_then(|member| member.permissions)
+        .is_some_and(|permissions| permissions.contains(Permissions::MANAGE_GUILD))
+}
+
+#[instrument(name = "command.settings.can_manage_guild_command", skip(interaction))]
+fn can_manage_guild_settings_for_command(interaction: &CommandInteraction) -> bool {
     interaction
         .member
         .as_ref()
@@ -866,7 +885,12 @@ mod tests {
 
     #[test]
     fn overview_renders_current_effective_settings() {
-        let panel = plan_settings_panel(SettingsPanelCategory::Overview, true, test_summaries());
+        let panel = plan_settings_panel(
+            SettingsPanelCategory::Overview,
+            true,
+            true,
+            test_summaries(),
+        );
         let content = render_settings_panel(&panel);
 
         assert!(content.contains("**Settings**"));
@@ -881,7 +905,12 @@ mod tests {
 
     #[test]
     fn overview_marks_guild_settings_unavailable_in_dms() {
-        let panel = plan_settings_panel(SettingsPanelCategory::Overview, false, test_summaries());
+        let panel = plan_settings_panel(
+            SettingsPanelCategory::Overview,
+            false,
+            false,
+            test_summaries(),
+        );
         let content = render_settings_panel(&panel);
 
         assert!(content.contains("Guild: not available in DMs"));
@@ -891,6 +920,7 @@ mod tests {
     fn category_panel_renders_selected_details() {
         let panel = plan_settings_panel(
             SettingsPanelCategory::Setting(SettingKey::GuildScores),
+            true,
             true,
             test_summaries(),
         );
@@ -907,6 +937,7 @@ mod tests {
         let panel = plan_settings_panel(
             SettingsPanelCategory::Setting(SettingKey::TitleDisplay),
             true,
+            true,
             test_summaries(),
         );
 
@@ -922,12 +953,37 @@ mod tests {
             SettingScope::Guild,
             SettingKey::TitleDisplay
         )));
+        assert!(!value.to_string().contains("\"description\""));
+    }
+
+    #[test]
+    fn category_components_hide_guild_scope_without_manage_server() {
+        let panel = plan_settings_panel(
+            SettingsPanelCategory::Setting(SettingKey::TitleDisplay),
+            true,
+            false,
+            test_summaries(),
+        );
+
+        let value = serde_json::to_value(settings_panel_components(&panel))
+            .expect("components should serialize");
+
+        assert_eq!(value.as_array().expect("rows").len(), 2);
+        assert!(value.to_string().contains(&settings_set_custom_id(
+            SettingScope::User,
+            SettingKey::TitleDisplay
+        )));
+        assert!(!value.to_string().contains(&settings_set_custom_id(
+            SettingScope::Guild,
+            SettingKey::TitleDisplay
+        )));
     }
 
     #[test]
     fn analytics_privacy_components_only_include_user_scope() {
         let panel = plan_settings_panel(
             SettingsPanelCategory::Setting(SettingKey::AnalyticsPrivacy),
+            true,
             true,
             test_summaries(),
         );
