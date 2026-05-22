@@ -583,25 +583,24 @@ fn settings_panel_components(panel: &SettingsPanel) -> Vec<CreateActionRow> {
         ),
     ])];
 
-    if let SettingsPanelCategory::Setting(key) = active {
-        if let Some(summary) = panel
+    if let SettingsPanelCategory::Setting(key) = active
+        && let Some(summary) = panel
             .summaries
             .iter()
             .find(|summary| summary.layers.effective.key == key)
-        {
-            rows.push(setting_select_row(
-                SettingScope::User,
-                key,
-                summary.layers.user,
-            ));
+    {
+        rows.push(setting_select_row(
+            SettingScope::User,
+            key,
+            summary.layers.user,
+        ));
 
-            if guild_select_available(key, panel.guild_available) {
-                rows.push(setting_select_row(
-                    SettingScope::Guild,
-                    key,
-                    summary.layers.guild,
-                ));
-            }
+        if guild_select_available(key, panel.guild_available) {
+            rows.push(setting_select_row(
+                SettingScope::Guild,
+                key,
+                summary.layers.guild,
+            ));
         }
     }
 
