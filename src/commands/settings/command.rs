@@ -171,7 +171,15 @@ pub fn plan_settings_write(
         .parse_value(raw_value)
         .map_err(|error| SettingsWriteError::InvalidValue(error.to_string()))?;
 
-    if !allowed_values_for_scope(scope, key).contains(&value.as_storage_value()) {
+    let Some(allowed_values) = allowed_values_for_scope(scope, key) else {
+        return Err(SettingsWriteError::InvalidValue(format!(
+            "{} does not support a {}.",
+            key.label(),
+            scope.label()
+        )));
+    };
+
+    if !allowed_values.contains(&value.as_storage_value()) {
         return Err(SettingsWriteError::InvalidValue(format!(
             "{} cannot be saved as a {}.",
             format_setting_value(value),
@@ -625,6 +633,7 @@ fn setting_select_row(
     selected: Option<SettingValue>,
 ) -> CreateActionRow {
     let options = allowed_values_for_scope(scope, key)
+        .unwrap_or(&[])
         .iter()
         .filter_map(|raw_value| setting_select_option(key, raw_value, selected))
         .collect::<Vec<_>>();
@@ -659,12 +668,15 @@ fn guild_select_available(key: SettingKey, guild_available: bool, can_manage_gui
 }
 
 #[instrument(name = "command.settings.allowed_values_for_scope")]
-fn allowed_values_for_scope(scope: SettingScope, key: SettingKey) -> &'static [&'static str] {
+fn allowed_values_for_scope(
+    scope: SettingScope,
+    key: SettingKey,
+) -> Option<&'static [&'static str]> {
     match (scope, key) {
-        (SettingScope::User, SettingKey::GuildScores) => &["enabled", "opted_out"],
-        (SettingScope::Guild, SettingKey::GuildScores) => &["enabled", "disabled"],
-        (SettingScope::Guild, SettingKey::AnalyticsPrivacy) => &[],
-        _ => key.allowed_values(),
+        (SettingScope::User, SettingKey::GuildScores) => Some(&["enabled", "opted_out"]),
+        (SettingScope::Guild, SettingKey::GuildScores) => Some(&["enabled", "disabled"]),
+        (SettingScope::Guild, SettingKey::AnalyticsPrivacy) => None,
+        _ => Some(key.allowed_values()),
     }
 }
 
@@ -1007,11 +1019,15 @@ mod tests {
     fn guild_scores_scope_values_prevent_invalid_combinations() {
         assert_eq!(
             allowed_values_for_scope(SettingScope::User, SettingKey::GuildScores),
-            &["enabled", "opted_out"]
+            Some(&["enabled", "opted_out"][..])
         );
         assert_eq!(
             allowed_values_for_scope(SettingScope::Guild, SettingKey::GuildScores),
-            &["enabled", "disabled"]
+            Some(&["enabled", "disabled"][..])
+        );
+        assert_eq!(
+            allowed_values_for_scope(SettingScope::Guild, SettingKey::AnalyticsPrivacy),
+            None
         );
     }
 
