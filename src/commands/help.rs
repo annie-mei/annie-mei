@@ -33,7 +33,7 @@ pub async fn run(ctx: &Context, interaction: &CommandInteraction) {
         )
         .field(
             "Commands",
-            "`/anime search:<term or id>` - anime details\n`/manga search:<term or id>` - manga details\n`/recommend type:<anime|manga> search:<term or id>` - AniList recommendations\n`/character search:<term or id> spoilers:<allow|disallow>` - character details\n`/songs search:<term or id>` - OP/ED songs + links\n`/register` - open the AniList OAuth link or relink flow\n`/unregister confirmation:<confirm|cancel>` - unlink your AniList account after confirmation\n`/whoami` - show your linked AniList username and profile link\n`/ping` - bot health check\n`/help` - show this guide",
+            "`/anime search:<term or id>` - anime details\n`/manga search:<term or id>` - manga details\n`/recommend type:<anime|manga> search:<term or id>` - AniList recommendations\n`/character search:<term or id> spoilers:<allow|disallow>` - character details\n`/songs search:<term or id>` - OP/ED songs + links\n`/settings` - open your interactive settings panel\n`/register` - open the AniList OAuth link or relink flow\n`/unregister confirmation:<confirm|cancel>` - unlink your AniList account after confirmation\n`/whoami` - show your linked AniList username and profile link\n`/ping` - bot health check\n`/help` - show this guide",
             false,
         )
         .field(

@@ -31,6 +31,7 @@ A Discord bot written in Rust that fetches anime and manga information from AniL
 | `/search <query>` | Search for anime or manga using natural language powered by Gemini |
 | `/character search:<term or id> spoilers:<allow\|disallow>` | Look up characters by name or AniList ID |
 | `/songs <search>` | Find theme songs for an anime |
+| `/settings` | Open an interactive panel showing your current user, guild, and default settings |
 
 ### Search Tips
 
@@ -38,6 +39,16 @@ A Discord bot written in Rust that fetches anime and manga information from AniL
 - Use natural language when you do not know the exact title: `/search anime about volleyball`
 - Japanese kana is supported: `/manga きめつのやいば`
 - Wrap numeric titles in quotes: `/songs "86"`
+
+### Settings
+
+Run `/settings` with no arguments to open Annie Mei's interactive settings panel. The panel summarizes your effective preferences, your user override, the server override when available, and the default for each setting.
+
+Current settings shown in the panel:
+
+- Title display: preferred AniList title variant (`matched`, `romaji`, `english`, or `native`)
+- Analytics privacy: whether raw user-provided content can be included in supported analytics (`standard` or `opted_out`)
+- Guild scores: whether server score displays are enabled and whether you participate (`enabled`, `disabled`, or `opted_out`)
 
 ## Infrastructure
 
