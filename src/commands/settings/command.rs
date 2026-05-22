@@ -1,9 +1,7 @@
 use crate::{
     models::{
         db::settings::{ResolvedSettingLayers, SettingsStorageError, resolve_all_setting_layers},
-        settings::{
-            ALL_SETTING_KEYS, GuildScoresPreference, SettingKey, SettingScope, SettingValue,
-        },
+        settings::{ALL_SETTING_KEYS, SettingKey, SettingValue},
     },
     utils::{
         database::{DbPool, get_pool_from_context},
@@ -16,7 +14,7 @@ use serenity::{
     all::{
         ButtonStyle, CommandInteraction, ComponentInteraction, CreateActionRow, CreateButton,
         CreateInteractionResponse, CreateInteractionResponseMessage, EditInteractionResponse,
-        GuildId, Permissions, UserId,
+        GuildId, UserId,
     },
     builder::CreateCommand,
     client::Context,
@@ -44,28 +42,6 @@ pub struct SettingsPanel {
     pub category: SettingsPanelCategory,
     pub guild_available: bool,
     pub summaries: Vec<SettingSummary>,
-}
-
-#[allow(dead_code)]
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct SettingsContext {
-    pub user_id: UserId,
-    pub guild_id: Option<GuildId>,
-    pub member_permissions: Option<Permissions>,
-}
-
-#[allow(dead_code)]
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum SettingsWriteTarget {
-    User(UserId),
-    Guild(GuildId),
-}
-
-#[allow(dead_code)]
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct SettingsWritePlan {
-    pub target: SettingsWriteTarget,
-    pub value: SettingValue,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -137,38 +113,6 @@ pub fn render_settings_panel(panel: &SettingsPanel) -> String {
         SettingsPanelCategory::Overview => render_overview_panel(panel),
         SettingsPanelCategory::Setting(key) => render_category_panel(panel, key),
     }
-}
-
-#[allow(dead_code)]
-#[instrument(name = "command.settings.plan_write", skip(context, value))]
-pub fn plan_settings_write(
-    scope: SettingScope,
-    value: SettingValue,
-    context: SettingsContext,
-) -> Result<SettingsWritePlan, String> {
-    validate_value_for_scope(scope, value)?;
-
-    let target = match scope {
-        SettingScope::Effective => {
-            return Err("`effective` is read-only because it is resolved from user, guild, and default settings. Choose `user` or `guild` when setting a value.".to_string());
-        }
-        SettingScope::User => SettingsWriteTarget::User(context.user_id),
-        SettingScope::Guild => {
-            let Some(guild_id) = context.guild_id else {
-                return Err("Guild settings can only be changed from inside a server.".to_string());
-            };
-
-            if !can_manage_guild_settings(context.member_permissions) {
-                return Err(
-                    "You need the Manage Server permission to change guild settings.".to_string(),
-                );
-            }
-
-            SettingsWriteTarget::Guild(guild_id)
-        }
-    };
-
-    Ok(SettingsWritePlan { target, value })
 }
 
 #[instrument(name = "command.settings.run", skip(ctx, interaction))]
@@ -397,40 +341,6 @@ fn format_guild_layer(
     }
 
     format_optional_layer(value)
-}
-
-#[allow(dead_code)]
-#[instrument(name = "command.settings.validate_value_for_scope", skip(value))]
-fn validate_value_for_scope(scope: SettingScope, value: SettingValue) -> Result<(), String> {
-    match (scope, value) {
-        (SettingScope::User, SettingValue::GuildScores(GuildScoresPreference::Disabled)) => Err(
-            "Use `opted_out` to exclude yourself from guild scores, or `enabled` to participate. `disabled` is only for guild settings."
-                .to_string(),
-        ),
-        (SettingScope::Guild, SettingValue::AnalyticsPrivacy(_)) => {
-            Err(analytics_privacy_user_scope_message().to_string())
-        }
-        (SettingScope::Guild, SettingValue::GuildScores(GuildScoresPreference::OptedOut)) => Err(
-            "Use `disabled` to turn guild scores off for the server, or `enabled` to allow participating users. `opted_out` is only for user settings."
-                .to_string(),
-        ),
-        _ => Ok(()),
-    }
-}
-
-#[allow(dead_code)]
-#[instrument(name = "command.settings.analytics_privacy_user_scope_message")]
-fn analytics_privacy_user_scope_message() -> &'static str {
-    "Analytics privacy is a user-level setting. Choose the `user` scope to view or update your own analytics preference."
-}
-
-#[allow(dead_code)]
-#[instrument(name = "command.settings.can_manage_guild_settings")]
-fn can_manage_guild_settings(permissions: Option<Permissions>) -> bool {
-    permissions.is_some_and(|permissions| {
-        permissions.contains(Permissions::MANAGE_GUILD)
-            || permissions.contains(Permissions::ADMINISTRATOR)
-    })
 }
 
 #[instrument(name = "command.settings.format_value", skip(value))]
@@ -683,67 +593,5 @@ mod tests {
         assert!(content.contains("**Guild scores**"));
         assert!(content.contains("Allowed values: `enabled`, `disabled`, `opted_out`"));
         assert!(!content.contains("**Title display**"));
-    }
-
-    #[test]
-    fn write_planning_preserves_user_target_for_future_edit_flow() {
-        let context = SettingsContext {
-            user_id: UserId::new(42),
-            guild_id: Some(GuildId::new(7)),
-            member_permissions: None,
-        };
-        let value = SettingValue::AnalyticsPrivacy(AnalyticsPrivacyPreference::OptedOut);
-
-        let plan = plan_settings_write(SettingScope::User, value, context)
-            .expect("user write should be planned");
-
-        assert_eq!(plan.target, SettingsWriteTarget::User(UserId::new(42)));
-        assert_eq!(plan.value, value);
-    }
-
-    #[test]
-    fn write_planning_preserves_guild_permission_check_for_future_edit_flow() {
-        let context = SettingsContext {
-            user_id: UserId::new(42),
-            guild_id: Some(GuildId::new(7)),
-            member_permissions: Some(Permissions::VIEW_CHANNEL),
-        };
-        let value = SettingValue::TitleDisplay(TitleDisplayPreference::English);
-
-        let error = plan_settings_write(SettingScope::Guild, value, context)
-            .expect_err("guild writes require Manage Server");
-
-        assert!(error.contains("Manage Server"));
-    }
-
-    #[test]
-    fn write_planning_preserves_guild_target_for_future_edit_flow() {
-        let context = SettingsContext {
-            user_id: UserId::new(42),
-            guild_id: Some(GuildId::new(7)),
-            member_permissions: Some(Permissions::MANAGE_GUILD),
-        };
-        let value = SettingValue::TitleDisplay(TitleDisplayPreference::English);
-
-        let plan = plan_settings_write(SettingScope::Guild, value, context)
-            .expect("guild write should be planned");
-
-        assert_eq!(plan.target, SettingsWriteTarget::Guild(GuildId::new(7)));
-        assert_eq!(plan.value, value);
-    }
-
-    #[test]
-    fn write_planning_preserves_scope_value_validation_for_future_edit_flow() {
-        let context = SettingsContext {
-            user_id: UserId::new(42),
-            guild_id: Some(GuildId::new(7)),
-            member_permissions: Some(Permissions::MANAGE_GUILD),
-        };
-        let value = SettingValue::GuildScores(GuildScoresPreference::OptedOut);
-
-        let error = plan_settings_write(SettingScope::Guild, value, context)
-            .expect_err("guild scope cannot use user opt-out value");
-
-        assert!(error.contains("only for user settings"));
     }
 }

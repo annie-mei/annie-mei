@@ -4,49 +4,6 @@ use std::fmt;
 
 use tracing::instrument;
 
-#[allow(dead_code)]
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum SettingScope {
-    Effective,
-    User,
-    Guild,
-}
-
-#[allow(dead_code)]
-pub const ALL_SETTING_SCOPES: [SettingScope; 3] = [
-    SettingScope::Effective,
-    SettingScope::User,
-    SettingScope::Guild,
-];
-
-#[allow(dead_code)]
-impl SettingScope {
-    pub fn parse(raw: &str) -> Option<Self> {
-        match normalize_token(raw).as_str() {
-            "effective" => Some(Self::Effective),
-            "user" => Some(Self::User),
-            "guild" | "server" => Some(Self::Guild),
-            _ => None,
-        }
-    }
-
-    pub fn as_str(self) -> &'static str {
-        match self {
-            Self::Effective => "effective",
-            Self::User => "user",
-            Self::Guild => "guild",
-        }
-    }
-
-    pub fn label(self) -> &'static str {
-        match self {
-            Self::Effective => "Effective",
-            Self::User => "User",
-            Self::Guild => "Guild",
-        }
-    }
-}
-
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum SettingSource {
     User,
