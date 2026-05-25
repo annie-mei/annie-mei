@@ -50,7 +50,7 @@ pub async fn run(ctx: &Context, interaction: &mut CommandInteraction) {
         && let Err(err) = validate_search_term(search_term)
     {
         let builder = EditInteractionResponse::new().content(format!(
-            "Invalid search input: {err}. Please check your input and try again."
+            "I couldn't use that search: {err}. Try an anime title or AniList ID."
         ));
         let _ = interaction.edit_response(&ctx.http, builder).await;
         return;
@@ -65,18 +65,21 @@ pub async fn run(ctx: &Context, interaction: &mut CommandInteraction) {
             let endings = mal_response.parse_endings();
 
             // Narrow spawn_blocking: only the sync Spotify + Redis I/O
-            let (openings, endings) =
-                match task::spawn_blocking(move || enrich_song_sections(openings, endings)).await {
-                    Ok(result) => result,
-                    Err(err) => {
-                        error!(error = %err, "spawn_blocking panicked during Spotify enrichment");
-                        let builder = EditInteractionResponse::new().content(
-                        "An internal error occurred while fetching songs. Please try again later.",
+            let (openings, endings) = match task::spawn_blocking(move || {
+                enrich_song_sections(openings, endings)
+            })
+            .await
+            {
+                Ok(result) => result,
+                Err(err) => {
+                    error!(error = %err, "spawn_blocking panicked during Spotify enrichment");
+                    let builder = EditInteractionResponse::new().content(
+                        "I found the anime, but something went wrong while checking theme song links. Please try again later.",
                     );
-                        let _ = interaction.edit_response(&ctx.http, builder).await;
-                        return;
-                    }
-                };
+                    let _ = interaction.edit_response(&ctx.http, builder).await;
+                    return;
+                }
+            };
 
             // Pure formatting — no I/O, no spawn_blocking needed
             let builder = EditInteractionResponse::new().embed(
@@ -109,7 +112,7 @@ pub async fn run(ctx: &Context, interaction: &mut CommandInteraction) {
         }
         SongFetchResult::FetchError => {
             let builder = EditInteractionResponse::new()
-                .content("An error occurred while fetching song data. Please try again later.");
+                .content("I couldn't fetch theme song data right now. Please try again later.");
             interaction.edit_response(&ctx.http, builder).await
         }
     };

@@ -47,12 +47,12 @@ const RECOMMENDATION_LIMIT: usize = 5;
 
 pub fn register() -> CreateCommand {
     CreateCommand::new("recommend")
-        .description("Fetch AniList recommendations for an anime or manga")
+        .description("Find community recommendations for an anime or manga")
         .add_option(
             CreateCommandOption::new(
                 CommandOptionType::String,
                 TYPE_OPTION,
-                "Whether to find anime or manga recommendations",
+                "Choose whether the source title is anime or manga",
             )
             .add_string_choice("Anime", ANIME_TYPE)
             .add_string_choice("Manga", MANGA_TYPE)
@@ -122,7 +122,7 @@ pub fn handle_recommend(
 
     if recommendations.is_empty() {
         return CommandResponse::Content(format!(
-            "No recommendations found for {}.",
+            "I couldn't find community recommendations for {} yet.",
             media.transform_preferred_title(title_variant, title_preference)
         ));
     }
@@ -141,7 +141,7 @@ pub async fn run(ctx: &Context, interaction: &mut CommandInteraction) {
 
     let Some((media_type, search_term)) = parse_recommend_options(&interaction.data.options) else {
         let builder = EditInteractionResponse::new().content(
-            "Missing or invalid options — choose a type and provide an anime or manga name or ID.",
+            "Choose anime or manga, then tell me what to recommend from with `search:<name or AniList ID>`.",
         );
         let _ = interaction.edit_response(&ctx.http, builder).await;
         return;
@@ -149,7 +149,7 @@ pub async fn run(ctx: &Context, interaction: &mut CommandInteraction) {
 
     if let Err(err) = validate_search_term(&search_term) {
         let builder = EditInteractionResponse::new().content(format!(
-            "Invalid search input: {err}. Please check your input and try again."
+            "I couldn't use that search: {err}. Try a title or AniList ID."
         ));
         let _ = interaction.edit_response(&ctx.http, builder).await;
         return;
@@ -563,7 +563,7 @@ mod tests {
         assert!(
             response
                 .unwrap_content()
-                .contains("No recommendations found")
+                .contains("I couldn't find community recommendations")
         );
     }
 
@@ -580,7 +580,7 @@ mod tests {
         assert!(response.is_content());
         assert_eq!(
             response.unwrap_content(),
-            "No recommendations found for Yotsuba&!."
+            "I couldn't find community recommendations for Yotsuba&! yet."
         );
     }
 

@@ -31,7 +31,7 @@ const DISALLOW_SPOILERS: &str = "disallow";
 
 pub fn register() -> CreateCommand {
     CreateCommand::new("character")
-        .description("Fetches the details for an AniList character")
+        .description("Look up AniList character details")
         .add_option(
             CreateCommandOption::new(
                 CommandOptionType::String,
@@ -97,14 +97,14 @@ pub async fn run(ctx: &Context, interaction: &mut CommandInteraction) {
     let Some((search_term, allow_spoilers)) = parse_character_options(&interaction.data.options)
     else {
         let builder = EditInteractionResponse::new()
-            .content("Missing or invalid `search` option — please provide a character name or ID.");
+            .content("Tell me which character to look up with `search:<name or AniList ID>`.");
         let _ = interaction.edit_response(&ctx.http, builder).await;
         return;
     };
 
     if let Err(err) = validate_search_term(&search_term) {
         let builder = EditInteractionResponse::new().content(format!(
-            "Invalid search input: {err}. Please check your input and try again."
+            "I couldn't use that search: {err}. Try a character name or AniList ID."
         ));
         let _ = interaction.edit_response(&ctx.http, builder).await;
         return;

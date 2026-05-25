@@ -181,7 +181,7 @@ fn format_interpretation_is_conversational() {
 
     assert_eq!(
         format_interpretation(&intent),
-        "I think you're thinking of the manga `Berserk`."
+        "I searched AniList for the manga `Berserk`."
     );
 }
 
@@ -195,7 +195,7 @@ fn format_interpretation_handles_unknown_media_type() {
 
     assert_eq!(
         format_interpretation(&intent),
-        "I think you're thinking of `Monster`."
+        "I searched AniList for `Monster`."
     );
 }
 
