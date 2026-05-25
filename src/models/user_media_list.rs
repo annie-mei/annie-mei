@@ -61,7 +61,9 @@ impl MediaListData {
             ));
         }
 
-        if let Some(score) = &self.score {
+        if let Some(score) = self.score
+            && score > 0
+        {
             parts.push(format!("rated {score}/100"));
         }
 
@@ -174,5 +176,17 @@ mod tests {
         };
 
         assert_eq!(data.format_for_embed(false), "plans to read it");
+    }
+
+    #[test]
+    fn zero_score_is_omitted_as_unscored() {
+        let data = MediaListData {
+            status: Some(MediaListStatus::Current),
+            score: Some(0),
+            progress: Some(3),
+            progress_volumes: None,
+        };
+
+        assert_eq!(data.format_for_embed(true), "is watching, 3 eps in");
     }
 }
