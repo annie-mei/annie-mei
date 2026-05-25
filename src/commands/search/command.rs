@@ -429,7 +429,7 @@ fn format_interpretation(intent: &SearchIntent) -> String {
 
 #[instrument(name = "command.search.interpretation_variant", skip(intent))]
 fn interpretation_variant(intent: &SearchIntent) -> usize {
-    let mut hasher = DefaultHasher::new();
+    let mut hasher = DefaultHasher::default();
     intent.search.hash(&mut hasher);
     match intent.media_type {
         SearchMediaType::Anime => 0_u8,
