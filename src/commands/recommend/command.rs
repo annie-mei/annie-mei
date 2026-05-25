@@ -405,15 +405,9 @@ fn format_recommendation(
 #[instrument]
 fn format_recommendation_rating(rating: i32) -> String {
     match rating {
-        rating if rating > 0 => {
-            let noun = if rating == 1 { "user" } else { "users" };
-            format!("Community pick: {rating} AniList {noun} recommended this")
-        }
+        rating if rating > 0 => format!("Community score: +{rating}"),
         0 => "Community pick: AniList users are split on this recommendation".to_string(),
-        rating => format!(
-            "Community note: AniList users downvoted this recommendation by {}",
-            rating.abs()
-        ),
+        rating => format!("Community score: {rating}"),
     }
 }
 
@@ -615,7 +609,7 @@ mod tests {
             value["fields"][0]["value"]
                 .as_str()
                 .unwrap()
-                .contains("Community pick: 42 AniList users recommended this")
+                .contains("Community score: +42")
         );
     }
 
@@ -670,10 +664,7 @@ mod tests {
             format_recommendation_rating(0),
             "Community pick: AniList users are split on this recommendation"
         );
-        assert_eq!(
-            format_recommendation_rating(-3),
-            "Community note: AniList users downvoted this recommendation by 3"
-        );
+        assert_eq!(format_recommendation_rating(-3), "Community score: -3");
     }
 
     #[test]
