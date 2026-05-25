@@ -62,12 +62,12 @@ impl SettingKey {
 
     pub fn description(self) -> &'static str {
         match self {
-            Self::TitleDisplay => "Which AniList title variant Annie Mei should prefer.",
+            Self::TitleDisplay => "Pick which title language Annie Mei should show first.",
             Self::AnalyticsPrivacy => {
-                "Whether user-level analytics may include raw user-provided content. The default is `standard`; `opted_out` disables raw query, prompt, and output capture in supported analytics/observability while keeping pseudonymous operational telemetry."
+                "Choose whether analytics may include your raw searches and AI search prompts. `opted_out` keeps operational telemetry pseudonymous and skips raw content capture."
             }
             Self::GuildScores => {
-                "Whether guild score displays are enabled for a server and whether a user participates. Guild disabled wins over user participation; users who opt out are excluded."
+                "Control whether Annie Mei shows server members' AniList status and scores. Server disable wins; users who opt out are always excluded."
             }
         }
     }
@@ -232,7 +232,7 @@ impl fmt::Display for SettingValidationError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(
             f,
-            "`{}` is not valid for {}. Allowed values: {}.",
+            "`{}` is not valid for {}. Choose one of: {}.",
             self.raw_value,
             self.setting_key.label(),
             self.setting_key.allowed_values_sentence()

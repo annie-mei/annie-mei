@@ -76,19 +76,18 @@ fn parse_unregister_confirmation(options: &[CommandDataOption]) -> Option<bool> 
 pub fn handle_unregister(outcome: UnregisterOutcome) -> CommandResponse {
     match outcome {
         UnregisterOutcome::Unlinked => CommandResponse::Content(
-            "Your AniList account has been unlinked from Annie Mei and your stored OAuth credentials have been deleted."
+            "Your AniList account is unlinked, and Annie Mei deleted the stored OAuth credentials."
                 .to_string(),
         ),
         UnregisterOutcome::NotLinked => CommandResponse::Content(
-            "You do not have a linked AniList account. Run `/register` if you want to link one."
+            "No AniList account is linked right now. Run `/register` if you want to connect one."
                 .to_string(),
         ),
         UnregisterOutcome::Cancelled => CommandResponse::Content(
             "Cancelled. Your AniList account link was not changed.".to_string(),
         ),
         UnregisterOutcome::Failed => CommandResponse::Content(
-            "I hit an internal error while unlinking your AniList account. Please try again later."
-                .to_string(),
+            "I couldn't unlink your AniList account right now. Please try again later.".to_string(),
         ),
     }
 }
@@ -156,8 +155,9 @@ pub async fn run(ctx: &Context, interaction: &mut CommandInteraction) {
     configure_sentry_scope("Unregister", user.id.get(), None);
 
     let Some(confirmed) = parse_unregister_confirmation(&interaction.data.options) else {
-        let builder = EditInteractionResponse::new()
-            .content("Missing or invalid `confirmation` option — choose `Confirm unlink` to unlink your AniList account.");
+        let builder = EditInteractionResponse::new().content(
+            "Choose `Confirm unlink` to unlink AniList, or `Cancel` to leave it connected.",
+        );
         let _ = interaction.edit_response(&ctx.http, builder).await;
         return;
     };
@@ -174,7 +174,7 @@ pub async fn run(ctx: &Context, interaction: &mut CommandInteraction) {
 
     let Some(database_pool) = get_pool_from_context(ctx).await else {
         let builder = EditInteractionResponse::new()
-            .content("Database is not initialized. Please try again later.");
+            .content("I can't reach my database right now. Please try again later.");
         let _ = interaction.edit_response(&ctx.http, builder).await;
         return;
     };
@@ -248,8 +248,8 @@ mod tests {
 
         assert!(response.is_content(), "expected Content variant");
         let content = response.unwrap_content();
-        assert!(content.contains("has been unlinked"));
-        assert!(content.contains("OAuth credentials have been deleted"));
+        assert!(content.contains("is unlinked"));
+        assert!(content.contains("deleted the stored OAuth credentials"));
     }
 
     #[test]
@@ -258,7 +258,7 @@ mod tests {
 
         assert!(response.is_content(), "expected Content variant");
         let content = response.unwrap_content();
-        assert!(content.contains("do not have a linked AniList account"));
+        assert!(content.contains("No AniList account is linked"));
         assert!(content.contains("/register"));
     }
 
@@ -307,7 +307,7 @@ mod tests {
 
         assert!(response.is_content(), "expected Content variant");
         let content = response.unwrap_content();
-        assert!(content.contains("internal error"));
+        assert!(content.contains("couldn't unlink"));
         assert!(content.contains("try again later"));
     }
 

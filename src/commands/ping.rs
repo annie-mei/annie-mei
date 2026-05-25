@@ -9,7 +9,7 @@ use serenity::{
 };
 
 pub fn register() -> CreateCommand {
-    CreateCommand::new("ping").description("A ping command")
+    CreateCommand::new("ping").description("Check whether Annie Mei is awake")
 }
 
 // ── Core logic (transport-agnostic) ─────────────────────────────────────
@@ -20,7 +20,7 @@ pub fn register() -> CreateCommand {
 /// `CommandInteraction`.
 pub fn handle_ping(user_mention: &str) -> CommandResponse {
     CommandResponse::Message(format!(
-        "Hello {user_mention}! I'm Annie Mei, a bot that helps you find anime and manga!",
+        "Hi {user_mention}! I'm Annie Mei, awake and ready to help with anime, manga, recommendations, and theme songs.",
     ))
 }
 
@@ -71,7 +71,7 @@ mod tests {
     fn ping_response_includes_bot_description() {
         let text = handle_ping("<@999>").unwrap_message();
         assert!(
-            text.contains("anime and manga"),
+            text.contains("anime, manga"),
             "response should describe what the bot does"
         );
     }

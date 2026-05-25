@@ -23,12 +23,12 @@ use tracing::{error, info, instrument};
 
 pub fn register() -> CreateCommand {
     CreateCommand::new("songs")
-        .description("Fetches the songs of an anime")
+        .description("Find anime opening and ending theme songs")
         .add_option(
             CreateCommandOption::new(
                 CommandOptionType::String,
                 "search",
-                "Anilist ID or Search term",
+                "AniList ID or anime search term",
             )
             .required(true),
         )
@@ -50,7 +50,7 @@ pub async fn run(ctx: &Context, interaction: &mut CommandInteraction) {
         && let Err(err) = validate_search_term(search_term)
     {
         let builder = EditInteractionResponse::new().content(format!(
-            "Invalid search input: {err}. Please check your input and try again."
+            "I couldn't use that search: {err}. Try an anime title or AniList ID."
         ));
         let _ = interaction.edit_response(&ctx.http, builder).await;
         return;
@@ -65,31 +65,38 @@ pub async fn run(ctx: &Context, interaction: &mut CommandInteraction) {
             let endings = mal_response.parse_endings();
 
             // Narrow spawn_blocking: only the sync Spotify + Redis I/O
-            let (openings, endings) =
-                match task::spawn_blocking(move || enrich_song_sections(openings, endings)).await {
-                    Ok(result) => result,
-                    Err(err) => {
-                        error!(error = %err, "spawn_blocking panicked during Spotify enrichment");
-                        let builder = EditInteractionResponse::new().content(
-                        "An internal error occurred while fetching songs. Please try again later.",
+            let (openings, endings) = match task::spawn_blocking(move || {
+                enrich_song_sections(openings, endings)
+            })
+            .await
+            {
+                Ok(result) => result,
+                Err(err) => {
+                    error!(error = %err, "spawn_blocking panicked during Spotify enrichment");
+                    let builder = EditInteractionResponse::new().content(
+                        "I found the anime, but something went wrong while checking theme song links. Please try again later.",
                     );
-                        let _ = interaction.edit_response(&ctx.http, builder).await;
-                        return;
-                    }
-                };
+                    let _ = interaction.edit_response(&ctx.http, builder).await;
+                    return;
+                }
+            };
 
             // Pure formatting — no I/O, no spawn_blocking needed
             let builder = EditInteractionResponse::new().embed(
                 CreateEmbed::new()
                     .title(mal_response.transform_title())
                     .field(
-                        "Openings",
+                        "Opening themes",
                         MalResponse::format_parsed_songs(&openings),
                         false,
                     )
-                    .field("Endings", MalResponse::format_parsed_songs(&endings), false)
+                    .field(
+                        "Ending themes",
+                        MalResponse::format_parsed_songs(&endings),
+                        false,
+                    )
                     .thumbnail(mal_response.transform_thumbnail())
-                    .field("\u{200b}", mal_response.transform_mal_link(), false),
+                    .field("Source", mal_response.transform_mal_link(), false),
             );
             interaction.edit_response(&ctx.http, builder).await
         }
@@ -98,13 +105,14 @@ pub async fn run(ctx: &Context, interaction: &mut CommandInteraction) {
             interaction.edit_response(&ctx.http, builder).await
         }
         SongFetchResult::AnimeNotFoundOnMal => {
-            let builder = EditInteractionResponse::new()
-                .content("Anime not found on MAL. Song data is only available for anime listed on MyAnimeList.");
+            let builder = EditInteractionResponse::new().content(
+                "I found that anime on AniList, but couldn't find a MyAnimeList page for its theme songs.",
+            );
             interaction.edit_response(&ctx.http, builder).await
         }
         SongFetchResult::FetchError => {
             let builder = EditInteractionResponse::new()
-                .content("An error occurred while fetching song data. Please try again later.");
+                .content("I couldn't fetch theme song data right now. Please try again later.");
             interaction.edit_response(&ctx.http, builder).await
         }
     };

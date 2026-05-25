@@ -31,12 +31,12 @@ use tracing::{info, instrument};
 
 pub fn register() -> CreateCommand {
     CreateCommand::new("manga")
-        .description("Fetches the details for a manga")
+        .description("Look up manga details from AniList")
         .add_option(
             CreateCommandOption::new(
                 CommandOptionType::String,
                 "search",
-                "Anilist ID or Search term",
+                "AniList ID or manga search term",
             )
             .required(true),
         )
@@ -84,7 +84,7 @@ pub async fn run(ctx: &Context, interaction: &mut CommandInteraction) {
         interaction.data.options.first().map(|opt| &opt.value)
     else {
         let builder = EditInteractionResponse::new()
-            .content("Missing or invalid `search` option — please provide a manga name or ID.");
+            .content("Tell me which manga to look up with `search:<name or AniList ID>`.");
         let _ = interaction.edit_response(&ctx.http, builder).await;
         return;
     };
@@ -92,7 +92,7 @@ pub async fn run(ctx: &Context, interaction: &mut CommandInteraction) {
 
     if let Err(err) = validate_search_term(&search_term) {
         let builder = EditInteractionResponse::new().content(format!(
-            "Invalid search input: {err}. Please check your input and try again."
+            "I couldn't use that search: {err}. Try a manga title or AniList ID."
         ));
         let _ = interaction.edit_response(&ctx.http, builder).await;
         return;

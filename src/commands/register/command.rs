@@ -15,8 +15,7 @@ use serenity::{
 use tracing::{error, info, instrument};
 
 pub fn register() -> CreateCommand {
-    CreateCommand::new("register")
-        .description("Link or relink your AniList account with a secure OAuth flow")
+    CreateCommand::new("register").description("Link or refresh your AniList account")
 }
 
 #[derive(Debug, PartialEq, Eq)]
@@ -40,7 +39,7 @@ fn handle_register(oauth_url: &str, ttl_seconds: i64) -> RegisterResponse {
 
     RegisterResponse {
         content: format!(
-            "Click the button below to link your AniList account. This secure link is only for you and {expires_in}. If the page says the link expired or failed, or if you ever need to reconnect AniList later, run `/register` again in Discord.",
+            "Click the button below to link AniList. This secure link is only for you and {expires_in}. If it expires or you need to reconnect later, run `/register` again.",
         ),
         oauth_url: Some(oauth_url.to_string()),
     }
@@ -50,7 +49,7 @@ fn handle_register(oauth_url: &str, ttl_seconds: i64) -> RegisterResponse {
 fn handle_already_linked(credential: &OAuthCredential) -> RegisterResponse {
     RegisterResponse {
         content: format!(
-            "You're already linked to AniList account **{}**.\nProfile: <{}>\nIf you want to link a different AniList account, run `/unregister confirmation:Confirm unlink` first, then run `/register` again.",
+            "You're linked to AniList as **{}**.\nProfile: <{}>\nTo switch accounts, run `/unregister confirmation:Confirm unlink`, then `/register` again.",
             credential.anilist_display_name(),
             credential.anilist_profile_url(),
         ),
@@ -61,7 +60,8 @@ fn handle_already_linked(credential: &OAuthCredential) -> RegisterResponse {
 #[instrument(name = "command.register.handle_lookup_error")]
 fn handle_lookup_error() -> RegisterResponse {
     RegisterResponse {
-        content: "I couldn't check your existing AniList link right now. Please try `/register` again in a moment.".to_string(),
+        content: "I couldn't check your AniList link right now. Try `/register` again in a moment."
+            .to_string(),
         oauth_url: None,
     }
 }
@@ -70,11 +70,11 @@ fn handle_lookup_error() -> RegisterResponse {
 fn handle_register_error(err: &OAuthContextError) -> RegisterResponse {
     let content = match err {
         OAuthContextError::MissingEnv(_) => {
-            "AniList account linking is not configured right now. Please try again later."
-                .to_string()
+            "AniList linking is not configured right now. Please try again later.".to_string()
         }
-        _ => "I couldn't start the AniList linking flow right now. Please try again in a moment."
-            .to_string(),
+        _ => {
+            "I couldn't start AniList linking right now. Please try again in a moment.".to_string()
+        }
     };
 
     RegisterResponse {
@@ -192,7 +192,7 @@ mod tests {
         assert!(response.content.contains("only for you"));
         assert!(response.content.contains("about 5 minutes"));
         assert!(response.content.contains("run `/register` again"));
-        assert!(response.content.contains("reconnect AniList later"));
+        assert!(response.content.contains("reconnect later"));
     }
 
     #[test]
@@ -209,7 +209,7 @@ mod tests {
         let response = handle_already_linked(&credential);
 
         assert_eq!(response.oauth_url, None);
-        assert!(response.content.contains("already linked"));
+        assert!(response.content.contains("You're linked"));
         assert!(response.content.contains("**AniUser**"));
         assert!(
             response
@@ -238,7 +238,7 @@ mod tests {
             response.oauth_url,
             Some("https://auth.example.com/oauth/anilist/start?ctx=abc".to_string())
         );
-        assert!(response.content.contains("link your AniList account"));
+        assert!(response.content.contains("link AniList"));
     }
 
     #[test]
@@ -247,7 +247,7 @@ mod tests {
 
         assert_eq!(response.oauth_url, None);
         assert!(response.content.contains("couldn't check"));
-        assert!(response.content.contains("try `/register` again"));
+        assert!(response.content.contains("Try `/register` again"));
     }
 
     #[test]

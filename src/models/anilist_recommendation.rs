@@ -80,9 +80,8 @@ impl Recommendation {
         self.media_recommendation.as_ref()
     }
 
-    pub fn rating_text(&self) -> String {
+    pub fn rating(&self) -> Option<i32> {
         self.rating
-            .map_or_else(|| EMPTY_STR.to_string(), |rating| rating.to_string())
     }
 }
 
@@ -392,7 +391,7 @@ mod tests {
 
         let recommendation = media.recommendations().next().unwrap();
         let recommended_media = recommendation.recommended_media().unwrap();
-        assert_eq!(recommendation.rating_text(), "42");
+        assert_eq!(recommendation.rating(), Some(42));
         assert_eq!(
             recommended_media.display_title(None, TitleDisplayPreference::Matched),
             "Samurai Champloo"

@@ -108,7 +108,7 @@ impl MalResponse {
     #[instrument(name = "mal_response.format_parsed_songs", skip(songs))]
     pub fn format_parsed_songs(songs: &[ParsedSong]) -> String {
         if songs.is_empty() {
-            return "No information available".to_string();
+            return "No theme songs listed yet.".to_string();
         }
 
         let mut lines: Vec<String> = Vec::with_capacity(songs.len());
@@ -130,7 +130,7 @@ impl MalResponse {
             }
 
             if let Some(ref episodes) = song.episode_numbers {
-                write!(line, " | {}", episodes).unwrap();
+                write!(line, " · {}", episodes).unwrap();
             }
 
             lines.push(line);
@@ -223,7 +223,7 @@ impl MalResponse {
 
     pub fn transform_mal_link(&self) -> String {
         let link = format!("https://www.myanimelist.net/anime/{}", self.id);
-        linker("MyAnimeList", &link)
+        format!("Theme song data from {}", linker("MyAnimeList", &link))
     }
 
     pub fn transform_thumbnail(&self) -> String {
@@ -244,7 +244,7 @@ impl MalResponse {
 
 #[cfg(test)]
 mod tests {
-    use super::MalResponse;
+    use super::{MalResponse, ParsedSong};
 
     #[test]
     fn get_song_number_parses_numeric_prefixes() {
@@ -258,5 +258,51 @@ mod tests {
         let song = "#TV: \"Again\" by YUI";
 
         assert_eq!(MalResponse::get_song_number(song), None);
+    }
+
+    #[test]
+    fn format_parsed_songs_uses_friendly_empty_state() {
+        assert_eq!(
+            MalResponse::format_parsed_songs(&[]),
+            "No theme songs listed yet."
+        );
+    }
+
+    #[test]
+    fn format_parsed_songs_uses_episode_label() {
+        let songs = vec![ParsedSong {
+            display_number: 1,
+            song_name: "Again".to_string(),
+            romaji_name: "Again".to_string(),
+            kana_name: None,
+            artist_names: Some("YUI".to_string()),
+            episode_numbers: Some("eps 1-14".to_string()),
+            spotify_url: None,
+        }];
+
+        assert_eq!(
+            MalResponse::format_parsed_songs(&songs),
+            "1. Again by YUI · eps 1-14"
+        );
+    }
+
+    #[test]
+    fn transform_mal_link_describes_source() {
+        let response: MalResponse = serde_json::from_value(serde_json::json!({
+            "id": 5114,
+            "title": "Fullmetal Alchemist: Brotherhood",
+            "main_picture": {
+                "medium": "https://example.com/medium.jpg",
+                "large": "https://example.com/large.jpg"
+            },
+            "opening_themes": [],
+            "ending_themes": []
+        }))
+        .expect("MAL response should deserialize");
+
+        assert_eq!(
+            response.transform_mal_link(),
+            "Theme song data from [MyAnimeList](https://www.myanimelist.net/anime/5114)"
+        );
     }
 }
