@@ -181,7 +181,7 @@ fn format_interpretation_is_conversational() {
 
     assert_eq!(
         format_interpretation(&intent),
-        "I searched AniList for the manga `Berserk`."
+        format_manga_interpretation(interpretation_variant(&intent), "Berserk")
     );
 }
 
@@ -195,8 +195,43 @@ fn format_interpretation_handles_unknown_media_type() {
 
     assert_eq!(
         format_interpretation(&intent),
-        "I searched AniList for `Monster`."
+        format_unknown_interpretation(interpretation_variant(&intent), "Monster")
     );
+}
+
+#[test]
+fn interpretation_variant_is_stable_for_same_search() {
+    let intent = SearchIntent {
+        media_type: SearchMediaType::Anime,
+        search: "Trigun".to_string(),
+        candidates: Vec::new(),
+    };
+
+    assert_eq!(
+        interpretation_variant(&intent),
+        interpretation_variant(&intent)
+    );
+}
+
+#[test]
+fn interpretation_templates_cover_all_variants() {
+    let anime_expected = [
+        "I'm checking AniList for the anime `Cowboy Bebop`.",
+        "I found this likely anime candidate: `Cowboy Bebop`.",
+        "Best guess: anime `Cowboy Bebop`.",
+        "My best anime guess: `Cowboy Bebop`.",
+        "Anime radar says: `Cowboy Bebop`.",
+        "I went hunting on AniList for `Cowboy Bebop`.",
+        "I chased that clue to the anime `Cowboy Bebop`.",
+        "That sounds like the anime `Cowboy Bebop` to me.",
+    ];
+
+    for (variant, expected) in anime_expected.into_iter().enumerate() {
+        assert_eq!(
+            format_anime_interpretation(variant, "Cowboy Bebop"),
+            expected
+        );
+    }
 }
 
 #[tokio::test]

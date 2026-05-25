@@ -1,4 +1,8 @@
-use std::fmt;
+use std::{
+    collections::hash_map::DefaultHasher,
+    fmt,
+    hash::{Hash, Hasher},
+};
 
 use crate::{
     commands::{
@@ -36,6 +40,7 @@ use tracing::{info, instrument, warn};
 
 const NOT_FOUND_SEARCH: &str = "I couldn't find an anime or manga that matches that search.";
 const MAX_LLM_SEARCH_TERM_LENGTH: usize = 120;
+const INTERPRETATION_VARIANT_COUNT: u64 = 8;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum SearchMediaType {
@@ -413,14 +418,68 @@ pub async fn run(ctx: &Context, interaction: &mut CommandInteraction) {
 
 #[instrument(name = "command.search.format_interpretation", skip(intent))]
 fn format_interpretation(intent: &SearchIntent) -> String {
+    let variant = interpretation_variant(intent);
+
     match intent.media_type {
-        SearchMediaType::Anime => {
-            format!("I searched AniList for the anime `{}`.", intent.search)
-        }
-        SearchMediaType::Manga => {
-            format!("I searched AniList for the manga `{}`.", intent.search)
-        }
-        SearchMediaType::Unknown => format!("I searched AniList for `{}`.", intent.search),
+        SearchMediaType::Anime => format_anime_interpretation(variant, &intent.search),
+        SearchMediaType::Manga => format_manga_interpretation(variant, &intent.search),
+        SearchMediaType::Unknown => format_unknown_interpretation(variant, &intent.search),
+    }
+}
+
+#[instrument(name = "command.search.interpretation_variant", skip(intent))]
+fn interpretation_variant(intent: &SearchIntent) -> usize {
+    let mut hasher = DefaultHasher::new();
+    intent.search.hash(&mut hasher);
+    match intent.media_type {
+        SearchMediaType::Anime => 0_u8,
+        SearchMediaType::Manga => 1,
+        SearchMediaType::Unknown => 2,
+    }
+    .hash(&mut hasher);
+
+    (hasher.finish() % INTERPRETATION_VARIANT_COUNT) as usize
+}
+
+#[instrument(name = "command.search.format_anime_interpretation", skip(search))]
+fn format_anime_interpretation(variant: usize, search: &str) -> String {
+    match variant {
+        0 => format!("I'm checking AniList for the anime `{search}`."),
+        1 => format!("I found this likely anime candidate: `{search}`."),
+        2 => format!("Best guess: anime `{search}`."),
+        3 => format!("My best anime guess: `{search}`."),
+        4 => format!("Anime radar says: `{search}`."),
+        5 => format!("I went hunting on AniList for `{search}`."),
+        6 => format!("I chased that clue to the anime `{search}`."),
+        _ => format!("That sounds like the anime `{search}` to me."),
+    }
+}
+
+#[instrument(name = "command.search.format_manga_interpretation", skip(search))]
+fn format_manga_interpretation(variant: usize, search: &str) -> String {
+    match variant {
+        0 => format!("I'm checking AniList for the manga `{search}`."),
+        1 => format!("I found this likely manga candidate: `{search}`."),
+        2 => format!("Best guess: manga `{search}`."),
+        3 => format!("My best manga guess: `{search}`."),
+        4 => format!("Manga radar says: `{search}`."),
+        5 => format!("I went hunting on AniList for `{search}`."),
+        6 => format!("I chased that clue to the manga `{search}`."),
+        _ => format!("That sounds like the manga `{search}` to me."),
+    }
+}
+
+#[instrument(name = "command.search.format_unknown_interpretation", skip(search))]
+fn format_unknown_interpretation(variant: usize, search: &str) -> String {
+    match variant {
+        0 => format!("I'm checking AniList for `{search}`."),
+        1 => format!("I found this likely candidate: `{search}`."),
+        2 => format!("Best guess: `{search}`."),
+        3 => format!("My best guess: `{search}`."),
+        4 => format!("AniList radar says: `{search}`."),
+        5 => format!("I went hunting on AniList for `{search}`."),
+        6 => format!("I chased that clue to `{search}`."),
+        _ => format!("That sounds like `{search}` to me."),
     }
 }
 
