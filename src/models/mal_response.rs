@@ -130,7 +130,7 @@ impl MalResponse {
             }
 
             if let Some(ref episodes) = song.episode_numbers {
-                write!(line, " · Episodes: {}", episodes).unwrap();
+                write!(line, " · {}", episodes).unwrap();
             }
 
             lines.push(line);
@@ -282,7 +282,7 @@ mod tests {
 
         assert_eq!(
             MalResponse::format_parsed_songs(&songs),
-            "1. Again by YUI · Episodes: eps 1-14"
+            "1. Again by YUI · eps 1-14"
         );
     }
 
