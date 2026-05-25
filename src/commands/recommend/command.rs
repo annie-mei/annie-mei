@@ -381,7 +381,7 @@ fn format_recommendation(
     ];
 
     let descriptor = format_media_descriptor(recommended_media);
-    if !descriptor.is_empty() {
+    if !descriptor.is_empty() && descriptor != EMPTY_STR {
         summary_parts.push(descriptor);
     }
 
