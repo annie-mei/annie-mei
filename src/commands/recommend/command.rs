@@ -392,10 +392,7 @@ fn format_recommendation(
     let mut lines = vec![summary_parts.join(" • ")];
 
     if let Some(rating) = recommendation.rating() {
-        let noun = if rating == 1 { "user" } else { "users" };
-        lines.push(format!(
-            "Community pick: {rating} AniList {noun} recommended this"
-        ));
+        lines.push(format_recommendation_rating(rating));
     }
 
     if !genres.is_empty() {
@@ -403,6 +400,21 @@ fn format_recommendation(
     }
 
     lines.join("\n")
+}
+
+#[instrument]
+fn format_recommendation_rating(rating: i32) -> String {
+    match rating {
+        rating if rating > 0 => {
+            let noun = if rating == 1 { "user" } else { "users" };
+            format!("Community pick: {rating} AniList {noun} recommended this")
+        }
+        0 => "Community pick: AniList users are split on this recommendation".to_string(),
+        rating => format!(
+            "Community note: AniList users downvoted this recommendation by {}",
+            rating.abs()
+        ),
+    }
 }
 
 #[instrument(skip(recommended_media))]
@@ -650,6 +662,18 @@ mod tests {
         assert!(!field.contains("Audience score"));
         assert!(!field.contains("Community pick"));
         assert!(!field.contains("Genres:"));
+    }
+
+    #[test]
+    fn recommendation_rating_copy_handles_non_positive_scores() {
+        assert_eq!(
+            format_recommendation_rating(0),
+            "Community pick: AniList users are split on this recommendation"
+        );
+        assert_eq!(
+            format_recommendation_rating(-3),
+            "Community note: AniList users downvoted this recommendation by 3"
+        );
     }
 
     #[test]
