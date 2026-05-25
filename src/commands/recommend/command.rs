@@ -367,10 +367,6 @@ fn format_recommendation(
     recommendation: &Recommendation,
     recommended_media: &RecommendedMedia,
 ) -> String {
-    let score = recommended_media
-        .average_score()
-        .map(|score| format!("{score}/100"))
-        .unwrap_or_else(|| EMPTY_STR.to_string());
     let genres = recommended_media
         .genres()
         .iter()
@@ -378,21 +374,35 @@ fn format_recommendation(
         .map(|genre| code(&titlecase(genre)))
         .collect::<Vec<_>>()
         .join(" - ");
-    let genres = if genres.is_empty() {
-        EMPTY_STR.to_string()
-    } else {
-        genres
-    };
 
-    format!(
-        "{} • {} • {} • Score: {} • AniList rating: {}\nGenres: {}",
+    let mut summary_parts = vec![
         linker("AniList", recommended_media.site_url()),
         titlecase(recommended_media.media_type()),
-        format_media_descriptor(recommended_media),
-        score,
-        recommendation.rating_text(),
-        genres,
-    )
+    ];
+
+    let descriptor = format_media_descriptor(recommended_media);
+    if !descriptor.is_empty() {
+        summary_parts.push(descriptor);
+    }
+
+    if let Some(score) = recommended_media.average_score() {
+        summary_parts.push(format!("Audience score: {score}/100"));
+    }
+
+    let mut lines = vec![summary_parts.join(" • ")];
+
+    if let Some(rating) = recommendation.rating() {
+        let noun = if rating == 1 { "user" } else { "users" };
+        lines.push(format!(
+            "Community pick: {rating} AniList {noun} recommended this"
+        ));
+    }
+
+    if !genres.is_empty() {
+        lines.push(format!("Genres: {genres}"));
+    }
+
+    lines.join("\n")
 }
 
 #[instrument(skip(recommended_media))]
@@ -593,8 +603,53 @@ mod tests {
             value["fields"][0]["value"]
                 .as_str()
                 .unwrap()
-                .contains("AniList rating: 42")
+                .contains("Community pick: 42 AniList users recommended this")
         );
+    }
+
+    #[test]
+    fn recommendations_omit_missing_optional_details() {
+        let media = sample_media(false, false);
+        let recommendation: Recommendation = serde_json::from_value(serde_json::json!({
+            "rating": null,
+            "mediaRecommendation": {
+                "type": "ANIME",
+                "isAdult": false,
+                "title": {
+                    "romaji": "Mystery Show",
+                    "english": null,
+                    "native": null
+                },
+                "format": null,
+                "status": null,
+                "genres": [],
+                "coverImage": {
+                    "extraLarge": null,
+                    "large": null,
+                    "medium": null,
+                    "color": null
+                },
+                "averageScore": null,
+                "siteUrl": "https://anilist.co/anime/999"
+            }
+        }))
+        .expect("recommendation should deserialize");
+        let recommended_media = recommendation
+            .recommended_media()
+            .expect("recommended media should exist");
+
+        let embed = recommendations_embed(
+            &media,
+            &[(&recommendation, recommended_media)],
+            None,
+            TitleDisplayPreference::Matched,
+        );
+
+        let value = serde_json::to_value(&embed).expect("embed serializes");
+        let field = value["fields"][0]["value"].as_str().unwrap();
+        assert!(!field.contains("Audience score"));
+        assert!(!field.contains("Community pick"));
+        assert!(!field.contains("Genres:"));
     }
 
     #[test]
