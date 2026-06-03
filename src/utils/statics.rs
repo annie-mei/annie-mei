@@ -1,8 +1,8 @@
-pub const NOT_FOUND_ANIME: &str = "No such anime";
-pub const NOT_FOUND_MANGA: &str = "No such manga";
-pub const NOT_FOUND_CHARACTER: &str = "No such character";
+pub const NOT_FOUND_ANIME: &str = "I couldn't find that anime on AniList.";
+pub const NOT_FOUND_MANGA: &str = "I couldn't find that manga on AniList.";
+pub const NOT_FOUND_CHARACTER: &str = "I couldn't find that character on AniList.";
 pub const NSFW_NOT_ALLOWED: &str =
-    "This content is age-restricted and can only be viewed in NSFW channels";
+    "That result is age-restricted, so I can only show it in an NSFW channel.";
 pub const EMPTY_STR: &str = "-";
 pub const ANILIST_STATUS_RELEASING: &str = "RELEASING";
 #[cfg(test)]

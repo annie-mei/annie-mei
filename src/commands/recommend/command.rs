@@ -47,12 +47,12 @@ const RECOMMENDATION_LIMIT: usize = 5;
 
 pub fn register() -> CreateCommand {
     CreateCommand::new("recommend")
-        .description("Fetch AniList recommendations for an anime or manga")
+        .description("Find community recommendations for an anime or manga")
         .add_option(
             CreateCommandOption::new(
                 CommandOptionType::String,
                 TYPE_OPTION,
-                "Whether to find anime or manga recommendations",
+                "Choose whether the source title is anime or manga",
             )
             .add_string_choice("Anime", ANIME_TYPE)
             .add_string_choice("Manga", MANGA_TYPE)
@@ -122,7 +122,7 @@ pub fn handle_recommend(
 
     if recommendations.is_empty() {
         return CommandResponse::Content(format!(
-            "No recommendations found for {}.",
+            "I couldn't find community recommendations for {} yet.",
             media.transform_preferred_title(title_variant, title_preference)
         ));
     }
@@ -141,7 +141,7 @@ pub async fn run(ctx: &Context, interaction: &mut CommandInteraction) {
 
     let Some((media_type, search_term)) = parse_recommend_options(&interaction.data.options) else {
         let builder = EditInteractionResponse::new().content(
-            "Missing or invalid options — choose a type and provide an anime or manga name or ID.",
+            "Choose anime or manga, then tell me what to recommend from with `search:<name or AniList ID>`.",
         );
         let _ = interaction.edit_response(&ctx.http, builder).await;
         return;
@@ -149,7 +149,7 @@ pub async fn run(ctx: &Context, interaction: &mut CommandInteraction) {
 
     if let Err(err) = validate_search_term(&search_term) {
         let builder = EditInteractionResponse::new().content(format!(
-            "Invalid search input: {err}. Please check your input and try again."
+            "I couldn't use that search: {err}. Try a title or AniList ID."
         ));
         let _ = interaction.edit_response(&ctx.http, builder).await;
         return;
@@ -367,10 +367,6 @@ fn format_recommendation(
     recommendation: &Recommendation,
     recommended_media: &RecommendedMedia,
 ) -> String {
-    let score = recommended_media
-        .average_score()
-        .map(|score| format!("{score}/100"))
-        .unwrap_or_else(|| EMPTY_STR.to_string());
     let genres = recommended_media
         .genres()
         .iter()
@@ -378,21 +374,41 @@ fn format_recommendation(
         .map(|genre| code(&titlecase(genre)))
         .collect::<Vec<_>>()
         .join(" - ");
-    let genres = if genres.is_empty() {
-        EMPTY_STR.to_string()
-    } else {
-        genres
-    };
 
-    format!(
-        "{} • {} • {} • Score: {} • AniList rating: {}\nGenres: {}",
+    let mut summary_parts = vec![
         linker("AniList", recommended_media.site_url()),
         titlecase(recommended_media.media_type()),
-        format_media_descriptor(recommended_media),
-        score,
-        recommendation.rating_text(),
-        genres,
-    )
+    ];
+
+    let descriptor = format_media_descriptor(recommended_media);
+    if !descriptor.is_empty() && descriptor != EMPTY_STR {
+        summary_parts.push(descriptor);
+    }
+
+    if let Some(score) = recommended_media.average_score() {
+        summary_parts.push(format!("Audience score: {score}/100"));
+    }
+
+    let mut lines = vec![summary_parts.join(" • ")];
+
+    if let Some(rating) = recommendation.rating() {
+        lines.push(format_recommendation_rating(rating));
+    }
+
+    if !genres.is_empty() {
+        lines.push(format!("Genres: {genres}"));
+    }
+
+    lines.join("\n")
+}
+
+#[instrument]
+fn format_recommendation_rating(rating: i32) -> String {
+    match rating {
+        rating if rating > 0 => format!("Community score: +{rating}"),
+        0 => "Community pick: AniList users are split on this recommendation".to_string(),
+        rating => format!("Community score: {rating}"),
+    }
 }
 
 #[instrument(skip(recommended_media))]
@@ -553,7 +569,7 @@ mod tests {
         assert!(
             response
                 .unwrap_content()
-                .contains("No recommendations found")
+                .contains("I couldn't find community recommendations")
         );
     }
 
@@ -570,7 +586,7 @@ mod tests {
         assert!(response.is_content());
         assert_eq!(
             response.unwrap_content(),
-            "No recommendations found for Yotsuba&!."
+            "I couldn't find community recommendations for Yotsuba&! yet."
         );
     }
 
@@ -593,8 +609,62 @@ mod tests {
             value["fields"][0]["value"]
                 .as_str()
                 .unwrap()
-                .contains("AniList rating: 42")
+                .contains("Community score: +42")
         );
+    }
+
+    #[test]
+    fn recommendations_omit_missing_optional_details() {
+        let media = sample_media(false, false);
+        let recommendation: Recommendation = serde_json::from_value(serde_json::json!({
+            "rating": null,
+            "mediaRecommendation": {
+                "type": "ANIME",
+                "isAdult": false,
+                "title": {
+                    "romaji": "Mystery Show",
+                    "english": null,
+                    "native": null
+                },
+                "format": null,
+                "status": null,
+                "genres": [],
+                "coverImage": {
+                    "extraLarge": null,
+                    "large": null,
+                    "medium": null,
+                    "color": null
+                },
+                "averageScore": null,
+                "siteUrl": "https://anilist.co/anime/999"
+            }
+        }))
+        .expect("recommendation should deserialize");
+        let recommended_media = recommendation
+            .recommended_media()
+            .expect("recommended media should exist");
+
+        let embed = recommendations_embed(
+            &media,
+            &[(&recommendation, recommended_media)],
+            None,
+            TitleDisplayPreference::Matched,
+        );
+
+        let value = serde_json::to_value(&embed).expect("embed serializes");
+        let field = value["fields"][0]["value"].as_str().unwrap();
+        assert!(!field.contains("Audience score"));
+        assert!(!field.contains("Community pick"));
+        assert!(!field.contains("Genres:"));
+    }
+
+    #[test]
+    fn recommendation_rating_copy_handles_non_positive_scores() {
+        assert_eq!(
+            format_recommendation_rating(0),
+            "Community pick: AniList users are split on this recommendation"
+        );
+        assert_eq!(format_recommendation_rating(-3), "Community score: -3");
     }
 
     #[test]

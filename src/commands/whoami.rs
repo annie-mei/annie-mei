@@ -15,19 +15,19 @@ use serenity::{
 use tracing::{error, instrument};
 
 pub fn register() -> CreateCommand {
-    CreateCommand::new("whoami").description("Show your currently linked AniList account")
+    CreateCommand::new("whoami").description("Show the AniList account linked to you")
 }
 
 #[instrument(name = "command.whoami.handle", skip(profile))]
 pub fn handle_whoami(profile: Option<OAuthCredential>) -> CommandResponse {
     match profile {
         Some(profile) => CommandResponse::Content(format!(
-            "Your linked AniList account is **{}**.\nProfile: <{}>",
+            "You're linked to AniList as **{}**.\nProfile: <{}>",
             profile.anilist_display_name(),
             profile.anilist_profile_url()
         )),
         None => CommandResponse::Content(
-            "You have not linked an AniList account yet. Run `/register` first.".to_string(),
+            "No AniList account is linked yet. Run `/register` to connect one.".to_string(),
         ),
     }
 }
@@ -41,7 +41,7 @@ pub async fn run(ctx: &Context, interaction: &mut CommandInteraction) {
 
     let Some(database_pool) = get_pool_from_context(ctx).await else {
         let builder = EditInteractionResponse::new()
-            .content("Database is not initialized. Please try again later.");
+            .content("I can't reach my database right now. Please try again later.");
         let _ = interaction.edit_response(&ctx.http, builder).await;
         return;
     };
@@ -58,7 +58,7 @@ pub async fn run(ctx: &Context, interaction: &mut CommandInteraction) {
                 "Failed to fetch whoami profile from database"
             );
             CommandResponse::Content(
-                "I hit an internal error while looking up your AniList account. Please try again later."
+                "I couldn't look up your AniList account right now. Please try again later."
                     .to_string(),
             )
         }

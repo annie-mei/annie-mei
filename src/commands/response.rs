@@ -29,7 +29,7 @@ pub enum CommandResponse {
     /// A plain-text deferred reply (adapter should defer first, then edit).
     ///
     /// Used when the command did async work but the result is just text
-    /// (e.g. "No such anime").
+    /// (e.g. a not-found message).
     Content(String),
 
     /// An embed deferred reply (adapter should defer first, then edit).

@@ -240,7 +240,7 @@ pub async fn run(ctx: &Context, interaction: &mut CommandInteraction) {
         respond_to_command(
             interaction,
             ctx,
-            "Database is not initialized. Please try again later.".to_string(),
+            "I can't reach my database right now. Please try again later.".to_string(),
             Vec::new(),
         )
         .await;
@@ -262,8 +262,7 @@ pub async fn run(ctx: &Context, interaction: &mut CommandInteraction) {
             respond_to_command(
                 interaction,
                 ctx,
-                "I hit an internal error while reading your settings. Please try again later."
-                    .to_string(),
+                "I couldn't read your settings right now. Please try again later.".to_string(),
                 Vec::new(),
             )
             .await;
@@ -310,7 +309,7 @@ pub async fn handle_component(ctx: &Context, interaction: &mut ComponentInteract
         respond_to_component(
             interaction,
             ctx,
-            "Database is not initialized. Please try again later.".to_string(),
+            "I can't reach my database right now. Please try again later.".to_string(),
             Vec::new(),
         )
         .await;
@@ -352,7 +351,7 @@ pub async fn handle_component(ctx: &Context, interaction: &mut ComponentInteract
                         respond_to_component(
                             interaction,
                             ctx,
-                            "I hit an internal error while saving your setting. Please try again later."
+                            "I couldn't save your setting right now. Please try again later."
                                 .to_string(),
                             Vec::new(),
                         )
@@ -388,7 +387,7 @@ pub async fn handle_component(ctx: &Context, interaction: &mut ComponentInteract
                         respond_to_component(
                             interaction,
                             ctx,
-                            "I hit an internal error while saving the server setting. Please try again later."
+                            "I couldn't save the server setting right now. Please try again later."
                                 .to_string(),
                             Vec::new(),
                         )
@@ -427,8 +426,7 @@ pub async fn handle_component(ctx: &Context, interaction: &mut ComponentInteract
             respond_to_component(
                 interaction,
                 ctx,
-                "I hit an internal error while reading your settings. Please try again later."
-                    .to_string(),
+                "I couldn't read your settings right now. Please try again later.".to_string(),
                 Vec::new(),
             )
             .await;

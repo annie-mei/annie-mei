@@ -11,7 +11,7 @@ use serenity::{
 use tracing::{error, instrument, warn};
 
 pub fn register() -> CreateCommand {
-    CreateCommand::new("help").description("Shows how to use the bot")
+    CreateCommand::new("help").description("Show Annie Mei commands and tips")
 }
 
 #[instrument(name = "command.help.run", skip(ctx, interaction))]
@@ -24,21 +24,21 @@ pub async fn run(ctx: &Context, interaction: &CommandInteraction) {
         .colour(0x00ff00)
         .title(format!("{} • Annie Mei Help", user.name))
         .description(
-            "I can help you look up anime, manga, and character details, theme songs, and show what guild members are watching or reading.",
+            "I can look up anime, manga, characters, recommendations, theme songs, and what people in this server are watching or reading.",
         )
         .field(
             "Get started",
-            "1. Run `/register` and click the secure AniList link button\n2. Finish the AniList authorization in your browser, then return to Discord\n3. Use `/anime`, `/manga`, `/recommend`, or `/character` with an AniList ID or search term\n4. Use `/songs` to fetch openings/endings and links\n5. If your AniList connection ever expires later, run `/register` again to relink it, or `/unregister confirmation:Confirm unlink` to unlink it",
+            "1. Run `/register` and click the secure AniList link button\n2. Finish authorization in your browser, then return to Discord\n3. Use `/anime`, `/manga`, `/recommend`, or `/character` with an AniList ID or search term\n4. Use `/search` when you only remember a vibe, plot, or partial title\n5. Use `/songs` for opening and ending theme songs",
             false,
         )
         .field(
             "Commands",
-            "`/anime search:<term or id>` - anime details\n`/manga search:<term or id>` - manga details\n`/recommend type:<anime|manga> search:<term or id>` - AniList recommendations\n`/character search:<term or id> spoilers:<allow|disallow>` - character details\n`/songs search:<term or id>` - OP/ED songs + links\n`/settings` - open your interactive settings panel\n`/register` - open the AniList OAuth link or relink flow\n`/unregister confirmation:<confirm|cancel>` - unlink your AniList account after confirmation\n`/whoami` - show your linked AniList username and profile link\n`/ping` - bot health check\n`/help` - show this guide",
+            "`/anime search:<term or id>` - anime details\n`/manga search:<term or id>` - manga details\n`/search query:<description>` - natural-language anime/manga search\n`/recommend type:<anime|manga> search:<term or id>` - community recommendations\n`/character search:<term or id> spoilers:<allow|disallow>` - character details\n`/songs search:<term or id>` - opening and ending themes\n`/settings` - preferences for titles, analytics, and guild scores\n`/register` - link or relink AniList\n`/unregister confirmation:<confirm|cancel>` - unlink AniList\n`/whoami` - show your linked AniList account\n`/ping` - bot health check\n`/help` - show this guide",
             false,
         )
         .field(
             "Tips",
-            "You can search with full names, short names, or AniList IDs. If the AniList link page expires or fails, or if you need to reconnect your AniList account later, run `/register` again to get a fresh secure link. Use `/unregister confirmation:Confirm unlink` when you want Annie Mei to forget your linked AniList account.",
+            "Full titles, short titles, and AniList IDs all work. If you only remember a scene or premise, try `/search`. Run `/settings` to pick title language and privacy preferences. If your AniList link expires or you want to reconnect, run `/register` again.",
             false,
         )
         .footer(CreateEmbedFooter::new("Annie Mei"))
