@@ -46,7 +46,7 @@ sentry = { version = "0.48.2", default-features = false, features = [
   "ureq",
 ] }
 serde = "1.0.228"
-serde_json = "1.0.149"
+serde_json = "1.0.150"
 serenity = { version = "0.12", default-features = false, features = [
   "cache",
   "client",
