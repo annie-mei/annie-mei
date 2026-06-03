@@ -44,8 +44,10 @@ impl MediaListData {
     #[instrument(skip(self))]
     pub fn format_for_embed(&self, is_anime: bool) -> String {
         let mut parts = Vec::new();
+        let mut status_index = None;
 
         if let Some(status) = &self.status {
+            status_index = Some(parts.len());
             parts.push(status_phrase(status, is_anime).to_string());
         }
 
@@ -53,12 +55,22 @@ impl MediaListData {
             && !matches!(self.status, Some(MediaListStatus::Planning))
             && let Some(progress) = self.progress
         {
-            parts.push(progress_phrase(
+            let progress = progress_phrase(
                 progress,
                 self.progress_volumes,
                 self.status.as_ref(),
                 is_anime,
-            ));
+            );
+
+            if matches!(
+                self.status,
+                Some(MediaListStatus::Dropped | MediaListStatus::Paused)
+            ) && let Some(index) = status_index
+            {
+                parts[index].push_str(&format!(" {progress}"));
+            } else {
+                parts.push(progress);
+            }
         }
 
         if let Some(score) = self.score
@@ -188,5 +200,32 @@ mod tests {
         };
 
         assert_eq!(data.format_for_embed(true), "is watching, 3 eps in");
+    }
+
+    #[test]
+    fn dropped_progress_reads_as_single_phrase() {
+        let data = MediaListData {
+            status: Some(MediaListStatus::Dropped),
+            score: Some(80),
+            progress: Some(5),
+            progress_volumes: None,
+        };
+
+        assert_eq!(
+            data.format_for_embed(true),
+            "dropped it after 5 eps, rated 80/100"
+        );
+    }
+
+    #[test]
+    fn paused_progress_reads_as_single_phrase() {
+        let data = MediaListData {
+            status: Some(MediaListStatus::Paused),
+            score: None,
+            progress: Some(7),
+            progress_volumes: None,
+        };
+
+        assert_eq!(data.format_for_embed(true), "paused it at 7 eps");
     }
 }
