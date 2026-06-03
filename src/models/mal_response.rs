@@ -223,7 +223,7 @@ impl MalResponse {
 
     pub fn transform_mal_link(&self) -> String {
         let link = format!("https://www.myanimelist.net/anime/{}", self.id);
-        format!("Theme song data from {}", linker("MyAnimeList", &link))
+        linker("MyAnimeList", &link)
     }
 
     pub fn transform_thumbnail(&self) -> String {
@@ -287,7 +287,7 @@ mod tests {
     }
 
     #[test]
-    fn transform_mal_link_describes_source() {
+    fn transform_mal_link_returns_source_link() {
         let response: MalResponse = serde_json::from_value(serde_json::json!({
             "id": 5114,
             "title": "Fullmetal Alchemist: Brotherhood",
@@ -302,7 +302,7 @@ mod tests {
 
         assert_eq!(
             response.transform_mal_link(),
-            "Theme song data from [MyAnimeList](https://www.myanimelist.net/anime/5114)"
+            "[MyAnimeList](https://www.myanimelist.net/anime/5114)"
         );
     }
 }
