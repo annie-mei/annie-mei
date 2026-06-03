@@ -214,6 +214,17 @@ fn interpretation_variant_is_stable_for_same_search() {
 }
 
 #[test]
+fn interpretation_variant_has_stable_cross_toolchain_mapping() {
+    let intent = SearchIntent {
+        media_type: SearchMediaType::Anime,
+        search: "Trigun".to_string(),
+        candidates: Vec::new(),
+    };
+
+    assert_eq!(interpretation_variant(&intent), 5);
+}
+
+#[test]
 fn interpretation_templates_cover_all_variants() {
     let anime_expected = [
         "I'm checking AniList for the anime `Cowboy Bebop`.",

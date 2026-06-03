@@ -1,8 +1,4 @@
-use std::{
-    collections::hash_map::DefaultHasher,
-    fmt,
-    hash::{Hash, Hasher},
-};
+use std::fmt;
 
 use crate::{
     commands::{
@@ -429,16 +425,20 @@ fn format_interpretation(intent: &SearchIntent) -> String {
 
 #[instrument(name = "command.search.interpretation_variant", skip(intent))]
 fn interpretation_variant(intent: &SearchIntent) -> usize {
-    let mut hasher = DefaultHasher::default();
-    intent.search.hash(&mut hasher);
-    match intent.media_type {
+    let media_type = match intent.media_type {
         SearchMediaType::Anime => 0_u8,
         SearchMediaType::Manga => 1,
         SearchMediaType::Unknown => 2,
-    }
-    .hash(&mut hasher);
+    };
 
-    (hasher.finish() % INTERPRETATION_VARIANT_COUNT) as usize
+    let hash = intent
+        .search
+        .bytes()
+        .fold(u64::from(media_type), |hash, byte| {
+            hash.wrapping_mul(31).wrapping_add(u64::from(byte))
+        });
+
+    (hash % INTERPRETATION_VARIANT_COUNT) as usize
 }
 
 #[instrument(name = "command.search.format_anime_interpretation", skip(search))]
