@@ -124,7 +124,7 @@ async fn delete_user_registration_in_transaction(
 #[instrument(name = "unregister.delete_auth_records", skip(conn, sql, discord_id), fields(table = _table))]
 async fn delete_auth_records(
     _table: &str,
-    sql: &str,
+    sql: &'static str,
     discord_id: &str,
     conn: &mut PgConnection,
 ) -> Result<u64, sqlx::Error> {
