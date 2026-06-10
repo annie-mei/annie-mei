@@ -1,6 +1,6 @@
 [package]
 name = "annie-mei"
-version = "3.8.4"
+version = "3.8.5"
 edition = "2024"
 license = "GPL-3.0-or-later"
 rust-version = "1.95"
@@ -19,7 +19,7 @@ split-debuginfo = "packed"
 [dependencies]
 base64 = "0.22"
 blake3 = "1.8.5"
-chrono = "0.4.44"
+chrono = "0.4.45"
 clap = { version = "4", features = ["derive"] }
 sqlx = { version = "0.9", default-features = false, features = ["runtime-tokio", "postgres", "chrono", "macros", "migrate", "tls-rustls"] }
 getrandom = "0.4"
