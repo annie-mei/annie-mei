@@ -18,7 +18,7 @@ jobs:
       CARGO_TERM_COLOR: always
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
       - name: Install Rust
         run: |
           toolchain="$(awk -F'"' '/^[[:space:]]*channel[[:space:]]*=/ { print $2 }' rust-toolchain.toml)"
