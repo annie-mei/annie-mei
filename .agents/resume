@@ -1,0 +1,6 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# This repository has no local services required for builds or tests. Runtime
+# PostgreSQL, Redis, and third-party APIs are configured externally.
+echo "No local services need to be resumed."

@@ -1,0 +1,55 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+export PATH="${CARGO_HOME:-$HOME/.cargo}/bin:$PATH"
+
+echo "Installing system dependencies..."
+packages=(build-essential ca-certificates curl libpq-dev pkg-config)
+missing_packages=()
+for package in "${packages[@]}"; do
+  if ! dpkg-query -W -f='${Status}' "$package" 2>/dev/null | grep -q '^install ok installed$'; then
+    missing_packages+=("$package")
+  fi
+done
+
+if ((${#missing_packages[@]})); then
+  if ((EUID == 0)); then
+    apt-get update
+    DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends "${missing_packages[@]}"
+  else
+    sudo apt-get update
+    sudo DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends "${missing_packages[@]}"
+  fi
+fi
+
+if ! command -v rustup >/dev/null 2>&1; then
+  echo "Installing rustup..."
+  curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs |
+    sh -s -- -y --profile minimal --default-toolchain none --no-modify-path
+fi
+
+toolchain="$(awk -F'"' '/^[[:space:]]*channel[[:space:]]*=/ { print $2; exit }' rust-toolchain.toml)"
+echo "Installing Rust ${toolchain} and development components..."
+rustup toolchain install "$toolchain" \
+  --profile minimal \
+  --component clippy \
+  --component rust-analyzer \
+  --component rustfmt
+
+# Setup runs before Amp starts, so its PATH export does not reach later shells.
+# Expose rustup's command proxies through a directory already on the orb PATH.
+cargo_bin="${CARGO_HOME:-$HOME/.cargo}/bin"
+rust_commands=(cargo cargo-clippy cargo-fmt clippy-driver rust-analyzer rustc rustdoc rustfmt rustup)
+for command in "${rust_commands[@]}"; do
+  [[ -e "$cargo_bin/$command" ]] || continue
+  if ((EUID == 0)); then
+    ln -sfn "$cargo_bin/$command" "/usr/local/bin/$command"
+  else
+    sudo ln -sfn "$cargo_bin/$command" "/usr/local/bin/$command"
+  fi
+done
+
+echo "Fetching locked Cargo dependencies..."
+cargo fetch --locked
+
+echo "Orb setup complete."
