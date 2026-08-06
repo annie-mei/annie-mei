@@ -10,6 +10,7 @@ pub mod response;
 pub mod search;
 pub mod settings;
 pub mod songs;
+pub mod studio;
 pub mod traits;
 pub mod unregister;
 pub mod whoami;
