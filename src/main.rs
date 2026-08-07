@@ -239,12 +239,12 @@ async fn main() {
 
     let _guard = sentry::init((
         sentry_dsn,
-        sentry::ClientOptions {
-            release: sentry::release_name!(),
-            environment: Some(environment.into()),
-            traces_sample_rate: sentry_traces_sample_rate,
-            enable_logs: true,
-            before_send: Some(Arc::new(|mut event| {
+        sentry::ClientOptions::new()
+            .maybe_release(sentry::release_name!())
+            .environment(environment)
+            .traces_sample_rate(sentry_traces_sample_rate)
+            .enable_logs(true)
+            .before_send(|mut event| {
                 // Redact URLs with credentials from exception messages
                 for exception in event.exception.values.iter_mut() {
                     if let Some(ref mut value) = exception.value {
@@ -265,13 +265,11 @@ async fn main() {
                 }
 
                 Some(event)
-            })),
-            before_send_log: Some(Arc::new(|mut log| {
+            })
+            .before_send_log(|mut log| {
                 log.body = redact_url_credentials(&log.body);
                 Some(log)
-            })),
-            ..Default::default()
-        },
+            }),
     ));
 
     let env_filter =
