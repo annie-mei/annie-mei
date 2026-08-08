@@ -2,7 +2,7 @@
 name: create-release
 description: Create a GitHub release with version tag and release notes for Annie Mei
 license: MIT
-compatibility: opencode
+compatibility: Requires git and the GitHub CLI (gh)
 metadata:
   audience: maintainers
   workflow: github
@@ -50,15 +50,24 @@ Apply semantic versioning:
 - **MINOR** (0.X.0): New features, new commands, backwards-compatible functionality
 - **PATCH** (0.0.X): Bug fixes, refactors, dependency updates
 
-### Step 3: Create and Push Tag
+### Step 3: Create and Push Signed Tag
+
+Release tags should be signed using the same configured signing mechanism as commits. For this repo, commits and tags use SSH signing via `gpg.format=ssh` and `user.signingkey`.
 
 ```bash
-# Create the tag (replace X.X.X with the version)
-git tag vX.X.X
+# Optional sanity check: confirm SSH signing is configured
+git config --get gpg.format
+git config --get user.signingkey
+
+# Create a signed annotated tag (replace X.X.X with the version).
+# The -m message prevents Git from opening the editor for an interactive tag message.
+git tag -s vX.X.X -m "Release vX.X.X"
 
 # Push the tag so GitHub Releases can point to it
 git push origin vX.X.X
 ```
+
+Do **not** create release tags with plain `git tag vX.X.X` when `tag.gpgsign=true`; Git may open the configured editor for the required annotated tag message. Always provide `-m "Release vX.X.X"` to keep the process non-interactive while preserving signed tags.
 
 Pushing the tag does **not** trigger the release workflow. The workflow is dispatched manually from `main` in the next step to avoid cold tag-scoped Rust caches.
 
