@@ -24,16 +24,16 @@ pub async fn run(ctx: &Context, interaction: &CommandInteraction) {
         .colour(0x00ff00)
         .title(format!("{} • Annie Mei Help", user.name))
         .description(
-            "I can look up anime, manga, characters, recommendations, theme songs, and what people in this server are watching or reading.",
+            "I can look up anime, manga, characters, studios, recommendations, theme songs, and what people in this server are watching or reading.",
         )
         .field(
             "Get started",
-            "1. Run `/register` and click the secure AniList link button\n2. Finish authorization in your browser, then return to Discord\n3. Use `/anime`, `/manga`, `/recommend`, or `/character` with an AniList ID or search term\n4. Use `/search` when you only remember a vibe, plot, or partial title\n5. Use `/songs` for opening and ending theme songs",
+            "1. Run `/register` and click the secure AniList link button\n2. Finish authorization in your browser, then return to Discord\n3. Use `/anime`, `/manga`, `/recommend`, `/character`, or `/studio` with an AniList ID or search term\n4. Use `/search` when you only remember a vibe, plot, or partial title\n5. Use `/songs` for opening and ending theme songs",
             false,
         )
         .field(
             "Commands",
-            "`/anime search:<term or id>` - anime details\n`/manga search:<term or id>` - manga details\n`/search query:<description>` - natural-language anime/manga search\n`/recommend type:<anime|manga> search:<term or id>` - community recommendations\n`/character search:<term or id> spoilers:<allow|disallow>` - character details\n`/songs search:<term or id>` - opening and ending themes\n`/settings` - preferences for titles, analytics, and guild scores\n`/register` - link or relink AniList\n`/unregister confirmation:<confirm|cancel>` - unlink AniList\n`/whoami` - show your linked AniList account\n`/ping` - bot health check\n`/help` - show this guide",
+            "`/anime search:<term or id>` - anime details\n`/manga search:<term or id>` - manga details\n`/search query:<description>` - natural-language anime/manga search\n`/recommend type:<anime|manga> search:<term or id>` - community recommendations\n`/character search:<term or id> spoilers:<allow|disallow>` - character details\n`/studio search:<term or id>` - production studio details\n`/songs search:<term or id>` - opening and ending themes\n`/settings` - preferences for titles, analytics, and guild scores\n`/register` - link or relink AniList\n`/unregister confirmation:<confirm|cancel>` - unlink AniList\n`/whoami` - show your linked AniList account\n`/ping` - bot health check\n`/help` - show this guide",
             false,
         )
         .field(

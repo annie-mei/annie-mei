@@ -80,13 +80,24 @@ struct StudioData {
 #[derive(Deserialize)]
 struct GraphQlError {
     message: String,
+    status: Option<u16>,
 }
 
 #[instrument(name = "anilist.studio.fetch", fields(search_len = search_term.len()))]
 pub async fn fetch_studio(search_term: &str) -> Result<Option<Studio>, StudioFetchError> {
     let request = build_request(search_term);
-    let response = send_request(request).await?;
-    parse_response(&response)
+    parse_request_result(send_request(request).await)
+}
+
+#[instrument(name = "anilist.studio.parse_request_result", skip(result))]
+fn parse_request_result(
+    result: Result<String, AniListRequestError>,
+) -> Result<Option<Studio>, StudioFetchError> {
+    match result {
+        Ok(response) => parse_response(&response),
+        Err(AniListRequestError::NonSuccessStatus { status: 404, .. }) => Ok(None),
+        Err(error) => Err(error.into()),
+    }
 }
 
 #[instrument(name = "anilist.studio.build_request", skip(search_term))]
@@ -109,6 +120,10 @@ fn parse_response(response: &str) -> Result<Option<Studio>, StudioFetchError> {
         .map_err(|error| StudioFetchError::InvalidResponse(error.to_string()))?;
 
     if let Some(errors) = response.errors.filter(|errors| !errors.is_empty()) {
+        if errors.iter().all(|error| error.status == Some(404)) {
+            return Ok(None);
+        }
+
         return Err(StudioFetchError::GraphQl(
             errors
                 .into_iter()
@@ -168,5 +183,25 @@ mod tests {
             parse_response(r#"{"data":null,"errors":[{"message":"Unavailable"}]}"#).unwrap_err();
 
         assert!(matches!(error, StudioFetchError::GraphQl(_)));
+    }
+
+    #[test]
+    fn graphql_not_found_error_is_treated_as_not_found() {
+        let studio =
+            parse_response(r#"{"data":null,"errors":[{"message":"Not Found.","status":404}]}"#)
+                .unwrap();
+
+        assert!(studio.is_none());
+    }
+
+    #[test]
+    fn http_not_found_is_treated_as_not_found() {
+        let studio = parse_request_result(Err(AniListRequestError::NonSuccessStatus {
+            status: 404,
+            body: r#"{"errors":[{"message":"Not Found.","status":404}]}"#.to_string(),
+        }))
+        .unwrap();
+
+        assert!(studio.is_none());
     }
 }
