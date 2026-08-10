@@ -69,7 +69,7 @@ jobs:
           echo "tag_name=${tag_name}" >> "$GITHUB_OUTPUT"
           echo "is_release=${is_release}" >> "$GITHUB_OUTPUT"
       - name: Cache
-        uses: Swatinem/rust-cache@v2.9.1
+        uses: Swatinem/rust-cache@v2.9.2
         with:
           cache-on-failure: "true"
           prefix-key: "annie-mei"
