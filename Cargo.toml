@@ -1,6 +1,6 @@
 [package]
 name = "annie-mei"
-version = "3.10.12"
+version = "3.10.13"
 edition = "2024"
 license = "GPL-3.0-or-later"
 rust-version = "1.97.1"
