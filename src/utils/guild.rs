@@ -265,11 +265,44 @@ where
 
 #[cfg(test)]
 mod tests {
-    use super::build_batch_media_list_query;
+    use std::{cell::RefCell, collections::VecDeque, future::ready};
+
+    use super::{
+        ANILIST_MEDIA_LIST_BATCH_SIZE, build_batch_media_list_query,
+        get_guild_anilist_data_with_sender,
+    };
     use crate::models::{
         db::oauth_credential::OAuthCredential,
         settings::{GuildScoresPreference, SettingValue, user_participates_in_guild_scores},
     };
+    use serde_json::{Value, json};
+
+    fn credential(discord_id: impl ToString, anilist_id: i64) -> OAuthCredential {
+        OAuthCredential {
+            discord_user_id: discord_id.to_string(),
+            anilist_id,
+            anilist_username: None,
+        }
+    }
+
+    fn media_response(entries: &[(usize, u32)]) -> String {
+        let data = entries
+            .iter()
+            .map(|(alias, score)| {
+                (
+                    format!("media_{alias}"),
+                    json!({
+                        "status": "COMPLETED",
+                        "score": score,
+                        "progress": 12,
+                        "progressVolumes": null
+                    }),
+                )
+            })
+            .collect::<serde_json::Map<_, _>>();
+
+        json!({ "data": data }).to_string()
+    }
 
     #[test]
     fn guild_score_participation_defaults_to_include_and_honors_opt_out() {
@@ -301,5 +334,108 @@ mod tests {
 
         assert!(query.contains("media_0: MediaList(userId: 100, type: $type, mediaId: $mediaId)"));
         assert!(query.contains("media_1: MediaList(userId: 200, type: $type, mediaId: $mediaId)"));
+    }
+
+    #[tokio::test]
+    async fn batch_size_boundary_uses_one_request_at_limit_and_two_above_it() {
+        for (member_count, expected_request_count) in [
+            (ANILIST_MEDIA_LIST_BATCH_SIZE, 1),
+            (ANILIST_MEDIA_LIST_BATCH_SIZE + 1, 2),
+        ] {
+            let requests = RefCell::new(Vec::<Value>::new());
+            let members = (1..=member_count)
+                .map(|id| credential(id, id as i64 + 100))
+                .collect();
+
+            let result =
+                get_guild_anilist_data_with_sender(members, 42, "anime".to_string(), |body| {
+                    requests.borrow_mut().push(body);
+                    ready(Ok::<_, &str>(json!({ "data": {} }).to_string()))
+                })
+                .await;
+
+            assert!(result.is_empty());
+            assert_eq!(requests.borrow().len(), expected_request_count);
+            assert!(requests.borrow().iter().all(|body| {
+                body["query"]
+                    .as_str()
+                    .is_some_and(|query| !query.contains("media_25:"))
+            }));
+        }
+    }
+
+    #[tokio::test]
+    async fn multiple_batches_merge_results_with_batch_local_aliases() {
+        let members = (1..=(ANILIST_MEDIA_LIST_BATCH_SIZE + 2))
+            .map(|id| credential(id, id as i64 + 100))
+            .collect();
+        let responses = RefCell::new(VecDeque::from([
+            Ok::<_, &str>(media_response(&[(0, 81), (24, 82)])),
+            Ok(media_response(&[(0, 91), (1, 92)])),
+        ]));
+
+        let result = get_guild_anilist_data_with_sender(members, 42, "anime".to_string(), |_| {
+            ready(
+                responses
+                    .borrow_mut()
+                    .pop_front()
+                    .expect("response per batch"),
+            )
+        })
+        .await;
+
+        assert_eq!(result.len(), 4);
+        assert_eq!(result[&1].score, Some(81));
+        assert_eq!(result[&25].score, Some(82));
+        assert_eq!(result[&26].score, Some(91));
+        assert_eq!(result[&27].score, Some(92));
+    }
+
+    #[tokio::test]
+    async fn failed_batch_does_not_discard_successful_batch_results() {
+        let members = (1..=(ANILIST_MEDIA_LIST_BATCH_SIZE + 1))
+            .map(|id| credential(id, id as i64 + 100))
+            .collect();
+        let responses = RefCell::new(VecDeque::from([
+            Ok::<_, &str>(media_response(&[(0, 75)])),
+            Err("temporary failure"),
+        ]));
+
+        let result = get_guild_anilist_data_with_sender(members, 42, "anime".to_string(), |_| {
+            ready(
+                responses
+                    .borrow_mut()
+                    .pop_front()
+                    .expect("response per batch"),
+            )
+        })
+        .await;
+
+        assert_eq!(result.len(), 1);
+        assert_eq!(result[&1].score, Some(75));
+    }
+
+    #[tokio::test]
+    async fn empty_and_invalid_credentials_do_not_send_requests() {
+        for members in [
+            Vec::new(),
+            vec![
+                credential("not-a-discord-id", 100),
+                credential("1", 0),
+                credential("2", i64::from(i32::MAX) + 1),
+            ],
+        ] {
+            let request_count = RefCell::new(0);
+
+            let result =
+                get_guild_anilist_data_with_sender(members, 42, "anime".to_string(), |_| {
+                    *request_count.borrow_mut() += 1;
+                    ready(Ok::<_, &str>(json!({ "data": {} }).to_string()))
+                })
+                .await;
+
+            assert!(result.is_empty());
+            assert_eq!(*request_count.borrow(), 0);
+        }
     }
 }
