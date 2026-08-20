@@ -5,6 +5,7 @@ use super::response::CommandResponse;
 use serenity::{
     all::{CommandInteraction, CreateInteractionResponse, CreateInteractionResponseMessage},
     builder::CreateCommand,
+    http::Http,
     prelude::*,
 };
 
@@ -27,9 +28,16 @@ pub fn handle_ping(user_mention: &str) -> CommandResponse {
 // ── Serenity adapter (thin wrapper) ─────────────────────────────────────
 
 pub async fn run(ctx: &Context, interaction: &CommandInteraction) {
-    let user = &interaction.user;
+    configure_sentry_scope("Ping", interaction.user.id.get(), None);
+    let _ = run_with_http(&ctx.http, interaction).await;
+}
 
-    configure_sentry_scope("Ping", user.id.get(), None);
+/// Execute the Discord transport adapter with an explicit HTTP client.
+///
+/// Keeping this boundary independent of [`Context`] allows protocol tests to
+/// exercise Serenity's real request serialization against a local server.
+pub async fn run_with_http(http: &Http, interaction: &CommandInteraction) -> serenity::Result<()> {
+    let user = &interaction.user;
 
     let reply = handle_ping(&user.mention().to_string());
 
@@ -42,7 +50,7 @@ pub async fn run(ctx: &Context, interaction: &CommandInteraction) {
     let response_message = CreateInteractionResponseMessage::new().content(text);
     let response = CreateInteractionResponse::Message(response_message);
 
-    let _ = interaction.create_response(&ctx.http, response).await;
+    interaction.create_response(http, response).await
 }
 
 // ── Tests ───────────────────────────────────────────────────────────────
