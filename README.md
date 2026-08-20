@@ -60,6 +60,7 @@ Current settings shown in the panel:
 
 ## Documentation
 
+- [Testing Discord command plumbing](docs/testing.md) — deterministic protocol tests and the opt-in live Discord smoke checklist
 - [OAuth data contract](docs/oauth-contract.md) — shared schema and payload contract with the [`auth`](https://github.com/annie-mei/auth) repo
 - [Database schema ownership](docs/database-schemas.md) — shared Postgres schemas, migration isolation, grants, and deployment order
 
