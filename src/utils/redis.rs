@@ -121,3 +121,180 @@ pub fn try_to_cache_response(key: &str, response: &str) {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::{
+        collections::HashMap,
+        io::{BufRead, BufReader, Read, Write},
+        net::{TcpListener, TcpStream},
+        sync::{
+            Arc, Mutex,
+            atomic::{AtomicBool, AtomicUsize, Ordering},
+        },
+        thread,
+        time::Instant,
+    };
+
+    struct MockRedis {
+        address: String,
+        accepted_connections: Arc<AtomicUsize>,
+        ttl: Arc<Mutex<Option<u64>>>,
+        stopping: Arc<AtomicBool>,
+        server: Option<thread::JoinHandle<()>>,
+    }
+
+    impl MockRedis {
+        fn start() -> Self {
+            let listener = TcpListener::bind("127.0.0.1:0").expect("bind mock Redis");
+            listener
+                .set_nonblocking(true)
+                .expect("make mock Redis nonblocking");
+            let address = listener
+                .local_addr()
+                .expect("read mock Redis address")
+                .to_string();
+            let accepted_connections = Arc::new(AtomicUsize::new(0));
+            let ttl = Arc::new(Mutex::new(None));
+            let stopping = Arc::new(AtomicBool::new(false));
+            let values = Arc::new(Mutex::new(HashMap::new()));
+
+            let server_connections = Arc::clone(&accepted_connections);
+            let server_ttl = Arc::clone(&ttl);
+            let server_stopping = Arc::clone(&stopping);
+            let server = thread::spawn(move || {
+                while !server_stopping.load(Ordering::Relaxed) {
+                    match listener.accept() {
+                        Ok((stream, _)) => {
+                            server_connections.fetch_add(1, Ordering::Relaxed);
+                            let values = Arc::clone(&values);
+                            let ttl = Arc::clone(&server_ttl);
+                            thread::spawn(move || serve_connection(stream, &values, &ttl));
+                        }
+                        Err(error) if error.kind() == std::io::ErrorKind::WouldBlock => {
+                            thread::sleep(Duration::from_millis(5));
+                        }
+                        Err(error) => panic!("mock Redis accept failed: {error}"),
+                    }
+                }
+            });
+
+            Self {
+                address,
+                accepted_connections,
+                ttl,
+                stopping,
+                server: Some(server),
+            }
+        }
+
+        fn url(&self) -> String {
+            format!("redis://{}/", self.address)
+        }
+    }
+
+    impl Drop for MockRedis {
+        fn drop(&mut self) {
+            self.stopping.store(true, Ordering::Relaxed);
+            let _ = TcpStream::connect(&self.address);
+            if let Some(server) = self.server.take() {
+                server.join().expect("stop mock Redis");
+            }
+        }
+    }
+
+    fn serve_connection(
+        stream: TcpStream,
+        values: &Mutex<HashMap<String, String>>,
+        ttl: &Mutex<Option<u64>>,
+    ) {
+        let mut writer = stream.try_clone().expect("clone mock Redis stream");
+        let mut reader = BufReader::new(stream);
+
+        while let Some(command) = read_command(&mut reader) {
+            match command[0].to_ascii_uppercase().as_str() {
+                "PING" => writer.write_all(b"+PONG\r\n").expect("reply to PING"),
+                "CLIENT" => writer.write_all(b"+OK\r\n").expect("reply to CLIENT"),
+                "GET" => match values.lock().expect("lock mock values").get(&command[1]) {
+                    Some(value) => writer
+                        .write_all(format!("${}\r\n{value}\r\n", value.len()).as_bytes())
+                        .expect("reply to GET"),
+                    None => writer.write_all(b"$-1\r\n").expect("reply to GET miss"),
+                },
+                "SETEX" => {
+                    values
+                        .lock()
+                        .expect("lock mock values")
+                        .insert(command[1].clone(), command[3].clone());
+                    *ttl.lock().expect("lock mock TTL") =
+                        Some(command[2].parse().expect("parse SETEX TTL"));
+                    writer.write_all(b"+OK\r\n").expect("reply to SETEX");
+                }
+                command => panic!("unexpected Redis command: {command}"),
+            }
+        }
+    }
+
+    fn read_command(reader: &mut BufReader<TcpStream>) -> Option<Vec<String>> {
+        let mut line = String::new();
+        if reader.read_line(&mut line).ok()? == 0 {
+            return None;
+        }
+        let argument_count: usize = line.strip_prefix('*')?.trim().parse().ok()?;
+        let mut command = Vec::with_capacity(argument_count);
+
+        for _ in 0..argument_count {
+            line.clear();
+            reader.read_line(&mut line).ok()?;
+            let length: usize = line.strip_prefix('$')?.trim().parse().ok()?;
+            let mut argument = vec![0; length];
+            reader.read_exact(&mut argument).ok()?;
+            let mut crlf = [0; 2];
+            reader.read_exact(&mut crlf).ok()?;
+            command.push(String::from_utf8(argument).ok()?);
+        }
+
+        Some(command)
+    }
+
+    #[test]
+    fn cache_hit_miss_write_ttl_and_connection_reuse() {
+        let redis = MockRedis::start();
+        let cache = RedisCache::new(&redis.url()).expect("create Redis cache");
+
+        assert!(cache.get("missing").is_err());
+        cache.set("key", "value").expect("write cached value");
+        assert_eq!(cache.get("key").expect("read cached value"), "value");
+        assert_eq!(*redis.ttl.lock().expect("lock mock TTL"), Some(18_000));
+        assert_eq!(redis.accepted_connections.load(Ordering::Relaxed), 1);
+    }
+
+    #[test]
+    fn unavailable_redis_is_bounded() {
+        let listener = TcpListener::bind("127.0.0.1:0").expect("reserve unavailable port");
+        let url = format!("redis://{}/", listener.local_addr().expect("read address"));
+        drop(listener);
+        let cache = RedisCache::new(&url).expect("create Redis cache");
+
+        let started = Instant::now();
+        assert!(cache.get("key").is_err());
+        assert!(started.elapsed() < Duration::from_secs(3));
+    }
+
+    #[test]
+    fn command_wait_is_bounded() {
+        let listener = TcpListener::bind("127.0.0.1:0").expect("bind stalled Redis");
+        let url = format!("redis://{}/", listener.local_addr().expect("read address"));
+        let server = thread::spawn(move || {
+            let (_stream, _) = listener.accept().expect("accept stalled connection");
+            thread::sleep(Duration::from_secs(3));
+        });
+        let cache = RedisCache::new(&url).expect("create Redis cache");
+
+        let started = Instant::now();
+        assert!(cache.get("key").is_err());
+        assert!(started.elapsed() < Duration::from_secs(3));
+        server.join().expect("stop stalled Redis");
+    }
+}
