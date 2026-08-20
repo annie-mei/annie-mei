@@ -1,9 +1,5 @@
 #![recursion_limit = "256"]
 
-mod commands;
-mod models;
-mod utils;
-
 use std::env;
 use std::sync::Arc;
 
@@ -17,22 +13,24 @@ use serenity::{
         CreateEmbed, CreateInteractionResponse, CreateInteractionResponseMessage, CreateMessage,
     },
     async_trait,
-    builder::CreateCommand,
     client::{Client, Context, EventHandler},
     gateway::ActivityData,
     model::{application::Command, application::Interaction, gateway::Ready},
     prelude::*,
 };
 
-use utils::{
-    channel::is_nsfw_channel,
-    database::{DatabasePoolKey, create_pool, run_migrations},
-    llm::{GeminiClient, GeminiClientKey, configured_model_name},
-    oauth::{OAuthContextConfigKey, load_context_config},
-    posthog::{CommandTelemetryContext, PostHogClient},
-    privacy::{hash_discord_id, hash_user_id, redact_url_credentials},
-    statics::{DISCORD_TOKEN, ENV, SENTRY_DSN, SENTRY_TRACES_SAMPLE_RATE},
-    tls::install_rustls_crypto_provider,
+use annie_mei::{
+    commands::{self, BotCommand},
+    utils::{
+        channel::is_nsfw_channel,
+        database::{DatabasePoolKey, create_pool, run_migrations},
+        llm::{GeminiClient, GeminiClientKey, configured_model_name},
+        oauth::{OAuthContextConfigKey, load_context_config},
+        posthog::{CommandTelemetryContext, PostHogClient},
+        privacy::{hash_discord_id, hash_user_id, redact_url_credentials},
+        statics::{DISCORD_TOKEN, ENV, SENTRY_DSN, SENTRY_TRACES_SAMPLE_RATE},
+        tls::install_rustls_crypto_provider,
+    },
 };
 
 /// Annie Mei Discord Bot
@@ -79,32 +77,19 @@ impl EventHandler for Handler {
                     info!("Received command interaction");
                     self.capture_command_hit(&ctx, &command);
 
-                    match command.data.name.as_str() {
-                        "ping" => commands::ping::run(&ctx, &command).await,
-                        "help" => commands::help::run(&ctx, &command).await,
-                        "songs" => commands::songs::command::run(&ctx, &mut command).await,
-                        "manga" => commands::manga::command::run(&ctx, &mut command).await,
-                        "anime" => commands::anime::command::run(&ctx, &mut command).await,
-                        "search" => commands::search::command::run(&ctx, &mut command).await,
-                        "recommend" => commands::recommend::command::run(&ctx, &mut command).await,
-                        "character" => commands::character::command::run(&ctx, &mut command).await,
-                        "studio" => commands::studio::command::run(&ctx, &mut command).await,
-                        "register" => commands::register::command::run(&ctx, &mut command).await,
-                        "unregister" => commands::unregister::run(&ctx, &mut command).await,
-                        "whoami" => commands::whoami::run(&ctx, &mut command).await,
-                        "settings" => commands::settings::run(&ctx, &mut command).await,
-                        _ => {
-                            let embed = CreateEmbed::new()
-                                .title("Error")
-                                .description("Not implemented");
-                            let builder = CreateMessage::new().embed(embed);
-                            let msg = command.channel_id.send_message(&ctx.http, builder).await;
-                            if let Err(why) = msg {
-                                println!("Error sending message: {why:?}");
-                                info!("Cannot respond to slash command: {why}");
-                            }
+                    if let Some(bot_command) = BotCommand::from_name(&command.data.name) {
+                        bot_command.run(&ctx, &mut command).await;
+                    } else {
+                        let embed = CreateEmbed::new()
+                            .title("Error")
+                            .description("Not implemented");
+                        let builder = CreateMessage::new().embed(embed);
+                        let msg = command.channel_id.send_message(&ctx.http, builder).await;
+                        if let Err(why) = msg {
+                            println!("Error sending message: {why:?}");
+                            info!("Cannot respond to slash command: {why}");
                         }
-                    };
+                    }
                 }
                 .instrument(command_span)
                 .await;
@@ -145,21 +130,7 @@ impl EventHandler for Handler {
 
     #[instrument(name = "discord.ready", skip_all)]
     async fn ready(&self, ctx: Context, ready: Ready) {
-        let commands: Vec<CreateCommand> = vec![
-            commands::ping::register(),
-            commands::help::register(),
-            commands::songs::command::register(),
-            commands::manga::command::register(),
-            commands::anime::command::register(),
-            commands::search::command::register(),
-            commands::recommend::command::register(),
-            commands::character::command::register(),
-            commands::studio::command::register(),
-            commands::register::command::register(),
-            commands::unregister::register(),
-            commands::whoami::register(),
-            commands::settings::register(),
-        ];
+        let commands = commands::command_definitions();
 
         let guild_commands = Command::set_global_commands(&ctx.http, commands).await;
 
