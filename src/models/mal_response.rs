@@ -9,12 +9,13 @@ use tracing::instrument;
 pub struct MalResponse {
     id: u32,
     title: String,
+    #[serde(default)]
     main_picture: MalPicture,
     opening_themes: Option<Vec<SongInfo>>,
     ending_themes: Option<Vec<SongInfo>>,
 }
 
-#[derive(Deserialize, Debug, Clone)]
+#[derive(Deserialize, Debug, Clone, Default)]
 struct MalPicture {
     medium: Option<String>,
     large: Option<String>,
@@ -166,6 +167,7 @@ impl MalResponse {
         }
     }
 
+    #[instrument(name = "mal_response.get_episode_numbers", skip(song))]
     fn get_episode_numbers(song: &str) -> Option<String> {
         let start_index = song.rfind("(ep")?;
         let annotation = &song[(start_index + 1)..];
@@ -329,6 +331,19 @@ mod tests {
     #[test]
     fn transform_thumbnail_handles_missing_images() {
         let response = response_with_pictures(None, None);
+
+        assert_eq!(response.transform_thumbnail(), None);
+    }
+
+    #[test]
+    fn transform_thumbnail_handles_missing_main_picture() {
+        let response: MalResponse = serde_json::from_value(serde_json::json!({
+            "id": 5114,
+            "title": "Fullmetal Alchemist: Brotherhood",
+            "opening_themes": [],
+            "ending_themes": []
+        }))
+        .expect("MAL response should deserialize");
 
         assert_eq!(response.transform_thumbnail(), None);
     }
