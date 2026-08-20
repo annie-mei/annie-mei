@@ -294,7 +294,7 @@ mod tests {
     }
 
     fn read_command(reader: &mut BufReader<TcpStream>) -> Option<Vec<String>> {
-        let mut line = String::new();
+        let mut line = String::default();
         if reader.read_line(&mut line).ok()? == 0 {
             return None;
         }
