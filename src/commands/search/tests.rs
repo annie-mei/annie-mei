@@ -180,8 +180,8 @@ fn format_interpretation_is_conversational() {
     };
 
     assert_eq!(
-        format_interpretation(&intent),
-        format_manga_interpretation(interpretation_variant(&intent), "Berserk")
+        format_interpretation_with_variant(&intent, 4),
+        "Manga radar says: `Berserk`."
     );
 }
 
@@ -194,34 +194,36 @@ fn format_interpretation_handles_unknown_media_type() {
     };
 
     assert_eq!(
-        format_interpretation(&intent),
-        format_unknown_interpretation(interpretation_variant(&intent), "Monster")
+        format_interpretation_with_variant(&intent, 6),
+        "I chased that clue to `Monster`."
     );
 }
 
 #[test]
-fn interpretation_variant_is_stable_for_same_search() {
+fn interpretation_variant_uses_supplied_random_value() {
     let intent = SearchIntent {
         media_type: SearchMediaType::Anime,
         search: "Trigun".to_string(),
         candidates: Vec::new(),
     };
 
-    assert_eq!(
-        interpretation_variant(&intent),
-        interpretation_variant(&intent)
-    );
+    for expected in 0..INTERPRETATION_VARIANT_COUNT {
+        assert_eq!(
+            interpretation_variant_with_random_value(&intent, Some(expected)),
+            expected as usize
+        );
+    }
 }
 
 #[test]
-fn interpretation_variant_has_stable_cross_toolchain_mapping() {
+fn interpretation_variant_falls_back_to_stable_cross_toolchain_mapping() {
     let intent = SearchIntent {
         media_type: SearchMediaType::Anime,
         search: "Trigun".to_string(),
         candidates: Vec::new(),
     };
 
-    assert_eq!(interpretation_variant(&intent), 5);
+    assert_eq!(interpretation_variant_with_random_value(&intent, None), 5);
 }
 
 #[test]

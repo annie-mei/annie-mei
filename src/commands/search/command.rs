@@ -416,6 +416,14 @@ pub async fn run(ctx: &Context, interaction: &mut CommandInteraction) {
 fn format_interpretation(intent: &SearchIntent) -> String {
     let variant = interpretation_variant(intent);
 
+    format_interpretation_with_variant(intent, variant)
+}
+
+#[instrument(
+    name = "command.search.format_interpretation_with_variant",
+    skip(intent)
+)]
+fn format_interpretation_with_variant(intent: &SearchIntent, variant: usize) -> String {
     match intent.media_type {
         SearchMediaType::Anime => format_anime_interpretation(variant, &intent.search),
         SearchMediaType::Manga => format_manga_interpretation(variant, &intent.search),
@@ -425,20 +433,41 @@ fn format_interpretation(intent: &SearchIntent) -> String {
 
 #[instrument(name = "command.search.interpretation_variant", skip(intent))]
 fn interpretation_variant(intent: &SearchIntent) -> usize {
+    let mut random_bytes = [0_u8; 8];
+    let random_value = getrandom::fill(&mut random_bytes)
+        .ok()
+        .map(|()| u64::from_ne_bytes(random_bytes));
+
+    interpretation_variant_with_random_value(intent, random_value)
+}
+
+#[instrument(
+    name = "command.search.interpretation_variant_with_random_value",
+    skip(intent)
+)]
+fn interpretation_variant_with_random_value(
+    intent: &SearchIntent,
+    random_value: Option<u64>,
+) -> usize {
+    let value = random_value.unwrap_or_else(|| stable_interpretation_value(intent));
+
+    (value % INTERPRETATION_VARIANT_COUNT) as usize
+}
+
+#[instrument(name = "command.search.stable_interpretation_value", skip(intent))]
+fn stable_interpretation_value(intent: &SearchIntent) -> u64 {
     let media_type = match intent.media_type {
         SearchMediaType::Anime => 0_u8,
         SearchMediaType::Manga => 1,
         SearchMediaType::Unknown => 2,
     };
 
-    let hash = intent
+    intent
         .search
         .bytes()
         .fold(u64::from(media_type), |hash, byte| {
             hash.wrapping_mul(31).wrapping_add(u64::from(byte))
-        });
-
-    (hash % INTERPRETATION_VARIANT_COUNT) as usize
+        })
 }
 
 #[instrument(name = "command.search.format_anime_interpretation", skip(search))]
