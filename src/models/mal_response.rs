@@ -167,13 +167,10 @@ impl MalResponse {
     }
 
     fn get_episode_numbers(song: &str) -> Option<String> {
-        let has_episodes_numbers = song.contains("(ep");
-        if !has_episodes_numbers {
-            return None;
-        }
-        let start_index = song.rfind('(').unwrap();
-        let end_index = song.rfind(')').unwrap();
-        Some(song[(start_index + 1)..end_index].to_string())
+        let start_index = song.rfind("(ep")?;
+        let annotation = &song[(start_index + 1)..];
+        let end_index = annotation.find(')')?;
+        Some(annotation[..end_index].to_string())
     }
 
     fn get_song_name(song: &str) -> String {
@@ -226,15 +223,11 @@ impl MalResponse {
         linker("MyAnimeList", &link)
     }
 
-    pub fn transform_thumbnail(&self) -> String {
-        let large = self.main_picture.large.as_ref();
-        let medium = self.main_picture.medium.as_ref();
-
-        if let Some(value) = large {
-            return value.to_string();
-        }
-
-        medium.unwrap().to_string()
+    pub fn transform_thumbnail(&self) -> Option<String> {
+        self.main_picture
+            .large
+            .clone()
+            .or_else(|| self.main_picture.medium.clone())
     }
 
     pub fn transform_title(&self) -> String {
@@ -284,6 +277,74 @@ mod tests {
             MalResponse::format_parsed_songs(&songs),
             "1. Again by YUI · eps 1-14"
         );
+    }
+
+    #[test]
+    fn get_episode_numbers_extracts_annotation() {
+        let song = "#1: \"Again\" by YUI (eps 1-14)";
+
+        assert_eq!(
+            MalResponse::get_episode_numbers(song),
+            Some("eps 1-14".to_string())
+        );
+    }
+
+    #[test]
+    fn get_episode_numbers_ignores_unclosed_annotation() {
+        let song = "#1: \"Again\" by YUI (eps 1-14";
+
+        assert_eq!(MalResponse::get_episode_numbers(song), None);
+    }
+
+    #[test]
+    fn get_episode_numbers_ignores_songs_without_annotation() {
+        let song = "#1: \"Again\" by YUI";
+
+        assert_eq!(MalResponse::get_episode_numbers(song), None);
+    }
+
+    #[test]
+    fn transform_thumbnail_prefers_large_image() {
+        let response = response_with_pictures(
+            Some("https://example.com/medium.jpg"),
+            Some("https://example.com/large.jpg"),
+        );
+
+        assert_eq!(
+            response.transform_thumbnail(),
+            Some("https://example.com/large.jpg".to_string())
+        );
+    }
+
+    #[test]
+    fn transform_thumbnail_falls_back_to_medium_image() {
+        let response = response_with_pictures(Some("https://example.com/medium.jpg"), None);
+
+        assert_eq!(
+            response.transform_thumbnail(),
+            Some("https://example.com/medium.jpg".to_string())
+        );
+    }
+
+    #[test]
+    fn transform_thumbnail_handles_missing_images() {
+        let response = response_with_pictures(None, None);
+
+        assert_eq!(response.transform_thumbnail(), None);
+    }
+
+    fn response_with_pictures(medium: Option<&str>, large: Option<&str>) -> MalResponse {
+        serde_json::from_value(serde_json::json!({
+            "id": 5114,
+            "title": "Fullmetal Alchemist: Brotherhood",
+            "main_picture": {
+                "medium": medium,
+                "large": large
+            },
+            "opening_themes": [],
+            "ending_themes": []
+        }))
+        .expect("MAL response should deserialize")
     }
 
     #[test]
