@@ -174,16 +174,19 @@ fn enrich_songs_with_backend<B: SpotifyBackend>(songs: &mut [ParsedSong], backen
         }
 
         let authenticated = *authentication.get_or_insert_with(|| backend.authenticate());
-        let url = if authenticated {
-            search_song(
-                backend,
-                &song.romaji_name,
-                song.kana_name.as_deref(),
-                artist,
-            )
-        } else {
-            None
-        };
+        if !authenticated {
+            // No Spotify lookup occurred, so do not turn a transient token
+            // failure into a five-hour negative cache entry.
+            song.spotify_url = None;
+            continue;
+        }
+
+        let url = search_song(
+            backend,
+            &song.romaji_name,
+            song.kana_name.as_deref(),
+            artist,
+        );
 
         backend.write_cache(&cache_key, url.as_deref().unwrap_or("None"));
         song.spotify_url = url;
@@ -210,6 +213,7 @@ mod tests {
         cache: HashMap<String, Option<String>>,
         cached_writes: Vec<(String, String)>,
         authentication_count: usize,
+        authentication_result: Option<bool>,
         searches: Vec<(String, String)>,
         search_results: VecDeque<SearchOutcome>,
     }
@@ -224,7 +228,7 @@ mod tests {
 
         fn authenticate(&mut self) -> bool {
             self.authentication_count += 1;
-            true
+            self.authentication_result.unwrap_or(true)
         }
 
         fn search(&mut self, song_name: &str, artist_name: &str) -> SearchOutcome {
@@ -360,5 +364,24 @@ mod tests {
             backend.cached_writes[0],
             ("First:None:Artist".to_string(), "None".to_string())
         );
+    }
+
+    #[test]
+    fn failed_authentication_does_not_write_negative_cache_entries() {
+        let mut songs = vec![
+            song("First", None, "Artist"),
+            song("Second", None, "Artist"),
+        ];
+        let mut backend = FakeBackend {
+            authentication_result: Some(false),
+            ..Default::default()
+        };
+
+        enrich_songs_with_backend(&mut songs, &mut backend);
+
+        assert_eq!(backend.authentication_count, 1);
+        assert!(backend.searches.is_empty());
+        assert!(backend.cached_writes.is_empty());
+        assert!(songs.iter().all(|song| song.spotify_url.is_none()));
     }
 }
