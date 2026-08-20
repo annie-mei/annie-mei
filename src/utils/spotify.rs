@@ -39,6 +39,7 @@ struct DefaultSpotifyBackend {
 }
 
 impl SpotifyBackend for DefaultSpotifyBackend {
+    #[instrument(name = "spotify.backend.read_cache", skip(self, key), fields(key_len = key.len()))]
     fn read_cache(&mut self, key: &str) -> CacheLookup {
         match check_cache(key) {
             Ok(value) => {
@@ -55,6 +56,7 @@ impl SpotifyBackend for DefaultSpotifyBackend {
         }
     }
 
+    #[instrument(name = "spotify.backend.authenticate", skip(self))]
     fn authenticate(&mut self) -> bool {
         let spotify = get_spotify_client();
         if let Err(err) = spotify.request_token() {
@@ -66,6 +68,7 @@ impl SpotifyBackend for DefaultSpotifyBackend {
         true
     }
 
+    #[instrument(name = "spotify.backend.search", skip(self, song_name, artist_name), fields(song = %song_name, artist = %artist_name))]
     fn search(&mut self, song_name: &str, artist_name: &str) -> SearchOutcome {
         let Some(spotify) = self.client.as_ref() else {
             return SearchOutcome::Failed;
@@ -83,6 +86,7 @@ impl SpotifyBackend for DefaultSpotifyBackend {
         }
     }
 
+    #[instrument(name = "spotify.backend.write_cache", skip(self, key, value), fields(key_len = key.len(), value_len = value.len()))]
     fn write_cache(&mut self, key: &str, value: &str) {
         try_to_cache_response(key, value);
     }
