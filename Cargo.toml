@@ -29,6 +29,7 @@ linkify = "0.11"
 ngrammatic = "0.7.0"
 reqwest = { version = "0.13.4", default-features = false, features = ["http2", "rustls-no-provider"] }
 redis = { version = "1.2.2", features = ["tls-rustls"] }
+r2d2 = "0.8.10"
 rspotify = { version = "0.16.1", default-features = false, features = [
   "client-ureq",
   "ureq-rustls-tls",
