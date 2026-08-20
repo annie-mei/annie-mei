@@ -24,6 +24,7 @@ use serenity::{
     all::{CommandInteraction, CreateCommandOption, EditInteractionResponse},
     builder::CreateCommand,
     client::Context,
+    http::Http,
     model::application::CommandOptionType,
 };
 
@@ -75,28 +76,11 @@ pub fn handle_anime(
 
 #[instrument(name = "command.anime.run", skip(ctx, interaction))]
 pub async fn run(ctx: &Context, interaction: &mut CommandInteraction) {
-    let _ = interaction.defer(&ctx.http).await;
-
     let user = &interaction.user;
 
-    // Validate the required "search" option up-front.
-    let Some(serenity::all::CommandDataOptionValue::String(search_term)) =
-        interaction.data.options.first().map(|opt| &opt.value)
-    else {
-        let builder = EditInteractionResponse::new()
-            .content("Tell me which anime to look up with `search:<name or AniList ID>`.");
-        let _ = interaction.edit_response(&ctx.http, builder).await;
+    let Some(search_term) = defer_and_validate_search(&ctx.http, interaction).await else {
         return;
     };
-    let search_term = search_term.clone();
-
-    if let Err(err) = validate_search_term(&search_term) {
-        let builder = EditInteractionResponse::new().content(format!(
-            "I couldn't use that search: {err}. Try an anime title or AniList ID."
-        ));
-        let _ = interaction.edit_response(&ctx.http, builder).await;
-        return;
-    }
 
     configure_sentry_scope("Anime", user.id.get(), Some(json!(search_term.clone())));
 
@@ -166,6 +150,40 @@ pub async fn run(ctx: &Context, interaction: &mut CommandInteraction) {
             interaction.edit_response(&ctx.http, builder).await
         }
     };
+}
+
+/// Defer the interaction and validate the required search option.
+///
+/// This is the protocol-testable prefix of `/anime`; upstream lookups and
+/// cache-dependent behavior remain in [`run`].
+#[instrument(
+    name = "command.anime.defer_and_validate_search",
+    skip(http, interaction)
+)]
+pub async fn defer_and_validate_search(
+    http: &Http,
+    interaction: &CommandInteraction,
+) -> Option<String> {
+    let _ = interaction.defer(http).await;
+
+    let Some(serenity::all::CommandDataOptionValue::String(search_term)) =
+        interaction.data.options.first().map(|opt| &opt.value)
+    else {
+        let builder = EditInteractionResponse::new()
+            .content("Tell me which anime to look up with `search:<name or AniList ID>`.");
+        let _ = interaction.edit_response(http, builder).await;
+        return None;
+    };
+
+    if let Err(err) = validate_search_term(search_term) {
+        let builder = EditInteractionResponse::new().content(format!(
+            "I couldn't use that search: {err}. Try an anime title or AniList ID."
+        ));
+        let _ = interaction.edit_response(http, builder).await;
+        return None;
+    }
+
+    Some(search_term.clone())
 }
 
 // ── Tests ───────────────────────────────────────────────────────────────
