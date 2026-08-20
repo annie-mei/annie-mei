@@ -3,7 +3,7 @@ name = "annie-mei"
 version = "3.10.8"
 edition = "2024"
 license = "GPL-3.0-or-later"
-rust-version = "1.95"
+rust-version = "1.97.1"
 
 [profile.dev]
 split-debuginfo = "unpacked"
