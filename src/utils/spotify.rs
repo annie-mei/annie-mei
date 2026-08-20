@@ -15,6 +15,8 @@ use rspotify::{
 use std::env;
 use tracing::{error, info, instrument};
 
+const MAX_AUTHENTICATION_ATTEMPTS: usize = 2;
+
 enum CacheLookup {
     Hit(Option<String>),
     Miss,
@@ -164,6 +166,7 @@ fn search_song<B: SpotifyBackend>(
 #[instrument(name = "spotify.enrich_songs_backend", skip(songs, backend), fields(count = songs.len()))]
 fn enrich_songs_with_backend<B: SpotifyBackend>(songs: &mut [ParsedSong], backend: &mut B) {
     let mut authentication = None;
+    let mut authentication_attempts = 0;
 
     for song in songs.iter_mut() {
         let Some(artist) = song.artist_names.as_deref() else {
@@ -177,7 +180,16 @@ fn enrich_songs_with_backend<B: SpotifyBackend>(songs: &mut [ParsedSong], backen
             continue;
         }
 
-        let authenticated = *authentication.get_or_insert_with(|| backend.authenticate());
+        let authenticated = match authentication {
+            Some(true) => true,
+            _ if authentication_attempts < MAX_AUTHENTICATION_ATTEMPTS => {
+                authentication_attempts += 1;
+                let authenticated = backend.authenticate();
+                authentication = Some(authenticated);
+                authenticated
+            }
+            _ => false,
+        };
         if !authenticated {
             // No Spotify lookup occurred, so do not turn a transient token
             // failure into a five-hour negative cache entry.
@@ -217,7 +229,7 @@ mod tests {
         cache: HashMap<String, Option<String>>,
         cached_writes: Vec<(String, String)>,
         authentication_count: usize,
-        authentication_result: Option<bool>,
+        authentication_results: VecDeque<bool>,
         searches: Vec<(String, String)>,
         search_results: VecDeque<SearchOutcome>,
     }
@@ -232,7 +244,7 @@ mod tests {
 
         fn authenticate(&mut self) -> bool {
             self.authentication_count += 1;
-            self.authentication_result.unwrap_or(true)
+            self.authentication_results.pop_front().unwrap_or(true)
         }
 
         fn search(&mut self, song_name: &str, artist_name: &str) -> SearchOutcome {
@@ -377,15 +389,46 @@ mod tests {
             song("Second", None, "Artist"),
         ];
         let mut backend = FakeBackend {
-            authentication_result: Some(false),
+            authentication_results: VecDeque::from([false, false]),
             ..Default::default()
         };
 
         enrich_songs_with_backend(&mut songs, &mut backend);
 
-        assert_eq!(backend.authentication_count, 1);
+        assert_eq!(backend.authentication_count, MAX_AUTHENTICATION_ATTEMPTS);
         assert!(backend.searches.is_empty());
         assert!(backend.cached_writes.is_empty());
         assert!(songs.iter().all(|song| song.spotify_url.is_none()));
+    }
+
+    #[test]
+    fn transient_authentication_failure_retries_once_and_reuses_recovered_client() {
+        let mut songs = vec![
+            song("First", None, "Artist"),
+            song("Second", None, "Artist"),
+            song("Third", None, "Artist"),
+        ];
+        let mut backend = FakeBackend {
+            authentication_results: VecDeque::from([false, true]),
+            search_results: VecDeque::from([
+                SearchOutcome::Found("https://spotify/second".to_string()),
+                SearchOutcome::Found("https://spotify/third".to_string()),
+            ]),
+            ..Default::default()
+        };
+
+        enrich_songs_with_backend(&mut songs, &mut backend);
+
+        assert_eq!(backend.authentication_count, 2);
+        assert!(songs[0].spotify_url.is_none());
+        assert_eq!(
+            songs[1].spotify_url.as_deref(),
+            Some("https://spotify/second")
+        );
+        assert_eq!(
+            songs[2].spotify_url.as_deref(),
+            Some("https://spotify/third")
+        );
+        assert_eq!(backend.cached_writes.len(), 2);
     }
 }
