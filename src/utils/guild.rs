@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, fmt::Display, future::Future};
 
 use crate::{
     models::{
@@ -30,6 +30,10 @@ struct BatchUserMediaListResponse {
 }
 
 const MEDIA_LIST_QUERY_FIELDS: &str = "status\nscore(format: POINT_100)\nprogress\nprogressVolumes";
+// Each lookup is a root resolver returning four scalar fields. Twenty-five
+// lookups therefore cap a request at 100 fields and roughly 4 KiB of query
+// text, while avoiding a separate rate-limited AniList request per member.
+const ANILIST_MEDIA_LIST_BATCH_SIZE: usize = 25;
 
 #[instrument(name = "guild.media_alias")]
 fn media_alias(index: usize) -> String {
@@ -155,61 +159,103 @@ async fn get_guild_anilist_data(
     media_id: u32,
     media_type: String,
 ) -> HashMap<u64, MediaListData> {
-    if guild_members.is_empty() {
-        return HashMap::new();
-    }
+    get_guild_anilist_data_with_sender(guild_members, media_id, media_type, send_request).await
+}
 
-    // Skip credentials whose stored discord_user_id is not a valid u64; we
-    // index back into the per-guild HashMap by Discord snowflake (u64).
-    let discord_ids_by_media_alias: HashMap<String, u64> = guild_members
-        .iter()
-        .enumerate()
-        .filter_map(|(index, credential)| {
-            credential
-                .discord_id_u64()
-                .map(|discord_id| (media_alias(index), discord_id))
+#[instrument(name = "guild.fetch_anilist_data_batches", skip(guild_members, media_type, sender), fields(member_count = guild_members.len(), media_id = media_id, media_type = %media_type))]
+async fn get_guild_anilist_data_with_sender<F, Fut, E>(
+    guild_members: Vec<OAuthCredential>,
+    media_id: u32,
+    media_type: String,
+    mut sender: F,
+) -> HashMap<u64, MediaListData>
+where
+    F: FnMut(serde_json::Value) -> Fut,
+    Fut: Future<Output = Result<String, E>>,
+    E: Display,
+{
+    // Invalid stored identifiers cannot be mapped safely and an out-of-range
+    // AniList ID is not valid for GraphQL's signed 32-bit Int type.
+    let valid_guild_members: Vec<_> = guild_members
+        .into_iter()
+        .filter(|credential| {
+            credential.discord_id_u64().is_some()
+                && i32::try_from(credential.anilist_id).is_ok_and(|id| id > 0)
         })
         .collect();
 
-    let query = build_batch_media_list_query(&guild_members);
+    let mut guild_members_data: HashMap<u64, MediaListData> = HashMap::new();
+    let batch_count = valid_guild_members
+        .len()
+        .div_ceil(ANILIST_MEDIA_LIST_BATCH_SIZE);
 
-    let body = json!({
-        "query": query,
-        "variables": {
-            "type": media_type.to_uppercase(),
-            "mediaId": media_id
-        }
-    });
+    for (batch_index, guild_member_batch) in valid_guild_members
+        .chunks(ANILIST_MEDIA_LIST_BATCH_SIZE)
+        .enumerate()
+    {
+        // Aliases restart in each independent query, so build the reverse map
+        // from this exact slice rather than from the full guild member list.
+        let discord_ids_by_media_alias: HashMap<String, u64> = guild_member_batch
+            .iter()
+            .enumerate()
+            .filter_map(|(index, credential)| {
+                credential
+                    .discord_id_u64()
+                    .map(|discord_id| (media_alias(index), discord_id))
+            })
+            .collect();
+        let query = build_batch_media_list_query(guild_member_batch);
 
-    info!(
-        request_body_len = body.to_string().len(),
-        "Sending batch AniList media list query"
-    );
-    let user_media_list_response = match send_request(body).await {
-        Ok(response) => response,
-        Err(err) => {
-            error!(error = %err, "AniList batch media list request failed");
-            return HashMap::new();
-        }
-    };
+        let body = json!({
+            "query": query,
+            "variables": {
+                "type": media_type.to_uppercase(),
+                "mediaId": media_id
+            }
+        });
 
-    let user_media_list_response: BatchUserMediaListResponse =
-        match serde_json::from_str::<BatchUserMediaListResponse>(&user_media_list_response) {
+        info!(
+            batch_number = batch_index + 1,
+            batch_count,
+            batch_member_count = guild_member_batch.len(),
+            request_body_len = body.to_string().len(),
+            "Sending batch AniList media list query"
+        );
+        let user_media_list_response = match sender(body).await {
             Ok(response) => response,
             Err(err) => {
-                error!("Failed to parse guild AniList media data response: {err}");
-                return HashMap::new();
+                error!(
+                    error = %err,
+                    batch_number = batch_index + 1,
+                    batch_count,
+                    "AniList batch media list request failed"
+                );
+                continue;
             }
         };
 
-    let mut guild_members_data: HashMap<u64, MediaListData> = HashMap::new();
-    if let Some(media_lookup_data) = user_media_list_response.data {
-        for (media_alias, media_list_data) in media_lookup_data {
-            if let (Some(discord_id), Some(data)) = (
-                discord_ids_by_media_alias.get(&media_alias),
-                media_list_data,
-            ) {
-                guild_members_data.insert(*discord_id, data);
+        let user_media_list_response: BatchUserMediaListResponse =
+            match serde_json::from_str::<BatchUserMediaListResponse>(&user_media_list_response) {
+                Ok(response) => response,
+                Err(err) => {
+                    error!(
+                        error = %err,
+                        batch_number = batch_index + 1,
+                        batch_count,
+                        "Failed to parse guild AniList media data response"
+                    );
+                    continue;
+                }
+            };
+
+        if let Some(media_lookup_data) = user_media_list_response.data {
+            for (media_alias, media_list_data) in media_lookup_data {
+                if let (Some(discord_id), Some(data)) = (
+                    discord_ids_by_media_alias.get(&media_alias),
+                    media_list_data,
+                ) {
+                    guild_members_data.insert(*discord_id, data);
+                }
             }
         }
     }
