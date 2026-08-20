@@ -277,6 +277,7 @@ mod tests {
     };
     use serde_json::{Value, json};
 
+    #[tracing::instrument(skip(discord_id, anilist_id))]
     fn credential(discord_id: impl ToString, anilist_id: i64) -> OAuthCredential {
         OAuthCredential {
             discord_user_id: discord_id.to_string(),
@@ -285,6 +286,7 @@ mod tests {
         }
     }
 
+    #[tracing::instrument(skip(entries))]
     fn media_response(entries: &[(usize, u32)]) -> String {
         let data = entries
             .iter()
