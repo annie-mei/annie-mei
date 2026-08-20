@@ -117,8 +117,7 @@ This PR description was written by MODEL_NAME.
 3. Implement `register()` for slash command definition
 4. Implement `run()` for command execution
 5. Export in `src/commands/mod.rs`
-6. Register in `main.rs` `ready` event
-7. Add match arm in `main.rs` `interaction_create`
+6. Add a `BotCommand` variant and its name, definition, and `run()` mappings in `src/commands/mod.rs`; this catalog drives both registration and dispatch
 
 Notes:
 
@@ -152,13 +151,13 @@ Annie Mei-specific settings tables in the `annie_mei` schema, such as
 1. **Always defer long operations** - Discord has a 3-second response window
 2. **Keep blocking I/O on explicit boundaries** - use `spawn_blocking` for known sync subsystems (Redis, Spotify sync calls). Database operations are async via SQLx and don't need spawn_blocking
 3. **SQLx pool connects eagerly at startup** - The bot will fail fast if DB is unavailable on boot
-4. **Global command registration is slow to propagate** - `main.rs` re-registers global slash commands on startup
+4. **Global command registration is slow to propagate** - the `BotCommand` catalog is re-registered globally from `main.rs` on startup
 5. **Check environment variables** - Bot requires multiple env vars to run
 6. **Don't assume all commands follow the same file shape** - some are folder-based, others are single files
 
 ## Review Guidelines
 
-- Confirm command changes follow the existing registration and dispatch structure in `src/main.rs`
+- Confirm command registration and dispatch are both represented in the `BotCommand` catalog in `src/commands/mod.rs`
 - Prefer the core-handler plus thin-Serenity-adapter pattern for substantial command work
 - Verify blocking I/O work (Redis, Spotify) uses explicit `tokio::task::spawn_blocking` boundaries
 - Database operations use native SQLx async (no spawn_blocking needed)
@@ -170,7 +169,8 @@ Annie Mei-specific settings tables in the `annie_mei` schema, such as
 
 ## Key Paths
 
-- `src/main.rs` - bot startup, command registration/dispatch, shutdown, Sentry setup
+- `src/main.rs` - bot startup, Discord event handling, shutdown, Sentry setup
+- `src/commands/mod.rs` - shared slash-command registration and dispatch catalog
 - `src/commands/<name>/command.rs` or `src/commands/<name>.rs` - slash commands
 - `src/commands/response.rs` and `src/commands/traits.rs` - testable command patterns
 - `src/models/transformers.rs` - shared embed construction
