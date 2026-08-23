@@ -123,8 +123,10 @@ fn enrich_song_sections(
     mut openings: Vec<ParsedSong>,
     mut endings: Vec<ParsedSong>,
 ) -> (Vec<ParsedSong>, Vec<ParsedSong>) {
+    let opening_count = openings.len();
+    openings.append(&mut endings);
     enrich_songs_with_spotify(&mut openings);
-    enrich_songs_with_spotify(&mut endings);
+    let endings = openings.split_off(opening_count);
     (openings, endings)
 }
 
