@@ -73,7 +73,7 @@ jobs:
 
       - name: Setup Rust cache
         if: steps.load.outputs.bump_needed == 'true'
-        uses: Swatinem/rust-cache@v2.9.1
+        uses: Swatinem/rust-cache@v2.9.2
         with:
           cache-on-failure: "true"
           prefix-key: "annie-mei"
