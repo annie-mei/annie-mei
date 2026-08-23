@@ -191,7 +191,7 @@ dependencies = [
 
 [[package]]
 name = "annie-mei"
-version = "3.10.2"
+version = "3.10.3"
 dependencies = [
  "base64",
  "blake3",
