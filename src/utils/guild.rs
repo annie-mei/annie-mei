@@ -9,7 +9,7 @@ use crate::{
     },
     utils::{
         database::get_pool_from_context,
-        requests::anilist::send_request,
+        requests::anilist::{AniListRequestError, send_request},
         settings::{participates_in_guild_scores, resolve_guild_scores_enabled_with_pool},
     },
 };
@@ -60,6 +60,21 @@ fn build_batch_media_list_query(guild_members: &[OAuthCredential]) -> String {
         "query ($type: MediaType, $mediaId: Int) {{\n{}\n}}",
         media_lookups
     )
+}
+
+#[instrument(name = "guild.accept_partial_batch_response", skip(result))]
+fn accept_partial_batch_response(
+    result: Result<String, AniListRequestError>,
+) -> Result<String, AniListRequestError> {
+    match result {
+        Err(AniListRequestError::NonSuccessStatus { status: 404, body })
+            if serde_json::from_str::<BatchUserMediaListResponse>(&body)
+                .is_ok_and(|response| response.data.is_some()) =>
+        {
+            Ok(body)
+        }
+        result => result,
+    }
 }
 
 #[instrument(name = "discord.guild.member_ids", skip(guild), fields(member_count = guild.members.len()))]
@@ -159,7 +174,10 @@ async fn get_guild_anilist_data(
     media_id: u32,
     media_type: String,
 ) -> HashMap<u64, MediaListData> {
-    get_guild_anilist_data_with_sender(guild_members, media_id, media_type, send_request).await
+    get_guild_anilist_data_with_sender(guild_members, media_id, media_type, |body| async {
+        accept_partial_batch_response(send_request(body).await)
+    })
+    .await
 }
 
 #[instrument(name = "guild.fetch_anilist_data_batches", skip(guild_members, media_type, sender), fields(member_count = guild_members.len(), media_id = media_id, media_type = %media_type))]
@@ -268,13 +286,14 @@ mod tests {
     use std::{cell::RefCell, collections::VecDeque, future::ready};
 
     use super::{
-        ANILIST_MEDIA_LIST_BATCH_SIZE, build_batch_media_list_query,
+        ANILIST_MEDIA_LIST_BATCH_SIZE, accept_partial_batch_response, build_batch_media_list_query,
         get_guild_anilist_data_with_sender,
     };
     use crate::models::{
         db::oauth_credential::OAuthCredential,
         settings::{GuildScoresPreference, SettingValue, user_participates_in_guild_scores},
     };
+    use crate::utils::requests::anilist::AniListRequestError;
     use serde_json::{Value, json};
 
     #[tracing::instrument(skip(discord_id, anilist_id))]
@@ -415,6 +434,50 @@ mod tests {
 
         assert_eq!(result.len(), 1);
         assert_eq!(result[&1].score, Some(75));
+    }
+
+    #[tokio::test]
+    async fn partial_not_found_response_keeps_available_member_data() {
+        let members = vec![credential("1", 101), credential("2", 102)];
+        let body = json!({
+            "errors": [{ "message": "Not Found.", "status": 404 }],
+            "data": {
+                "media_0": {
+                    "status": "COMPLETED",
+                    "score": 88,
+                    "progress": 12,
+                    "progressVolumes": null
+                },
+                "media_1": null
+            }
+        })
+        .to_string();
+
+        let result = get_guild_anilist_data_with_sender(members, 42, "anime".to_string(), |_| {
+            ready(accept_partial_batch_response(Err(
+                AniListRequestError::NonSuccessStatus {
+                    status: 404,
+                    body: body.clone(),
+                },
+            )))
+        })
+        .await;
+
+        assert_eq!(result.len(), 1);
+        assert_eq!(result[&1].score, Some(88));
+    }
+
+    #[test]
+    fn non_partial_not_found_response_remains_an_error() {
+        let result = accept_partial_batch_response(Err(AniListRequestError::NonSuccessStatus {
+            status: 404,
+            body: r#"{"errors":[{"message":"Not Found.","status":404}]}"#.to_string(),
+        }));
+
+        assert!(matches!(
+            result,
+            Err(AniListRequestError::NonSuccessStatus { status: 404, .. })
+        ));
     }
 
     #[tokio::test]
