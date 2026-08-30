@@ -43,12 +43,18 @@ reviews:
         For slash commands, verify the newer architecture is followed where practical:
         - Prefer a transport-agnostic core handler plus a thin Serenity adapter in `run()`.
         - For substantial commands, prefer `src/commands/<name>/command.rs`.
-        - Check that command behavior matches the registration and dispatch structure in `src/main.rs`.
+        - Check that command registration and dispatch are both represented in the `BotCommand`
+          catalog in `src/commands/mod.rs`.
         - Ensure user-facing failures return clear Discord responses.
+
+    - path: "src/commands/mod.rs"
+      instructions: |
+        Review the `BotCommand` catalog as the shared source of truth for slash-command
+        registration and dispatch. Ensure names, definitions, and runtime adapters stay aligned.
 
     - path: "src/main.rs"
       instructions: |
-        Review command registration and dispatch carefully.
+        Review Discord event forwarding into the command catalog carefully.
         Check startup and shutdown flow, Sentry/tracing setup, and any privacy-sensitive logging.
 
     - path: "src/server.rs"
