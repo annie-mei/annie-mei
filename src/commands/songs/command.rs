@@ -12,7 +12,10 @@ use crate::{
 
 use serde_json::json;
 use serenity::{
-    all::{CommandInteraction, CreateCommandOption, CreateEmbed, EditInteractionResponse},
+    all::{
+        CommandDataOption, CommandDataOptionValue, CommandInteraction, CreateCommandOption,
+        CreateEmbed, EditInteractionResponse,
+    },
     builder::CreateCommand,
     client::Context,
     model::application::CommandOptionType,
@@ -21,17 +24,30 @@ use serenity::{
 use tokio::task;
 use tracing::{error, info, instrument};
 
+const SEARCH_OPTION: &str = "search";
+
 pub fn register() -> CreateCommand {
     CreateCommand::new("songs")
         .description("Find anime opening and ending theme songs")
         .add_option(
             CreateCommandOption::new(
                 CommandOptionType::String,
-                "search",
+                SEARCH_OPTION,
                 "AniList ID or anime search term",
             )
             .required(true),
         )
+}
+
+#[instrument(name = "command.songs.parse_options", skip(options))]
+fn parse_songs_options(options: &[CommandDataOption]) -> Option<String> {
+    options
+        .iter()
+        .find(|option| option.name == SEARCH_OPTION)
+        .and_then(|option| match &option.value {
+            CommandDataOptionValue::String(search_term) => Some(search_term.clone()),
+            _ => None,
+        })
 }
 
 #[instrument(name = "command.songs.run", skip(ctx, interaction))]
@@ -39,16 +55,19 @@ pub async fn run(ctx: &Context, interaction: &mut CommandInteraction) {
     let _ = interaction.defer(&ctx.http).await;
 
     let user = &interaction.user;
-    let arg = interaction.data.options[0].value.clone();
-    let arg_str = format!("{:?}", arg);
 
-    configure_sentry_scope("Songs", user.id.get(), Some(json!(arg_str)));
+    let Some(search_term) = parse_songs_options(&interaction.data.options) else {
+        let builder = EditInteractionResponse::new()
+            .content("Tell me what to look up with `search:<anime title or AniList ID>`.");
+        let _ = interaction.edit_response(&ctx.http, builder).await;
+        return;
+    };
 
-    info!("Got command 'songs' with args: {arg:#?}");
+    configure_sentry_scope("Songs", user.id.get(), Some(json!(search_term.clone())));
 
-    if let serenity::all::CommandDataOptionValue::String(ref search_term) = arg
-        && let Err(err) = validate_search_term(search_term)
-    {
+    info!("Got command 'songs' with args: {search_term:#?}");
+
+    if let Err(err) = validate_search_term(&search_term) {
         let builder = EditInteractionResponse::new().content(format!(
             "I couldn't use that search: {err}. Try an anime title or AniList ID."
         ));
@@ -56,7 +75,7 @@ pub async fn run(ctx: &Context, interaction: &mut CommandInteraction) {
         return;
     }
 
-    let response = SongFetcher(arg).await;
+    let response = SongFetcher(CommandDataOptionValue::String(search_term)).await;
 
     let _songs_response = match response {
         SongFetchResult::Found(mal_response) => {
@@ -82,22 +101,28 @@ pub async fn run(ctx: &Context, interaction: &mut CommandInteraction) {
             };
 
             // Pure formatting — no I/O, no spawn_blocking needed
-            let builder = EditInteractionResponse::new().embed(
-                CreateEmbed::new()
-                    .title(mal_response.transform_title())
-                    .field(
-                        "Opening themes",
-                        MalResponse::format_parsed_songs(&openings),
-                        false,
-                    )
-                    .field(
-                        "Ending themes",
-                        MalResponse::format_parsed_songs(&endings),
-                        false,
-                    )
-                    .thumbnail(mal_response.transform_thumbnail())
-                    .field("Source", mal_response.transform_mal_link(), false),
-            );
+            let mut embed = CreateEmbed::new()
+                .title(mal_response.transform_title())
+                .field(
+                    "Opening themes",
+                    MalResponse::format_parsed_songs(&openings),
+                    false,
+                )
+                .field(
+                    "Ending themes",
+                    MalResponse::format_parsed_songs(&endings),
+                    false,
+                );
+
+            if let Some(thumbnail) = mal_response.transform_thumbnail() {
+                embed = embed.thumbnail(thumbnail);
+            }
+
+            let builder = EditInteractionResponse::new().embed(embed.field(
+                "Source",
+                mal_response.transform_mal_link(),
+                false,
+            ));
             interaction.edit_response(&ctx.http, builder).await
         }
         SongFetchResult::AnimeNotFound => {
@@ -133,6 +158,53 @@ fn enrich_song_sections(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn string_option(name: &str, value: &str) -> CommandDataOption {
+        serde_json::from_value(serde_json::json!({
+            "name": name,
+            "type": 3,
+            "value": value
+        }))
+        .expect("option should deserialize")
+    }
+
+    fn integer_option(name: &str, value: i64) -> CommandDataOption {
+        serde_json::from_value(serde_json::json!({
+            "name": name,
+            "type": 4,
+            "value": value
+        }))
+        .expect("option should deserialize")
+    }
+
+    #[test]
+    fn parse_songs_options_extracts_search_term() {
+        let options = vec![string_option(SEARCH_OPTION, "Fullmetal Alchemist")];
+
+        assert_eq!(
+            parse_songs_options(&options),
+            Some("Fullmetal Alchemist".to_string())
+        );
+    }
+
+    #[test]
+    fn parse_songs_options_handles_missing_options() {
+        assert_eq!(parse_songs_options(&[]), None);
+    }
+
+    #[test]
+    fn parse_songs_options_ignores_incorrectly_typed_options() {
+        let options = vec![integer_option(SEARCH_OPTION, 5114)];
+
+        assert_eq!(parse_songs_options(&options), None);
+    }
+
+    #[test]
+    fn parse_songs_options_ignores_unknown_options() {
+        let options = vec![string_option("query", "Fullmetal Alchemist")];
+
+        assert_eq!(parse_songs_options(&options), None);
+    }
 
     fn song_without_artist(song_name: &str, display_number: u32) -> ParsedSong {
         ParsedSong {
