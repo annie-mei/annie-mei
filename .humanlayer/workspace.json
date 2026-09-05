@@ -1,0 +1,17 @@
+{
+  "disabled": false,
+  "pathTemplate": "~/.humanlayer/workspaces/{{ TASKSLUG }}/{{ REPOBASENAME }}",
+  "branchTemplate": "{{ TASKSLUG }}",
+  "sourceRef": "origin/main",
+  "setupCommand": "cargo fetch --locked",
+  "copyGlobs": [
+    ".codex/config.toml"
+  ],
+  "repos": [
+    {
+      "localPath": ".",
+      "description": "Annie Mei Discord bot",
+      "primary": true
+    }
+  ]
+}
