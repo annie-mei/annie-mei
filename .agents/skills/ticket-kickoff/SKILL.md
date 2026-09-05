@@ -89,6 +89,7 @@ Validation: <focused checks plus repository-required checks>
 Version ownership: <repository and file, bump level, no bump, or clarification needed>
 Authorization:
 - inspect: <authorized/not authorized and source>
+- fetch: <authorized/not authorized, authorization source, remote, and ref scope>
 - edit: <authorized/not authorized and source>
 - branch: <authorized/not authorized and source>
 - commit: <authorized/not authorized and source>
@@ -117,6 +118,7 @@ Treat each action as a separate capability. Authorization for a later action nev
 | Action | Required authorization |
 | --- | --- |
 | Inspect | The request clearly asks for investigation or implementation; ask before sensitive or out-of-scope inspection. |
+| Fetch | Explicit approval naming the repository or remote and ref scope to fetch. |
 | Edit files | The request clearly asks to implement or modify the scoped repositories. |
 | Create or switch branch | Explicit branch instruction, or explicit approval after presenting the suggested branch. |
 | Commit | Explicit request or approval to commit locally. |
@@ -126,7 +128,7 @@ Treat each action as a separate capability. Authorization for a later action nev
 
 Ticket creation is a separate action and always requires explicit approval. Never infer authorization for a branch, commit, push, PR, merge, ticket mutation, release, deployment, or destructive Git operation from a request to inspect or edit.
 
-Authorization applies only to the action and scope stated. For example, permission to push does not authorize opening a PR, and permission to open a PR does not authorize merging it. If authorization is absent, complete all authorized work, report the exact next action, and stop.
+Authorization applies only to the action and scope stated. Later actions do not authorize fetching: permission to create a branch, commit, push, open a PR, or merge does not authorize a fetch. Likewise, permission to push does not authorize opening a PR, and permission to open a PR does not authorize merging it. If authorization is absent, complete all authorized work, report the exact next action, and stop.
 
 ## 6. Execute without drifting
 
