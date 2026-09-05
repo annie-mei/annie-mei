@@ -10,8 +10,18 @@ updates:
     schedule:
       interval: "weekly"
     target-branch: "main"
+    groups:
+      weekly-cargo:
+        applies-to: "version-updates"
+        patterns:
+          - "*"
   - package-ecosystem: "github-actions"
     directory: "/"
     schedule:
-      interval: "daily"
+      interval: "weekly"
     target-branch: "main"
+    groups:
+      weekly-github-actions:
+        applies-to: "version-updates"
+        patterns:
+          - "*"
