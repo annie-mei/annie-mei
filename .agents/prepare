@@ -1,0 +1,11 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Delta checkouts are short-lived, but Rust build artifacts are expensive.
+# Keep them in a machine-local cache so new checkouts can reuse prior builds.
+# Cargo handles locking when multiple worktrees build concurrently.
+if [[ -z "${CARGO_TARGET_DIR:-}" && ! -e target && ! -L target ]]; then
+  target_cache="${XDG_CACHE_HOME:-$HOME/.cache}/delta/annie-mei/target"
+  mkdir -p "$target_cache"
+  ln -s "$target_cache" target
+fi
