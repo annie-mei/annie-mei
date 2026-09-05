@@ -11,11 +11,13 @@ Annie Mei is a Rust Discord bot using Serenity 0.12, SQLx, Redis, Spotify, and e
 - Opening, updating, commenting on, reviewing, merging, and closing a pull request are six distinct shared-state actions. Each requires explicit authorization for that action; authorization for one does not authorize any other. Read-only PR inspection does not require approval.
 - PR titles must use `[ANNIE-<ticket-number>]/<description>`.
 - Load and follow the project `pull-request` skill for any PR creation, update, review, comment, readiness check, merge, or close workflow.
+- After a Git failure, explain what failed, present the available recovery options, and ask the user which option to take.
 
 ## Code Conventions
 
+- Use Conventional Commits in the form `type(scope): summary` and keep commits small and logically coherent.
 - Run `cargo fmt`; run appropriate tests and `cargo clippy`, fixing warnings.
-- Use `tracing` macros and add `#[instrument]` to public and private functions where useful, with `skip(...)`/`fields(...)` as appropriate.
+- Use `tracing` macros. Add `#[instrument]` to public functions and all private/helper functions, preserving signatures and using `skip(...)`/`fields(...)` as appropriate.
 - Prefer `?` over `.unwrap()`.
 - Preserve the testable core-handler plus thin Serenity `run()` adapter pattern. Keep large embed construction in shared model/transformer code.
 - Defer Discord interactions before long work; Discord has a three-second response window.

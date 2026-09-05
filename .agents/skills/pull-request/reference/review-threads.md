@@ -40,7 +40,7 @@ gh api graphql --paginate --slurp \
                 originalLine
                 commit { oid }
               }
-              pageInfo { hasNextPage endCursor }
+              commentsPageInfo: pageInfo { hasNextPage endCursor }
             }
           }
           pageInfo { hasNextPage endCursor }
@@ -58,8 +58,8 @@ Find every thread whose embedded comments connection has another page:
 
 ```bash
 jq -r '.[] | .data.repository.pullRequest.reviewThreads.nodes[] |
-  select(.comments.pageInfo.hasNextPage) |
-  [.id, .comments.pageInfo.endCursor] | @tsv' \
+  select(.comments.commentsPageInfo.hasNextPage) |
+  [.id, .comments.commentsPageInfo.endCursor] | @tsv' \
   /tmp/annie-pr-review-threads.json
 ```
 
@@ -99,15 +99,18 @@ Do not omit resolved or outdated threads. They remain relevant history and can c
 
 ## Verify against the current head
 
-1. Read `headRefOid` from the retrieval output and independently refresh it with:
+1. Read `headRefOid` from the retrieval output and independently refresh it. Fetch only with explicit fetch authorization:
 
    ```bash
    HEAD_SHA=$(gh pr view "$PR" --json headRefOid --jq .headRefOid)
-   git fetch origin "pull/$PR/head:refs/remotes/origin/pr/$PR"
-   test "$(git rev-parse "refs/remotes/origin/pr/$PR")" = "$HEAD_SHA"
+   HEAD_REF="refs/remotes/origin/pr/$PR/head"
+   git fetch origin "pull/$PR/head:$HEAD_REF"
+   test "$(git rev-parse "$HEAD_REF")" = "$HEAD_SHA"
    ```
 
-2. For every substantive finding, inspect the referenced path and surrounding implementation at `HEAD_SHA` (for example, `git show "$HEAD_SHA:<path>"`). Trace related callers/tests when the claim depends on behavior beyond the commented line.
+   When fetching is not authorized, inspect files at the captured SHA through the read-only contents API, for example `gh api "repos/$OWNER/$REPO/contents/<path>?ref=$HEAD_SHA" --jq .content | base64 -d`. Use `gh pr diff "$PR"` and commit APIs for broader context, then refresh `headRefOid`. Report anything that cannot be verified equivalently without a fetch.
+
+2. For every substantive finding, inspect the referenced path and surrounding implementation at `HEAD_SHA` through the fetched `HEAD_REF` (for example, `git show "$HEAD_REF:<path>"`) or the API fallback. Trace related callers/tests when the claim depends on behavior beyond the commented line.
 3. Classify each finding as **applies**, **already fixed**, **outdated but still applies**, or **cannot verify**, and cite current-head evidence. Resolution state and `commit.oid` are context only.
 4. Refresh `headRefOid` after verification. If it differs from `HEAD_SHA`, discard the stale assessment and repeat against the new SHA.
 5. Only after verification may an authorized action respond to a thread, submit a review, update code/body, merge, or close. Each remains separately authorized under `AGENTS.md`.
