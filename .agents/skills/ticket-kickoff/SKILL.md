@@ -77,6 +77,7 @@ Before editing, report this compact contract:
 Ticket: <ID — title and status>
 Suggested branch: <Linear branch name>
 Repositories: <in-scope repositories>
+Current branches: <repository: symbolic branch name or detached HEAD; matches/blocked>
 Goal: <one outcome>
 Acceptance criteria:
 - <observable result>
@@ -90,13 +91,13 @@ Version ownership: <repository and file, bump level, no bump, or clarification n
 Authorization:
 - inspect: <authorized/not authorized and source>
 - fetch: <authorized/not authorized, authorization source, remote, and ref scope>
-- edit: <authorized/not authorized and source; blocked while the current branch is main>
-- branch: <authorized/not authorized and source; required before editing when the current branch is main>
+- edit: <authorized/not authorized and source; allowed only when every repository to edit is on the suggested branch>
+- branch: <authorized/not authorized and source; required when any repository to edit is not on the suggested branch>
 - commit: <authorized/not authorized and source>
 - push: <authorized/not authorized and source>
 - PR create/update: <authorized/not authorized and source>
 - merge: <authorized/not authorized and source>
-Stop conditions: <decisions or state changes that require returning to the user>
+Stop conditions: <decisions, branch mismatches or detached HEAD, missing branch authorization, or state changes that require returning to the user>
 ```
 
 Keep expected files narrow. Name files that are likely to change and explain uncertainty instead of broadening scope preemptively.
@@ -119,7 +120,7 @@ Treat each action as a separate capability. Authorization for a later action nev
 | --- | --- |
 | Inspect | The request clearly asks for investigation or implementation; ask before sensitive or out-of-scope inspection. |
 | Fetch | Explicit approval naming the repository or remote and ref scope to fetch. |
-| Edit files | The request clearly asks to implement or modify the scoped repositories, and the current branch is not `main`. |
+| Edit files | The request clearly asks to implement or modify the scoped repositories, and each repository to edit is on a symbolic branch whose name exactly matches the Linear issue's suggested branch. |
 | Create or switch branch | Explicit branch instruction, or explicit approval after presenting the suggested branch. |
 | Commit | Explicit request or approval to commit locally. |
 | Push | Explicit request or approval naming the remote destination. |
@@ -134,7 +135,7 @@ Authorization applies only to the action and scope stated. Later actions do not 
 
 After the contract is accepted or contains no blocking ambiguity:
 
-1. Before editing, verify the current branch is not `main`. If it is `main`, stop and request authorization to create or switch to the ticket branch; do not infer branch authorization from edit or later-action authorization.
+1. Before editing, resolve the current symbolic branch for every repository to edit and compare it with the Linear issue's suggested branch name. If any repository is on `main`, another branch, or detached HEAD, stop and request authorization to create or switch to the suggested branch. Do not infer branch authorization from edit or later-action authorization.
 2. Perform only authorized actions.
 3. Re-check overlap if new evidence changes expected files or repository ownership.
 4. Stop before touching an excluded ownership area or making an unapproved product choice.
