@@ -69,10 +69,10 @@ Before a mutation, state the exact action and confirm the request authorizes it.
 
 When reviewing a PR, responding to findings, or checking readiness, follow [`reference/review-threads.md`](reference/review-threads.md). It is mandatory to:
 
-1. Retrieve every review thread and every comment via paginated GraphQL, including resolved and outdated threads.
-2. Record the PR's current `headRefOid`.
+1. Retrieve all PR feedback via paginated GraphQL: inline review threads and every nested comment (including resolved and outdated threads), top-level review bodies, and general conversation comments.
+2. Record `headRefOid` from every top-level feedback query and confirm all channels describe the same PR head.
 3. Verify each finding against code at that exact head SHA. Never treat comment position, resolution, or age as proof that the finding still applies.
-4. Re-read the PR head after verification. If the SHA changed, repeat verification against the new head before reporting or mutating state.
+4. Re-read the PR head after retrieving and verifying all channels. If the SHA changed, discard the complete feedback snapshot and repeat retrieval and verification against the new head before reporting or mutating state.
 
 ## Readiness
 
@@ -80,7 +80,7 @@ Readiness is a read-only assessment, not authorization to update, review, merge,
 
 1. Confirm the assessed local or fetched commit equals the PR's current `headRefOid`.
 2. Review the complete base-to-head diff and commit list.
-3. Complete review-thread retrieval and current-head finding verification.
+3. Complete all-channel feedback retrieval and current-head finding verification.
 4. Inspect `isDraft`, `mergeable`, `mergeStateStatus`, `reviewDecision`, and every required check in `statusCheckRollup`.
 5. Confirm selected local validation passed and the title/body follow this skill.
 6. Report blockers and uncertainty. Do not claim ready while verified findings, conflicts, required checks, required reviews, or stale-head uncertainty remain.
