@@ -1,199 +1,37 @@
 # Agent Instructions for Annie Mei
 
-This document provides context for AI coding agents working on the Annie Mei Discord bot.
+Annie Mei is a Rust Discord bot using Serenity 0.12, SQLx, Redis, Spotify, and external anime APIs. Sentry provides error reporting; the companion auth service owns OAuth schema and HTTP health endpoints.
 
-## Project Summary
+## Permanent Git and PR Safety
 
-Annie Mei is a Rust Discord bot using Serenity 0.12 that fetches anime/manga data from AniList and theme songs from MyAnimeList/Spotify. Users interact via Discord slash commands. The app reports errors/logs to Sentry; HTTP health endpoints live in the companion auth service.
+- Never commit or push directly to `main`; work on a feature branch.
+- Every branch must have a Linear ticket and use that ticket's suggested branch name (for example, `annie-123-description`).
+- Do not create a Linear ticket automatically. Check for a suitable existing ticket, then ask before creating one.
+- Never force-push without explicit approval.
+- Opening, updating, commenting on, reviewing, merging, and closing a pull request are six distinct shared-state actions. Each requires explicit authorization for that action; authorization for one does not authorize any other. Read-only PR inspection does not require approval.
+- PR titles must use `[ANNIE-<ticket-number>]/<description>`.
+- Load and follow the project `pull-request` skill for any PR creation, update, review, comment, readiness check, merge, or close workflow.
+- After a Git failure, explain what failed, present the available recovery options, and ask the user which option to take.
 
-## Project Layout
+## Code Conventions
 
-```
-src/
-├── commands/        # Slash command implementations
-├── models/          # Data types, DB models, API responses
-├── utils/           # Shared utilities, API clients, DB helpers
-└── main.rs          # Bot entry point, event routing, startup/shutdown
-migrations/          # SQL migrations for bot-owned tables; auth-service owns OAuth schema
-```
+- Use Conventional Commits in the form `type(scope): summary` and keep commits small and logically coherent.
+- Run `cargo fmt`; run appropriate tests and `cargo clippy`, fixing warnings.
+- Use `tracing` macros. Add `#[instrument]` to public functions and all private/helper functions, preserving signatures and using `skip(...)`/`fields(...)` as appropriate.
+- Prefer `?` over `.unwrap()`.
+- Preserve the testable core-handler plus thin Serenity `run()` adapter pattern. Keep large embed construction in shared model/transformer code.
+- Defer Discord interactions before long work; Discord has a three-second response window.
+- Put synchronous Redis and Spotify work behind `tokio::task::spawn_blocking`. SQLx operations are async and must not use `spawn_blocking`.
+- Never expose secrets, credential-bearing URLs, or raw Discord user IDs in logs or code.
 
-## Conventions to Follow
+## Commands and Data Ownership
 
-### Code Style
+- The `BotCommand` catalog in `src/commands/mod.rs` owns command registration and dispatch. Substantial commands belong in `src/commands/<name>/command.rs`; small legacy commands may remain flat modules.
+- The auth service owns OAuth schema. Bot migrations may change only bot-owned tables in `annie_mei`.
+- Store migrations as root-level SQLx files named `YYYYMMDDHHMMSS_description.up.sql` and `.down.sql`. Migration history belongs in `annie_mei._sqlx_migrations`.
+- Use async SQLx, `query_as` with `FromRow`, and `pool.begin().await` for transactions.
 
-- Run `cargo fmt` before committing
-- Run `cargo clippy` and fix warnings
-- Use `tracing` macros for logging (`info!`, `debug!`, `error!`)
-- Add `#[instrument]` attribute to functions for tracing spans
-- Add `#[instrument]` to private/helper functions too (for example query builders and alias helpers), keeping signatures unchanged and using `skip(...)`/`fields(...)` when useful
-- When implementing review findings, first verify the current code state and only apply changes that are actually missing
-- Prefer `?` operator over `.unwrap()` for error handling
-- Preserve the newer "core handler + thin Serenity adapter" pattern when extending commands; prefer returning `CommandResponse` from testable logic and keeping Discord transport concerns in `run()`
-- Keep embed construction in shared model/transformer code when possible instead of building large embeds inline in command handlers
+## Tests and Versions
 
-### Git Commits
-
-- Use Conventional Commits and prefer `type(scope): summary`
-- Example: `feat(anime): add guild score fallback`
-- Types: `feat`, `fix`, `docs`, `chore`, `refactor`, `test`
-- Make small, sensible commits as you go; avoid batching unrelated changes into one commit
-- Squash WIP commits before opening a PR
-
-### Git Safety
-
-- **NEVER commit or push directly to `main`** - Always create a feature branch first
-- **All branches must have a Linear ticket** - Use the ticket's suggested branch name (e.g., `annie-XXX-description`)
-- **Don't create tickets automatically** - Check for existing/recent tickets that the work might fit under, and ask the user before creating a new one
-- **Never force push** - Always ask before any destructive git operation
-- **When git issues occur** (failed push, wrong commit, merge conflicts, etc.):
-  1. Explain what went wrong
-  2. Present the available options
-  3. Ask the user how they want to resolve it
-
-### Versioning
-
-Bump the version in `Cargo.toml` using semantic versioning when preparing versioned changes:
-
-- **MAJOR** (X.0.0): Breaking changes, incompatible API changes
-- **MINOR** (0.X.0): New features, backwards-compatible functionality
-- **PATCH** (0.0.X): Bug fixes, backwards-compatible patches
-
-Examples:
-
-- New command or feature → bump minor
-- Bug fix or refactor → bump patch
-- Breaking change to existing behavior → bump major
-
-- Also commit the Cargo.lock file when bumping the version — run `cargo check` to update the lockfile
-
-### Pull Requests
-
-- PR titles should use `[ANNIE-<ticket-number>]/<description>`
-- PR descriptions should include:
-  - `## Summary` describing the change at a high level
-  - `## Type of Change` with relevant checklist items
-  - `## Changes` with bullets in `full-commit-sha: description` format (no code formatting)
-  - `### Notes` under Changes when implementation details matter
-  - `### High-risk resources` under Changes when applicable
-  - `## Validation` with appropriate test and QA steps for the scope of the change
-  - `## References` for relevant dashboards, docs, issues, or runbooks when useful
-  - A closing footnote replacing `MODEL_NAME` with the actual model used to write the PR
-
-PR template:
-
-```md
-## Summary
-
-## Type of Change
-
-- [ ] Bug fix
-- [ ] New feature
-- [ ] Refactor
-- [ ] Documentation
-- [ ] Chore
-
-## Changes
-- <full-commit-sha>: <what changed>
-
-### Notes (optional)
-
-### High-risk resources (optional)
-
-## Validation
-- [ ] <relevant cargo test / cargo clippy / manual verification steps>
-- [ ] <Discord QA or runtime verification, if applicable>
-
-## References (optional)
-
----
-
-This PR description was written by MODEL_NAME.
-```
-
-### Adding Commands
-
-1. Create module in `src/commands/`
-2. If the command is substantial, prefer a `src/commands/<name>/command.rs` module with a transport-agnostic core handler and a thin `run()` adapter
-3. Implement `register()` for slash command definition
-4. Implement `run()` for command execution
-5. Export in `src/commands/mod.rs`
-6. Add a `BotCommand` variant and its name, definition, and `run()` mappings in `src/commands/mod.rs`; this catalog drives both registration and dispatch
-
-Notes:
-
-- Not every command uses a folder yet; smaller legacy commands like `src/commands/help.rs` and `src/commands/ping.rs` are still flat files
-- Reuse `src/commands/response.rs` and `src/commands/traits.rs` patterns where practical so logic stays unit-testable without Discord runtime dependencies
-
-### Database Changes
-
-The bot uses **SQLx** for database access. The auth-service owns OAuth schema;
-the bot reads from the auth-owned `annie_auth.oauth_credentials` table and owns
-Annie Mei-specific settings tables in the `annie_mei` schema, such as
-`user_settings` and `guild_settings`.
-
-1. Keep migrations limited to bot-owned tables; coordinate auth-service schema changes in the auth-service
-2. Bot startup runs SQLx migrations with `search_path=annie_mei,annie_auth,public`, so migration history belongs in `annie_mei._sqlx_migrations`
-3. Store bot migrations as SQLx root-level files named like `YYYYMMDDHHMMSS_description.up.sql` / `.down.sql`; SQLx ignores Diesel-style migration directories
-4. Use `sqlx::query_as()` with `#[derive(FromRow)]` for queries
-5. All database operations are async - no `spawn_blocking` needed for DB
-6. Use `pool.begin().await` for transactions
-
-## Testing
-
-- Unit tests go in the same file as the code being tested by default
-- For oversized pure-utility modules where inline unit tests materially hurt readability, prefer a directory-backed module with a sibling `tests.rs` file so the tests stay unit-scoped without overwhelming the implementation file
-- Integration tests go in `tests/` directory
-- Mock external APIs in tests
-- Run `cargo test` to execute all tests
-
-## Common Pitfalls
-
-1. **Always defer long operations** - Discord has a 3-second response window
-2. **Keep blocking I/O on explicit boundaries** - use `spawn_blocking` for known sync subsystems (Redis, Spotify sync calls). Database operations are async via SQLx and don't need spawn_blocking
-3. **SQLx pool connects eagerly at startup** - The bot will fail fast if DB is unavailable on boot
-4. **Global command registration is slow to propagate** - the `BotCommand` catalog is re-registered globally from `main.rs` on startup
-5. **Check environment variables** - Bot requires multiple env vars to run
-6. **Don't assume all commands follow the same file shape** - some are folder-based, others are single files
-
-## Review Guidelines
-
-- Confirm command registration and dispatch are both represented in the `BotCommand` catalog in `src/commands/mod.rs`
-- Prefer the core-handler plus thin-Serenity-adapter pattern for substantial command work
-- Verify blocking I/O work (Redis, Spotify) uses explicit `tokio::task::spawn_blocking` boundaries
-- Database operations use native SQLx async (no spawn_blocking needed)
-- Ensure long-running Discord interactions defer before doing expensive work
-- Check that `tracing` and `#[instrument]` are added where they provide useful observability
-- Verify secrets, credential-bearing URLs, and raw Discord user IDs are not exposed in logs or code
-- Confirm validation matches the scope: targeted tests, `cargo test`, `cargo clippy`, and manual Discord or auth-service `/healthz`/`/readyz` verification when applicable
-- For versioned changes, verify the `Cargo.toml` bump is correct and `Cargo.lock` is updated
-
-## Key Paths
-
-- `src/main.rs` - bot startup, Discord event handling, shutdown, Sentry setup
-- `src/commands/mod.rs` - shared slash-command registration and dispatch catalog
-- `src/commands/<name>/command.rs` or `src/commands/<name>.rs` - slash commands
-- `src/commands/response.rs` and `src/commands/traits.rs` - testable command patterns
-- `src/models/transformers.rs` - shared embed construction
-- `src/utils/requests/*.rs` - upstream API clients
-- `src/utils/privacy/mod.rs` - hashed IDs and URL redaction
-
-## Environment Requirements
-
-Required environment variables:
-
-- `DISCORD_TOKEN` - Bot token from Discord Developer Portal
-- `SENTRY_DSN` - Sentry project DSN
-- `ENV` - Environment name
-- `SENTRY_TRACES_SAMPLE_RATE` - Sentry tracing sample rate from 0.0 to 1.0
-- `DATABASE_URL` - PostgreSQL connection string
-- `REDIS_URL` - Redis connection string
-- `SPOTIFY_CLIENT_ID` - Spotify API client ID
-- `SPOTIFY_CLIENT_SECRET` - Spotify API client secret
-- `MAL_CLIENT_ID` - MyAnimeList API client ID
-- `USERID_HASH_SALT` - Salt used when hashing Discord user IDs for Sentry/log correlation
-- `GEMINI_API_KEY` - API key for the Gemini / OpenAI-compatible LLM endpoint
-- `LLM_BASE_URL` - Optional base URL override for the LLM API (defaults to Gemini OpenAI compatibility endpoint)
-- `LLM_MODEL` - Optional model name override (defaults to `gemini-2.0-flash`)
-- `AUTH_SERVICE_BASE_URL` - Base URL for the auth service (e.g. `https://auth.example.com`)
-- `OAUTH_CONTEXT_SIGNING_SECRET` - HMAC signing secret for OAuth context tokens
-- `OAUTH_CONTEXT_TTL_SECONDS` - Optional TTL for OAuth context in seconds (defaults to 300)
+- Keep unit tests with their module by default; use a sibling `tests.rs` only when inline tests materially harm readability. Put integration tests in `tests/` and mock external APIs.
+- For versioned changes, use semantic versioning: major for breaking changes, minor for backward-compatible features, and patch for fixes/refactors. Update both `Cargo.toml` and `Cargo.lock` (`cargo check` refreshes the lockfile).
