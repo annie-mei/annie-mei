@@ -31,7 +31,7 @@ Inspection is read-only. Before inspecting sensitive data or private systems bey
 2. Read the applicable `AGENTS.md` files and repository guidance for every repository in scope.
 3. Inspect each repository's current branch, worktree state, remotes, and relevant manifests or CI configuration. Preserve unrelated worktree changes.
 4. Confirm the requested base ref from the user or repository guidance. Do not fetch, switch, create, reset, or update a branch unless that action is authorized.
-5. Record any mismatch among the issue, user request, repository guidance, and observed code. The newest explicit user direction wins unless it would violate a safety constraint.
+5. Record any mismatch among the issue, user request, repository guidance, and observed code. Applicable `AGENTS.md` and repository guidance cannot be overridden by user direction; identify any conflict and ask for clarification instead of proceeding.
 
 ## 2. Check overlap and recent work
 
@@ -90,8 +90,8 @@ Version ownership: <repository and file, bump level, no bump, or clarification n
 Authorization:
 - inspect: <authorized/not authorized and source>
 - fetch: <authorized/not authorized, authorization source, remote, and ref scope>
-- edit: <authorized/not authorized and source>
-- branch: <authorized/not authorized and source>
+- edit: <authorized/not authorized and source; blocked while the current branch is main>
+- branch: <authorized/not authorized and source; required before editing when the current branch is main>
 - commit: <authorized/not authorized and source>
 - push: <authorized/not authorized and source>
 - PR create/update: <authorized/not authorized and source>
@@ -119,7 +119,7 @@ Treat each action as a separate capability. Authorization for a later action nev
 | --- | --- |
 | Inspect | The request clearly asks for investigation or implementation; ask before sensitive or out-of-scope inspection. |
 | Fetch | Explicit approval naming the repository or remote and ref scope to fetch. |
-| Edit files | The request clearly asks to implement or modify the scoped repositories. |
+| Edit files | The request clearly asks to implement or modify the scoped repositories, and the current branch is not `main`. |
 | Create or switch branch | Explicit branch instruction, or explicit approval after presenting the suggested branch. |
 | Commit | Explicit request or approval to commit locally. |
 | Push | Explicit request or approval naming the remote destination. |
@@ -134,9 +134,10 @@ Authorization applies only to the action and scope stated. Later actions do not 
 
 After the contract is accepted or contains no blocking ambiguity:
 
-1. Perform only authorized actions.
-2. Re-check overlap if new evidence changes expected files or repository ownership.
-3. Stop before touching an excluded ownership area or making an unapproved product choice.
-4. Validate against the contract and report deviations, unavailable checks, and remaining unauthorized actions.
+1. Before editing, verify the current branch is not `main`. If it is `main`, stop and request authorization to create or switch to the ticket branch; do not infer branch authorization from edit or later-action authorization.
+2. Perform only authorized actions.
+3. Re-check overlap if new evidence changes expected files or repository ownership.
+4. Stop before touching an excluded ownership area or making an unapproved product choice.
+5. Validate against the contract and report deviations, unavailable checks, and remaining unauthorized actions.
 
 Do not create tickets, branches, commits, or remote changes merely because this skill was invoked.
