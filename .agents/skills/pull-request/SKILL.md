@@ -49,7 +49,7 @@ Before a mutation, state the exact action and confirm the request authorizes it.
 5. For a new PR whose branch is the current checkout, establish the range against the intended base without fetching unless fetch authorization was given. Do not assume an existing local base ref is current; use API inspection or report that current-base verification requires fetch authorization.
 6. Select validation according to the changed behavior, not a fixed checklist:
    - Documentation or agent guidance: `git diff --check` plus focused structural/content checks.
-   - Rust changes: `cargo fmt --check`, targeted tests, `cargo test --all-features`, and `cargo clippy --all-features` as warranted by scope.
+   - Rust changes: relevant targeted tests followed by `scripts/verify.sh` for the full sequential suite.
    - Discord behavior: exercise representative command paths and include Discord QA when runtime credentials are required.
    - Database/auth/release changes: run the owning subsystem's checks and identify manual health, migration, or rollout verification.
    Report skipped or unavailable checks honestly.
