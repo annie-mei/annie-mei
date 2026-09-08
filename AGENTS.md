@@ -16,7 +16,7 @@ Annie Mei is a Rust Discord bot using Serenity 0.12, SQLx, Redis, Spotify, and e
 ## Code Conventions
 
 - Use Conventional Commits in the form `type(scope): summary` and keep commits small and logically coherent.
-- Run `cargo fmt`; run appropriate tests and `cargo clippy`, fixing warnings.
+- Run `scripts/verify.sh` for the canonical sequential local validation suite. For focused Rust changes, run the relevant targeted test first.
 - Use `tracing` macros. Add `#[instrument]` to public functions and all private/helper functions, preserving signatures and using `skip(...)`/`fields(...)` as appropriate.
 - Prefer `?` over `.unwrap()`.
 - Preserve the testable core-handler plus thin Serenity `run()` adapter pattern. Keep large embed construction in shared model/transformer code.
