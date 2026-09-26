@@ -216,7 +216,6 @@ async fn main() {
             .maybe_release(sentry::release_name!())
             .environment(environment)
             .traces_sample_rate(sentry_traces_sample_rate)
-            .enable_logs(true)
             .before_send(|mut event| {
                 // Redact URLs with credentials from exception messages
                 for exception in event.exception.values.iter_mut() {
