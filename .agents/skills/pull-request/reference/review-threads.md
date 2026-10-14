@@ -19,6 +19,7 @@ gh api graphql --paginate --slurp \
     repository(owner: $owner, name: $repo) {
       pullRequest(number: $number) {
         headRefOid
+        timelineItems(first: 1) { updatedAt }
         reviewThreads(first: 100, after: $endCursor) {
           nodes {
             id
@@ -110,6 +111,7 @@ gh api graphql --paginate --slurp \
     repository(owner: $owner, name: $repo) {
       pullRequest(number: $number) {
         headRefOid
+        timelineItems(first: 1) { updatedAt }
         reviews(first: 100, after: $endCursor) {
           nodes {
             id
@@ -143,6 +145,7 @@ gh api graphql --paginate --slurp \
     repository(owner: $owner, name: $repo) {
       pullRequest(number: $number) {
         headRefOid
+        timelineItems(first: 1) { updatedAt }
         comments(first: 100, after: $endCursor) {
           nodes {
             id
@@ -162,33 +165,58 @@ gh api graphql --paginate --slurp \
 
 ## Confirm a consistent feedback snapshot
 
-Each file is an outer array of pages. Confirm every page from all three top-level channels reports one shared head SHA before evaluating findings:
+Each file is an outer array of pages. Treat the PR head and timeline update time as one feedback-generation token. Confirm every page from all three top-level channels reports one shared token pair before evaluating findings:
 
 ```bash
 jq -e -s '
-  [.[][] | .data.repository.pullRequest.headRefOid] |
+  [.[][] | .data.repository.pullRequest |
+    [.headRefOid, .timelineItems.updatedAt]] |
   unique | length == 1
 ' /tmp/annie-pr-review-threads.json \
   /tmp/annie-pr-reviews.json \
   /tmp/annie-pr-comments.json
 ```
 
-If this fails, the PR changed during retrieval. Discard every file and repeat all three queries. Treat substantive text from inline comments, review bodies, and conversation comments as findings to verify; metadata-only bot comments and empty review bodies still provide context but are not findings.
+If this fails, the PR head or feedback changed during retrieval. Discard every file and repeat all three queries. Treat substantive text from inline comments, review bodies, and conversation comments as findings to verify; metadata-only bot comments and empty review bodies still provide context but are not findings.
 
 ## Verify against the current head
 
-1. Read the shared `headRefOid` from the complete feedback snapshot and independently refresh it. Fetch only with explicit fetch authorization:
+1. Read the shared `headRefOid` from the complete feedback snapshot and fetch only with explicit fetch authorization:
 
    ```bash
-   HEAD_SHA=$(gh pr view "$PR" --json headRefOid --jq .headRefOid)
+   HEAD_SHA=$(jq -r '.[0].data.repository.pullRequest.headRefOid' \
+     /tmp/annie-pr-review-threads.json)
    HEAD_REF="refs/remotes/origin/pr/$PR/head"
    git fetch origin "pull/$PR/head:$HEAD_REF"
    test "$(git rev-parse "$HEAD_REF")" = "$HEAD_SHA"
    ```
 
-   The three GraphQL feedback queries require no Git fetch. When fetching code is not authorized, inspect files at the captured SHA through the read-only contents API, for example `gh api "repos/$OWNER/$REPO/contents/<path>?ref=$HEAD_SHA" --jq .content | base64 -d`. Use `gh pr diff "$PR"` and commit APIs for broader context, then refresh `headRefOid`. Report anything that cannot be verified equivalently without a fetch.
+   The three GraphQL feedback queries require no Git fetch. When fetching code is not authorized, inspect files at the captured SHA through the read-only contents API, for example `gh api "repos/$OWNER/$REPO/contents/<path>?ref=$HEAD_SHA" --jq .content | base64 -d`. Use `gh pr diff "$PR"` and commit APIs for broader context. Report anything that cannot be verified equivalently without a fetch.
 
 2. For every substantive finding, inspect the referenced path and surrounding implementation at `HEAD_SHA` through the fetched `HEAD_REF` (for example, `git show "$HEAD_REF:<path>"`) or the API fallback. Trace related callers/tests when the claim depends on behavior beyond the commented line.
 3. Classify each finding as **applies**, **already fixed**, **outdated but still applies**, or **cannot verify**, and cite current-head evidence. Resolution state and `commit.oid` are context only.
-4. Refresh `headRefOid` after all-channel retrieval and verification. If it differs from `HEAD_SHA`, discard the entire feedback snapshot and assessment, then repeat every channel against the new SHA.
-5. Only after verification may an authorized action respond to a thread, submit a review, update code/body, merge, or close. Each remains separately authorized under `AGENTS.md`.
+4. Immediately after all-channel verification and before readiness or an authorized mutation, refresh both feedback-generation token fields:
+
+   ```bash
+   FINAL_TOKEN=$(gh api graphql \
+     -f owner="$OWNER" \
+     -f repo="$REPO" \
+     -F number="$PR" \
+     -f query='query($owner: String!, $repo: String!, $number: Int!) {
+       repository(owner: $owner, name: $repo) {
+         pullRequest(number: $number) {
+           headRefOid
+           timelineItems(first: 1) { updatedAt }
+         }
+       }
+     }' \
+     --jq '.data.repository.pullRequest |
+       [.headRefOid, .timelineItems.updatedAt] | @tsv')
+   SNAPSHOT_TOKEN=$(jq -r '.[0].data.repository.pullRequest |
+     [.headRefOid, .timelineItems.updatedAt] | @tsv' \
+     /tmp/annie-pr-review-threads.json)
+   test "$FINAL_TOKEN" = "$SNAPSHOT_TOKEN"
+   ```
+
+   If either field changed, discard the entire feedback snapshot and assessment, then repeat every channel and verification against the new token.
+5. Describe feedback completeness as of the final `headRefOid` and timeline `updatedAt` token. Only after verification may an authorized action respond to a thread, submit a review, update code/body, merge, or close. Each remains separately authorized under `AGENTS.md`.
