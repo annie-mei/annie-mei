@@ -4,6 +4,7 @@ use std::time::Duration;
 use reqwest::Client;
 use serde_json::Value;
 use tracing::instrument;
+use url::Url;
 
 use crate::utils::tls::install_rustls_crypto_provider;
 
@@ -40,18 +41,68 @@ impl std::fmt::Display for AniListRequestError {
 impl std::error::Error for AniListRequestError {}
 
 const ANILIST_TIMEOUT_SECS: u64 = 10;
+const ANILIST_ENDPOINT: &str = "https://graphql.anilist.co/";
 
-static ANILIST_CLIENT: LazyLock<Result<Client, String>> = LazyLock::new(|| {
-    install_rustls_crypto_provider();
+#[derive(Clone)]
+pub struct AniListClient {
+    http: Client,
+    endpoint: Url,
+}
 
-    Client::builder()
-        .timeout(Duration::from_secs(ANILIST_TIMEOUT_SECS))
-        .build()
-        .map_err(|error| error.to_string())
-});
+impl AniListClient {
+    #[instrument(name = "http.anilist.client.new", skip(endpoint))]
+    pub fn new(endpoint: Url, timeout: Duration) -> Result<Self, AniListRequestError> {
+        install_rustls_crypto_provider();
+
+        let http = Client::builder()
+            .timeout(timeout)
+            .build()
+            .map_err(|error| AniListRequestError::ClientBuild(error.to_string()))?;
+
+        Ok(Self { http, endpoint })
+    }
+
+    #[instrument(name = "http.anilist.client.production")]
+    pub fn production() -> Result<Self, AniListRequestError> {
+        let endpoint = Url::parse(ANILIST_ENDPOINT)
+            .map_err(|error| AniListRequestError::ClientBuild(error.to_string()))?;
+        Self::new(endpoint, Duration::from_secs(ANILIST_TIMEOUT_SECS))
+    }
+
+    #[instrument(name = "http.anilist.send_request", skip(self, json))]
+    pub async fn send_request(&self, json: Value) -> Result<String, AniListRequestError> {
+        let response = self
+            .http
+            .post(self.endpoint.clone())
+            .header("Content-Type", "application/json")
+            .header("Accept", "application/json")
+            .body(json.to_string())
+            .send()
+            .await
+            .map_err(|error| AniListRequestError::RequestFailed(error.to_string()))?;
+
+        let status = response.status();
+        let body = response
+            .text()
+            .await
+            .map_err(|error| AniListRequestError::ResponseBodyReadFailed(error.to_string()))?;
+
+        if !status.is_success() {
+            return Err(AniListRequestError::NonSuccessStatus {
+                status: status.as_u16(),
+                body,
+            });
+        }
+
+        Ok(body)
+    }
+}
+
+static ANILIST_CLIENT: LazyLock<Result<AniListClient, String>> =
+    LazyLock::new(|| AniListClient::production().map_err(|error| error.to_string()));
 
 #[instrument(name = "http.anilist.client", level = "trace")]
-fn get_client() -> Result<&'static Client, AniListRequestError> {
+pub(crate) fn default_client() -> Result<&'static AniListClient, AniListRequestError> {
     match &*ANILIST_CLIENT {
         Ok(client) => Ok(client),
         Err(error) => Err(AniListRequestError::ClientBuild(error.clone())),
@@ -64,29 +115,6 @@ fn get_client() -> Result<&'static Client, AniListRequestError> {
     fields(endpoint = "https://graphql.anilist.co/")
 )]
 pub async fn send_request(json: Value) -> Result<String, AniListRequestError> {
-    let client = get_client()?;
-
-    let response = client
-        .post("https://graphql.anilist.co/")
-        .header("Content-Type", "application/json")
-        .header("Accept", "application/json")
-        .body(json.to_string())
-        .send()
-        .await
-        .map_err(|error| AniListRequestError::RequestFailed(error.to_string()))?;
-
-    let status = response.status();
-    let body = response
-        .text()
-        .await
-        .map_err(|error| AniListRequestError::ResponseBodyReadFailed(error.to_string()))?;
-
-    if !status.is_success() {
-        return Err(AniListRequestError::NonSuccessStatus {
-            status: status.as_u16(),
-            body,
-        });
-    }
-
-    Ok(body)
+    let client = default_client()?;
+    client.send_request(json).await
 }

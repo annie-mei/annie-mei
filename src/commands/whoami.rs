@@ -1,4 +1,5 @@
 use crate::{
+    commands::context::CommandContext,
     commands::response::CommandResponse,
     models::db::oauth_credential::OAuthCredential,
     utils::{
@@ -10,7 +11,6 @@ use crate::{
 use serenity::{
     all::{CommandInteraction, EditInteractionResponse},
     builder::CreateCommand,
-    client::Context,
 };
 use tracing::{error, instrument};
 
@@ -33,7 +33,7 @@ pub fn handle_whoami(profile: Option<OAuthCredential>) -> CommandResponse {
 }
 
 #[instrument(name = "command.whoami.run", skip(ctx, interaction))]
-pub async fn run(ctx: &Context, interaction: &mut CommandInteraction) {
+pub async fn run(ctx: &CommandContext, interaction: &mut CommandInteraction) {
     let _ = interaction.defer_ephemeral(&ctx.http).await;
 
     let user = &interaction.user;

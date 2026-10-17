@@ -1,5 +1,6 @@
 use crate::{
     commands::{
+        context::CommandContext,
         input_validation::validate_search_term,
         songs::fetcher::{SongFetchResult, fetcher as SongFetcher},
     },
@@ -17,7 +18,6 @@ use serenity::{
         CreateEmbed, EditInteractionResponse,
     },
     builder::CreateCommand,
-    client::Context,
     model::application::CommandOptionType,
 };
 
@@ -51,7 +51,7 @@ fn parse_songs_options(options: &[CommandDataOption]) -> Option<String> {
 }
 
 #[instrument(name = "command.songs.run", skip(ctx, interaction))]
-pub async fn run(ctx: &Context, interaction: &mut CommandInteraction) {
+pub async fn run(ctx: &CommandContext, interaction: &mut CommandInteraction) {
     let _ = interaction.defer(&ctx.http).await;
 
     let user = &interaction.user;
@@ -75,7 +75,7 @@ pub async fn run(ctx: &Context, interaction: &mut CommandInteraction) {
         return;
     }
 
-    let response = SongFetcher(CommandDataOptionValue::String(search_term)).await;
+    let response = SongFetcher(&ctx.anilist, CommandDataOptionValue::String(search_term)).await;
 
     let _songs_response = match response {
         SongFetchResult::Found(mal_response) => {

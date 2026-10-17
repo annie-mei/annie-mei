@@ -1,7 +1,8 @@
-use serenity::{all::UserId, client::Context, model::prelude::GuildId};
+use serenity::{all::UserId, model::prelude::GuildId};
 use tracing::{instrument, warn};
 
 use crate::{
+    commands::context::CommandContext,
     models::{
         db::settings::{get_guild_setting, get_user_setting, resolve_setting_layers},
         settings::{
@@ -14,7 +15,7 @@ use crate::{
 
 #[instrument(name = "settings.resolve_title_display", skip(ctx, user_id, guild_id))]
 pub async fn resolve_title_display_preference(
-    ctx: &Context,
+    ctx: &CommandContext,
     user_id: UserId,
     guild_id: Option<GuildId>,
 ) -> TitleDisplayPreference {
@@ -40,7 +41,7 @@ pub async fn resolve_title_display_preference(
 
 #[instrument(name = "settings.resolve_analytics_privacy", skip(ctx, user_id))]
 pub async fn resolve_analytics_privacy_preference(
-    ctx: &Context,
+    ctx: &CommandContext,
     user_id: UserId,
 ) -> AnalyticsPrivacyPreference {
     let Some(pool) = get_pool_from_context(ctx).await else {

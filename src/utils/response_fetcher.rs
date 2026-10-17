@@ -7,6 +7,7 @@ use crate::models::{
     media_type::MediaType as Type,
     transformers::Transformers,
 };
+use crate::utils::requests::anilist::AniListClient;
 use serenity::all::CommandDataOptionValue;
 use tracing::{error, info, instrument};
 
@@ -34,10 +35,11 @@ fn return_argument(arg: CommandDataOptionValue) -> Option<Argument> {
     }
 }
 
-#[instrument(name = "fetcher.fetch", skip(arg), fields(media_type = ?media_type))]
+#[instrument(name = "fetcher.fetch", skip(client, arg), fields(media_type = ?media_type))]
 pub async fn fetcher<
     T: serde::de::DeserializeOwned + Transformers + std::fmt::Debug + std::clone::Clone,
 >(
+    client: &AniListClient,
     media_type: Type,
     arg: CommandDataOptionValue,
 ) -> Option<(T, TitleVariant)> {
@@ -47,22 +49,23 @@ pub async fn fetcher<
     match media_type {
         Type::Anime => {
             let anime_response: AnimeConfig = Response::new(argument);
-            fetch::<T>(&anime_response, media_type).await
+            fetch::<T>(client, &anime_response, media_type).await
         }
         Type::Manga => {
             let manga_response: MangaConfig = Response::new(argument);
-            fetch::<T>(&manga_response, media_type).await
+            fetch::<T>(client, &manga_response, media_type).await
         }
     }
 }
 
-#[instrument(name = "fetcher.fetch_character", skip(arg))]
+#[instrument(name = "fetcher.fetch_character", skip(client, arg))]
 pub async fn character_fetcher(
+    client: &AniListClient,
     arg: CommandDataOptionValue,
     allow_spoilers: bool,
 ) -> Option<Character> {
     info!("Character fetcher found arg: {:#?}", arg);
     let argument = return_argument(arg)?;
     let character_response: CharacterConfig = Response::new(argument);
-    fetch_character(&character_response, allow_spoilers).await
+    fetch_character(client, &character_response, allow_spoilers).await
 }

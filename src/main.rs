@@ -9,9 +9,6 @@ use tracing::{Instrument, info, info_span, instrument, warn};
 use tracing_subscriber::{EnvFilter, prelude::*, util::SubscriberInitExt};
 
 use serenity::{
-    all::{
-        CreateEmbed, CreateInteractionResponse, CreateInteractionResponseMessage, CreateMessage,
-    },
     async_trait,
     client::{Client, Context, EventHandler},
     gateway::ActivityData,
@@ -20,7 +17,7 @@ use serenity::{
 };
 
 use annie_mei::{
-    commands::{self, BotCommand},
+    commands::{self, context::CommandContext},
     utils::{
         channel::is_nsfw_channel,
         database::{DatabasePoolKey, create_pool, run_migrations},
@@ -28,6 +25,7 @@ use annie_mei::{
         oauth::{OAuthContextConfigKey, load_context_config},
         posthog::{CommandTelemetryContext, PostHogClient},
         privacy::{hash_discord_id, hash_user_id, redact_url_credentials},
+        requests::anilist::AniListClient,
         statics::{DISCORD_TOKEN, ENV, SENTRY_DSN, SENTRY_TRACES_SAMPLE_RATE},
         tls::install_rustls_crypto_provider,
     },
@@ -55,6 +53,7 @@ enum Commands {
 struct Handler {
     posthog: Option<Arc<PostHogClient>>,
     environment: Option<String>,
+    anilist: AniListClient,
 }
 
 #[async_trait]
@@ -76,20 +75,8 @@ impl EventHandler for Handler {
                 async {
                     info!("Received command interaction");
                     self.capture_command_hit(&ctx, &command);
-
-                    if let Some(bot_command) = BotCommand::from_name(&command.data.name) {
-                        bot_command.run(&ctx, &mut command).await;
-                    } else {
-                        let embed = CreateEmbed::new()
-                            .title("Error")
-                            .description("Not implemented");
-                        let builder = CreateMessage::new().embed(embed);
-                        let msg = command.channel_id.send_message(&ctx.http, builder).await;
-                        if let Err(why) = msg {
-                            println!("Error sending message: {why:?}");
-                            info!("Cannot respond to slash command: {why}");
-                        }
-                    }
+                    let command_ctx = CommandContext::from_serenity(&ctx, &self.anilist);
+                    commands::dispatch_command(&command_ctx, &mut command).await;
                 }
                 .instrument(command_span)
                 .await;
@@ -107,19 +94,8 @@ impl EventHandler for Handler {
 
                 async {
                     info!("Received component interaction");
-
-                    if commands::settings::is_settings_component(&component.data.custom_id) {
-                        commands::settings::handle_component(&ctx, &mut component).await;
-                    } else {
-                        let builder = CreateInteractionResponse::Message(
-                            CreateInteractionResponseMessage::new()
-                                .content(
-                                    "I don't recognize that control. Please run the command again.",
-                                )
-                                .ephemeral(true),
-                        );
-                        let _ = component.create_response(&ctx.http, builder).await;
-                    }
+                    let command_ctx = CommandContext::from_serenity(&ctx, &self.anilist);
+                    commands::dispatch_component(&command_ctx, &mut component).await;
                 }
                 .instrument(component_span)
                 .await;
@@ -151,7 +127,7 @@ impl Handler {
             return;
         };
 
-        let ctx = ctx.clone();
+        let ctx = CommandContext::from_serenity(ctx, &self.anilist);
         let distinct_id = Some(hash_user_id(command.user.id.get()).to_string());
         let guild_id = command
             .guild_id
@@ -302,10 +278,12 @@ async fn main() {
         | GatewayIntents::GUILDS;
 
     info!("Creating Discord client");
+    let anilist = AniListClient::production().expect("Failed to create AniList client");
     let mut client = Client::builder(&token, intents)
         .event_handler(Handler {
             posthog: posthog_client,
             environment: telemetry_environment,
+            anilist,
         })
         .await
         .expect("Err creating client");

@@ -6,13 +6,16 @@ use chrono::Utc;
 use getrandom::fill as fill_random;
 use hmac::{Hmac, KeyInit, Mac};
 use serde::Serialize;
-use serenity::{client::Context, prelude::TypeMapKey};
+use serenity::prelude::TypeMapKey;
 use sha2::Sha256;
 use tracing::instrument;
 use url::Url;
 
-use crate::utils::statics::{
-    AUTH_SERVICE_BASE_URL, OAUTH_CONTEXT_SIGNING_SECRET, OAUTH_CONTEXT_TTL_SECONDS,
+use crate::{
+    commands::context::CommandContext,
+    utils::statics::{
+        AUTH_SERVICE_BASE_URL, OAUTH_CONTEXT_SIGNING_SECRET, OAUTH_CONTEXT_TTL_SECONDS,
+    },
 };
 
 const CONTEXT_VERSION: u8 = 1;
@@ -204,7 +207,7 @@ impl TypeMapKey for OAuthContextConfigKey {
 }
 
 #[instrument(name = "oauth.context.get_from_context", skip(ctx))]
-pub async fn get_config_from_context(ctx: &Context) -> Option<Arc<OAuthContextConfig>> {
+pub async fn get_config_from_context(ctx: &CommandContext) -> Option<Arc<OAuthContextConfig>> {
     let data = ctx.data.read().await;
     data.get::<OAuthContextConfigKey>().cloned()
 }

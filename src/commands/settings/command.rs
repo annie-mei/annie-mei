@@ -1,4 +1,5 @@
 use crate::{
+    commands::context::CommandContext,
     models::{
         db::settings::{
             ResolvedSettingLayers, SettingsStorageError, resolve_all_setting_layers,
@@ -21,7 +22,6 @@ use serenity::{
         GuildId, Permissions, UserId,
     },
     builder::CreateCommand,
-    client::Context,
 };
 use tracing::{error, instrument, warn};
 
@@ -230,7 +230,7 @@ fn render_settings_panel_with_notice(panel: &SettingsPanel, notice: Option<&str>
 }
 
 #[instrument(name = "command.settings.run", skip(ctx, interaction))]
-pub async fn run(ctx: &Context, interaction: &mut CommandInteraction) {
+pub async fn run(ctx: &CommandContext, interaction: &mut CommandInteraction) {
     let _ = interaction.defer_ephemeral(&ctx.http).await;
 
     let user = &interaction.user;
@@ -280,7 +280,7 @@ pub async fn run(ctx: &Context, interaction: &mut CommandInteraction) {
 }
 
 #[instrument(name = "command.settings.handle_component", skip(ctx, interaction))]
-pub async fn handle_component(ctx: &Context, interaction: &mut ComponentInteraction) {
+pub async fn handle_component(ctx: &CommandContext, interaction: &mut ComponentInteraction) {
     configure_sentry_scope("Settings", interaction.user.id.get(), None);
 
     let Some(component_id) = parse_settings_component_id(&interaction.data.custom_id) else {
@@ -743,7 +743,7 @@ fn panel_button(
 )]
 async fn respond_to_command(
     interaction: &mut CommandInteraction,
-    ctx: &Context,
+    ctx: &CommandContext,
     content: String,
     components: Vec<CreateActionRow>,
 ) {
@@ -760,7 +760,7 @@ async fn respond_to_command(
 )]
 async fn respond_to_component(
     interaction: &mut ComponentInteraction,
-    ctx: &Context,
+    ctx: &CommandContext,
     content: String,
     components: Vec<CreateActionRow>,
 ) {

@@ -1,4 +1,4 @@
-use crate::utils::requests::anilist::{AniListRequestError, send_request};
+use crate::utils::requests::anilist::{AniListClient, AniListRequestError, default_client};
 
 use serde_json::json;
 use tracing::{info, instrument, warn};
@@ -96,15 +96,16 @@ fn has_media_results(response: &str) -> Option<bool> {
 
 #[instrument(
     name = "anilist.fetch_name_search",
-    skip(query),
+    skip(client, query),
     fields(search_len = search.len())
 )]
 async fn fetch_name_search(
+    client: &AniListClient,
     query: &str,
     search: &str,
 ) -> Result<(String, Option<bool>), AniListRequestError> {
     let json = json!({"query": query, "variables": {"search": search}});
-    let result = send_request(json).await?;
+    let result = client.send_request(json).await?;
     let has_results = has_media_results(&result);
 
     Ok((result, has_results))
@@ -112,18 +113,36 @@ async fn fetch_name_search(
 
 #[instrument(name = "anilist.fetch_by_id", skip(query), fields(id = id))]
 pub async fn fetch_by_id(query: String, id: u32) -> Result<String, AniListRequestError> {
+    let client = default_client()?;
+    fetch_by_id_with_client(client, query, id).await
+}
+
+#[instrument(name = "anilist.fetch_by_id_with_client", skip(client, query), fields(id = id))]
+pub async fn fetch_by_id_with_client(
+    client: &AniListClient,
+    query: String,
+    id: u32,
+) -> Result<String, AniListRequestError> {
     let json = json!({"query": query, "variables": {"id":id}});
-    let result = send_request(json).await?;
-
+    let result = client.send_request(json).await?;
     info!("Fetched By ID: {:#?}", id);
-
     Ok(result)
 }
 
 #[instrument(name = "anilist.fetch_by_name", skip(query), fields(name_len = name.len()))]
 pub async fn fetch_by_name(query: String, name: String) -> Result<String, AniListRequestError> {
+    let client = default_client()?;
+    fetch_by_name_with_client(client, query, name).await
+}
+
+#[instrument(name = "anilist.fetch_by_name_with_client", skip(client, query), fields(name_len = name.len()))]
+pub async fn fetch_by_name_with_client(
+    client: &AniListClient,
+    query: String,
+    name: String,
+) -> Result<String, AniListRequestError> {
     if !name.as_str().is_japanese() {
-        let (result, _) = fetch_name_search(&query, &name).await?;
+        let (result, _) = fetch_name_search(client, &query, &name).await?;
         info!("Fetched By Name: {:#?}", name);
         return Ok(result);
     }
@@ -131,7 +150,7 @@ pub async fn fetch_by_name(query: String, name: String) -> Result<String, AniLis
     // Try the original Japanese input, but only keep it as a fallback. Short kana
     // abbreviations can return weak partial native-title matches, while AniList
     // often has a stronger romaji synonym/search match (e.g. このすば → konosuba).
-    let (kana_result, kana_has_results) = fetch_name_search(&query, &name).await?;
+    let (kana_result, kana_has_results) = fetch_name_search(client, &query, &name).await?;
     let kana_fallback = match kana_has_results {
         Some(true) => Some(kana_result),
         None => return Ok(kana_result),
@@ -143,7 +162,8 @@ pub async fn fetch_by_name(query: String, name: String) -> Result<String, AniLis
     let spaced = kana_to_particle_spaced_romaji(&name);
     let compact = name.to_romaji();
     if spaced != compact {
-        let (spaced_result, spaced_has_results) = fetch_name_search(&query, &spaced).await?;
+        let (spaced_result, spaced_has_results) =
+            fetch_name_search(client, &query, &spaced).await?;
         match spaced_has_results {
             Some(true) => {
                 info!(strategy = "spaced_romaji", "Fetched By Name: {:#?}", spaced);
@@ -157,7 +177,7 @@ pub async fn fetch_by_name(query: String, name: String) -> Result<String, AniLis
     // Prefer compact romaji (original behaviour) over raw Japanese fallback when
     // it has candidates, because those candidates align better with downstream
     // romaji/English fuzzy matching.
-    let (compact_result, compact_has_results) = fetch_name_search(&query, &compact).await?;
+    let (compact_result, compact_has_results) = fetch_name_search(client, &query, &compact).await?;
     match compact_has_results {
         Some(true) => {
             info!(
@@ -181,13 +201,15 @@ pub async fn fetch_by_name(query: String, name: String) -> Result<String, AniLis
     }
 }
 
-#[instrument(name = "anilist.fetch_by_raw_name", skip(query), fields(name_len = name.len()))]
-pub async fn fetch_by_raw_name(query: String, name: String) -> Result<String, AniListRequestError> {
+#[instrument(name = "anilist.fetch_by_raw_name", skip(client, query), fields(name_len = name.len()))]
+pub async fn fetch_by_raw_name(
+    client: &AniListClient,
+    query: String,
+    name: String,
+) -> Result<String, AniListRequestError> {
     let json = json!({"query": query, "variables": {"search": name}});
-    let result = send_request(json).await?;
-
+    let result = client.send_request(json).await?;
     info!("Fetched By Raw Name");
-
     Ok(result)
 }
 

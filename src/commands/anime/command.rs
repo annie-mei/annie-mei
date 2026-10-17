@@ -2,6 +2,7 @@ use std::collections::HashMap;
 
 use crate::{
     commands::{
+        context::CommandContext,
         input_validation::validate_search_term,
         response::CommandResponse,
         traits::{AniListSource, MediaDataSource},
@@ -23,7 +24,6 @@ use serde_json::json;
 use serenity::{
     all::{CommandInteraction, CreateCommandOption, EditInteractionResponse},
     builder::CreateCommand,
-    client::Context,
     http::Http,
     model::application::CommandOptionType,
 };
@@ -75,7 +75,7 @@ pub fn handle_anime(
 // ── Serenity adapter (thin wrapper) ─────────────────────────────────────
 
 #[instrument(name = "command.anime.run", skip(ctx, interaction))]
-pub async fn run(ctx: &Context, interaction: &mut CommandInteraction) {
+pub async fn run(ctx: &CommandContext, interaction: &mut CommandInteraction) {
     let user = &interaction.user;
 
     let Some(search_term) = defer_and_validate_search(&ctx.http, interaction).await else {
@@ -86,8 +86,9 @@ pub async fn run(ctx: &Context, interaction: &mut CommandInteraction) {
 
     info!("Got command 'anime' with search_term: {search_term}");
 
+    let source = AniListSource::new(&ctx.anilist);
     let (fetch_result, title_preference): (Option<(Anime, TitleVariant)>, TitleDisplayPreference) = tokio::join!(
-        AniListSource.fetch_anime(&search_term),
+        source.fetch_anime(&search_term),
         resolve_title_display_preference(ctx, user.id, interaction.guild_id),
     );
     let (anime_result, title_variant): (Option<Anime>, Option<TitleVariant>) = match fetch_result {

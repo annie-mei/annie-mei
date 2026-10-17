@@ -12,8 +12,11 @@ use crate::{
         media_type::MediaType as Type, transformers::Transformers,
     },
     utils::{
-        fetch_by_arguments::{fetch_by_id, fetch_by_name, fetch_by_raw_name},
+        fetch_by_arguments::{
+            fetch_by_id_with_client, fetch_by_name_with_client, fetch_by_raw_name,
+        },
         redis::{check_cache, try_to_cache_response},
+        requests::anilist::AniListClient,
     },
 };
 
@@ -53,15 +56,16 @@ pub trait Response {
 
 #[instrument(
     name = "anilist.fetch_from_network_and_cache",
-    skip(search_query),
+    skip(client, search_query),
     fields(cache_key = %cache_key, lookup_len = lookup_value.len())
 )]
 async fn fetch_from_network_and_cache(
+    client: &AniListClient,
     search_query: String,
     lookup_value: String,
     cache_key: String,
 ) -> Option<String> {
-    let response = match fetch_by_name(search_query, lookup_value).await {
+    let response = match fetch_by_name_with_client(client, search_query, lookup_value).await {
         Ok(data) => data,
         Err(err) => {
             error!(error = %err, "Failed to fetch AniList data by name");
@@ -84,15 +88,16 @@ async fn fetch_from_network_and_cache(
 
 #[instrument(
     name = "anilist.fetch_raw_from_network_and_cache",
-    skip(search_query),
+    skip(client, search_query),
     fields(cache_key = %cache_key, lookup_len = lookup_value.len())
 )]
 async fn fetch_raw_from_network_and_cache(
+    client: &AniListClient,
     search_query: String,
     lookup_value: String,
     cache_key: String,
 ) -> Option<String> {
-    let response = match fetch_by_raw_name(search_query, lookup_value).await {
+    let response = match fetch_by_raw_name(client, search_query, lookup_value).await {
         Ok(data) => data,
         Err(err) => {
             error!(error = %err, "Failed to fetch AniList data by raw name");
@@ -123,22 +128,25 @@ fn write_cached_anilist_response(cache_key: String, response: String) {
     try_to_cache_response(&cache_key, &response)
 }
 
-#[instrument(name = "anilist.fetch", skip(response_config), fields(media_type = ?media_type))]
+#[instrument(name = "anilist.fetch", skip(client, response_config), fields(media_type = ?media_type))]
 pub async fn fetch<
     T: serde::de::DeserializeOwned + Transformers + std::fmt::Debug + std::clone::Clone,
 >(
+    client: &AniListClient,
     response_config: &impl Response,
     media_type: Type,
 ) -> Option<(T, TitleVariant)> {
     match response_config.get_argument() {
         Argument::Id(value) => {
-            let fetched_data = match fetch_by_id(response_config.get_id_query(), *value).await {
-                Ok(data) => data,
-                Err(err) => {
-                    error!(error = %err, id = *value, "Failed to fetch AniList data by id");
-                    return None;
-                }
-            };
+            let fetched_data =
+                match fetch_by_id_with_client(client, response_config.get_id_query(), *value).await
+                {
+                    Ok(data) => data,
+                    Err(err) => {
+                        error!(error = %err, id = *value, "Failed to fetch AniList data by id");
+                        return None;
+                    }
+                };
             let fetch_response: IdResponse<T> = match serde_json::from_str(&fetched_data) {
                 Ok(response) => response,
                 Err(err) => {
@@ -173,6 +181,7 @@ pub async fn fetch<
                 Ok(Err(err)) => {
                     info!("Cache miss for {:#?} with error {:#?}", cache_key, err);
                     fetch_from_network_and_cache(
+                        client,
                         search_query.clone(),
                         lookup_value.clone(),
                         cache_key.clone(),
@@ -181,8 +190,13 @@ pub async fn fetch<
                 }
                 Err(err) => {
                     error!(error = %err, "Failed to read AniList cache");
-                    fetch_from_network_and_cache(search_query, lookup_value, cache_key.clone())
-                        .await?
+                    fetch_from_network_and_cache(
+                        client,
+                        search_query,
+                        lookup_value,
+                        cache_key.clone(),
+                    )
+                    .await?
                 }
             };
             let fetch_response: MediaResponse<T> = match serde_json::from_str(&fetched_data) {
@@ -200,14 +214,21 @@ pub async fn fetch<
     }
 }
 
-#[instrument(name = "anilist.fetch_character", skip(response_config))]
+#[instrument(name = "anilist.fetch_character", skip(client, response_config))]
 pub async fn fetch_character(
+    client: &AniListClient,
     response_config: &impl Response,
     allow_spoilers: bool,
 ) -> Option<Character> {
     match response_config.get_argument() {
         Argument::Id(value) => {
-            let fetched_data = match fetch_by_id(response_config.get_id_query(), *value).await {
+            let fetched_data = match fetch_by_id_with_client(
+                client,
+                response_config.get_id_query(),
+                *value,
+            )
+            .await
+            {
                 Ok(data) => data,
                 Err(err) => {
                     error!(error = %err, id = *value, "Failed to fetch AniList character data by id");
@@ -243,6 +264,7 @@ pub async fn fetch_character(
                 Ok(Err(err)) => {
                     info!("Cache miss for {:#?} with error {:#?}", cache_key, err);
                     fetch_raw_from_network_and_cache(
+                        client,
                         search_query.clone(),
                         lookup_value.clone(),
                         cache_key.clone(),
@@ -251,8 +273,13 @@ pub async fn fetch_character(
                 }
                 Err(err) => {
                     error!(error = %err, "Failed to read AniList character cache");
-                    fetch_raw_from_network_and_cache(search_query, lookup_value, cache_key.clone())
-                        .await?
+                    fetch_raw_from_network_and_cache(
+                        client,
+                        search_query,
+                        lookup_value,
+                        cache_key.clone(),
+                    )
+                    .await?
                 }
             };
             let fetch_response: CharacterResponse = match serde_json::from_str(&fetched_data) {

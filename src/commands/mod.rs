@@ -1,5 +1,6 @@
 pub mod anime;
 pub mod character;
+pub mod context;
 pub mod help;
 pub mod input_validation;
 pub mod manga;
@@ -15,7 +16,16 @@ pub mod traits;
 pub mod unregister;
 pub mod whoami;
 
-use serenity::{builder::CreateCommand, client::Context, model::application::CommandInteraction};
+use serenity::{
+    all::{
+        CommandInteraction, ComponentInteraction, CreateEmbed, CreateInteractionResponse,
+        CreateInteractionResponseMessage, CreateMessage,
+    },
+    builder::CreateCommand,
+};
+use tracing::instrument;
+
+use self::context::CommandContext;
 
 /// A slash command known to both Discord registration and runtime dispatch.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -92,7 +102,8 @@ impl BotCommand {
         }
     }
 
-    pub async fn run(self, ctx: &Context, interaction: &mut CommandInteraction) {
+    #[instrument(name = "command.run", skip(ctx, interaction), fields(command = self.name()))]
+    pub async fn run(self, ctx: &CommandContext, interaction: &mut CommandInteraction) {
         match self {
             Self::Ping => ping::run(ctx, interaction).await,
             Self::Help => help::run(ctx, interaction).await,
@@ -108,6 +119,40 @@ impl BotCommand {
             Self::Whoami => whoami::run(ctx, interaction).await,
             Self::Settings => settings::run(ctx, interaction).await,
         }
+    }
+}
+
+#[instrument(name = "command.dispatch", skip(ctx, interaction), fields(command = %interaction.data.name))]
+pub async fn dispatch_command(ctx: &CommandContext, interaction: &mut CommandInteraction) {
+    if let Some(command) = BotCommand::from_name(&interaction.data.name) {
+        command.run(ctx, interaction).await;
+    } else {
+        let embed = CreateEmbed::new()
+            .title("Error")
+            .description("Not implemented");
+        let builder = CreateMessage::new().embed(embed);
+        let msg = interaction
+            .channel_id
+            .send_message(&ctx.http, builder)
+            .await;
+        if let Err(why) = msg {
+            println!("Error sending message: {why:?}");
+            tracing::info!("Cannot respond to slash command: {why}");
+        }
+    }
+}
+
+#[instrument(name = "component.dispatch", skip(ctx, interaction), fields(custom_id = %interaction.data.custom_id))]
+pub async fn dispatch_component(ctx: &CommandContext, interaction: &mut ComponentInteraction) {
+    if settings::is_settings_component(&interaction.data.custom_id) {
+        settings::handle_component(ctx, interaction).await;
+    } else {
+        let builder = CreateInteractionResponse::Message(
+            CreateInteractionResponseMessage::new()
+                .content("I don't recognize that control. Please run the command again.")
+                .ephemeral(true),
+        );
+        let _ = interaction.create_response(&ctx.http, builder).await;
     }
 }
 

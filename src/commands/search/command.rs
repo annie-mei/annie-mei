@@ -2,6 +2,7 @@ use std::fmt;
 
 use crate::{
     commands::{
+        context::CommandContext,
         input_validation::{ValidationError, validate_search_term},
         response::CommandResponse,
         search::prompts::SEARCH_SYSTEM_PROMPT,
@@ -29,7 +30,6 @@ use serenity::{
         CommandDataOptionValue, CommandInteraction, CreateCommandOption, EditInteractionResponse,
     },
     builder::CreateCommand,
-    client::Context,
     model::application::CommandOptionType,
 };
 use tracing::{info, instrument, warn};
@@ -287,7 +287,7 @@ pub fn build_response(
 }
 
 #[instrument(name = "command.search.run", skip(ctx, interaction))]
-pub async fn run(ctx: &Context, interaction: &mut CommandInteraction) {
+pub async fn run(ctx: &CommandContext, interaction: &mut CommandInteraction) {
     let _ = interaction.defer(&ctx.http).await;
 
     let user = &interaction.user;
@@ -360,7 +360,8 @@ pub async fn run(ctx: &Context, interaction: &mut CommandInteraction) {
             }
         };
 
-        fetch_search_result(&AniListSource, intent).await
+        let source = AniListSource::new(&ctx.anilist);
+        fetch_search_result(&source, intent).await
     };
     let (result, title_preference) = tokio::join!(
         search_result_future,

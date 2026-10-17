@@ -1,6 +1,7 @@
 use std::{collections::HashMap, fmt::Display, future::Future};
 
 use crate::{
+    commands::context::CommandContext,
     models::{
         db::{oauth_credential::OAuthCredential, settings::get_user_settings_for_discord_ids},
         settings::SettingKey,
@@ -9,14 +10,13 @@ use crate::{
     },
     utils::{
         database::get_pool_from_context,
-        requests::anilist::{AniListRequestError, send_request},
+        requests::anilist::{AniListClient, AniListRequestError},
         settings::{participates_in_guild_scores, resolve_guild_scores_enabled_with_pool},
     },
 };
 
 use serenity::{
     all::CommandInteraction,
-    client::Context,
     model::prelude::{Guild, GuildId, UserId},
 };
 
@@ -85,7 +85,10 @@ fn get_guild_member_ids(guild: &Guild) -> Vec<UserId> {
 }
 
 #[instrument(name = "discord.guild.from_interaction", skip(ctx, interaction), fields(has_guild_id = interaction.guild_id.is_some()))]
-fn get_guild_from_interaction(ctx: &Context, interaction: &CommandInteraction) -> Option<Guild> {
+fn get_guild_from_interaction(
+    ctx: &CommandContext,
+    interaction: &CommandInteraction,
+) -> Option<Guild> {
     interaction
         .guild_id
         .and_then(|guild_id| guild_id.to_guild_cached(&ctx.cache))
@@ -94,7 +97,10 @@ fn get_guild_from_interaction(ctx: &Context, interaction: &CommandInteraction) -
 }
 
 #[instrument(name = "discord.guild.current_members", skip(ctx, interaction), fields(has_guild_id = interaction.guild_id.is_some()))]
-pub fn get_current_guild_members(ctx: &Context, interaction: &CommandInteraction) -> Vec<UserId> {
+pub fn get_current_guild_members(
+    ctx: &CommandContext,
+    interaction: &CommandInteraction,
+) -> Vec<UserId> {
     get_guild_from_interaction(ctx, interaction)
         .as_ref()
         .map(get_guild_member_ids)
@@ -103,7 +109,7 @@ pub fn get_current_guild_members(ctx: &Context, interaction: &CommandInteraction
 
 #[instrument(name = "guild.fetch_media_data", skip(ctx, media, guild_members), fields(member_count = guild_members.len()))]
 pub async fn get_guild_data_for_media<T: Transformers>(
-    ctx: &Context,
+    ctx: &CommandContext,
     media: &T,
     guild_id: Option<GuildId>,
     guild_members: Vec<UserId>,
@@ -137,6 +143,7 @@ pub async fn get_guild_data_for_media<T: Transformers>(
         };
 
     get_guild_anilist_data(
+        &ctx.anilist,
         participating_users,
         media.get_id(),
         media.get_type().to_owned(),
@@ -168,14 +175,15 @@ async fn filter_guild_score_participants(
         .collect())
 }
 
-#[instrument(name = "guild.fetch_anilist_data", skip(guild_members, media_type), fields(member_count = guild_members.len(), media_id = media_id, media_type = %media_type))]
+#[instrument(name = "guild.fetch_anilist_data", skip(client, guild_members, media_type), fields(member_count = guild_members.len(), media_id = media_id, media_type = %media_type))]
 async fn get_guild_anilist_data(
+    client: &AniListClient,
     guild_members: Vec<OAuthCredential>,
     media_id: u32,
     media_type: String,
 ) -> HashMap<u64, MediaListData> {
     get_guild_anilist_data_with_sender(guild_members, media_id, media_type, |body| async {
-        accept_partial_batch_response(send_request(body).await)
+        accept_partial_batch_response(client.send_request(body).await)
     })
     .await
 }

@@ -1,6 +1,7 @@
 use serenity::all::{Channel, ChannelId, GuildId};
-use serenity::client::Context;
 use tracing::instrument;
+
+use crate::commands::context::CommandContext;
 
 /// Returns `true` when the given channel is marked as NSFW (age-restricted).
 ///
@@ -9,7 +10,7 @@ use tracing::instrument;
 /// **not** NSFW (i.e. adult content will be blocked).
 #[instrument(name = "utils.channel.is_nsfw", skip(ctx), fields(channel_id = %channel_id))]
 pub async fn is_nsfw_channel(
-    ctx: &Context,
+    ctx: &CommandContext,
     channel_id: ChannelId,
     guild_id: Option<GuildId>,
 ) -> bool {
