@@ -1,3 +1,4 @@
+use crate::utils::requests::anilist::AniListClient;
 use crate::{
     models::{
         anilist_anime::Anime, mal_response::MalResponse, media_type::MediaType as Type,
@@ -16,9 +17,9 @@ pub enum SongFetchResult {
     FetchError,
 }
 
-#[instrument(name = "command.songs.fetcher", skip(args))]
-pub async fn fetcher(args: CommandDataOptionValue) -> SongFetchResult {
-    let anime_response = anime_fetcher::<Anime>(Type::Anime, args).await;
+#[instrument(name = "command.songs.fetcher", skip(client, args))]
+pub async fn fetcher(client: &AniListClient, args: CommandDataOptionValue) -> SongFetchResult {
+    let anime_response = anime_fetcher::<Anime>(client, Type::Anime, args).await;
     let Some((anime, _variant)) = anime_response else {
         return SongFetchResult::AnimeNotFound;
     };

@@ -1,4 +1,5 @@
 use crate::{
+    commands::context::CommandContext,
     commands::response::CommandResponse,
     utils::{
         database::get_pool_from_context,
@@ -12,7 +13,6 @@ use serenity::{
         EditInteractionResponse,
     },
     builder::CreateCommand,
-    client::Context,
     model::application::CommandOptionType,
 };
 use sqlx::PgConnection;
@@ -148,7 +148,7 @@ fn outcome_from_deletions(deletions: DeletedRegistrations) -> UnregisterOutcome 
 }
 
 #[instrument(name = "command.unregister.run", skip(ctx, interaction))]
-pub async fn run(ctx: &Context, interaction: &mut CommandInteraction) {
+pub async fn run(ctx: &CommandContext, interaction: &mut CommandInteraction) {
     let _ = interaction.defer_ephemeral(&ctx.http).await;
 
     let user = &interaction.user;

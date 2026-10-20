@@ -1,0 +1,33 @@
+{
+  "data": {
+    "Page": {
+      "media": [{
+        "type": "ANIME",
+        "id": 900001,
+        "idMal": 900002,
+        "isAdult": false,
+        "title": {
+          "romaji": "Hoshi no Tabi",
+          "english": "Journey Among Stars",
+          "native": "星の旅"
+        },
+        "synonyms": [],
+        "season": "SPRING",
+        "seasonYear": 2024,
+        "format": "TV",
+        "status": "FINISHED",
+        "episodes": 13,
+        "duration": 24,
+        "genres": ["Adventure"],
+        "source": "ORIGINAL",
+        "coverImage": { "extraLarge": "https://example.invalid/qa-cover.jpg", "color": "#123456" },
+        "averageScore": 83,
+        "studios": { "edges": [{ "isMain": true }], "nodes": [{ "name": "Fixture Studio" }] },
+        "siteUrl": "https://anilist.co/anime/900001",
+        "externalLinks": [],
+        "description": "A synthetic adventure used only for QA.",
+        "tags": []
+      }]
+    }
+  }
+}

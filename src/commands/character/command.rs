@@ -1,5 +1,6 @@
 use crate::{
     commands::{
+        context::CommandContext,
         input_validation::validate_search_term,
         response::CommandResponse,
         traits::{AniListSource, CharacterDataSource},
@@ -19,7 +20,6 @@ use serenity::{
         EditInteractionResponse,
     },
     builder::CreateCommand,
-    client::Context,
     model::application::CommandOptionType,
 };
 use tracing::{info, instrument};
@@ -89,7 +89,7 @@ pub fn handle_character(
 }
 
 #[instrument(name = "command.character.run", skip(ctx, interaction))]
-pub async fn run(ctx: &Context, interaction: &mut CommandInteraction) {
+pub async fn run(ctx: &CommandContext, interaction: &mut CommandInteraction) {
     let _ = interaction.defer(&ctx.http).await;
 
     let user = &interaction.user;
@@ -116,9 +116,8 @@ pub async fn run(ctx: &Context, interaction: &mut CommandInteraction) {
         "Got command 'character' with search_term: {search_term}, allow_spoilers: {allow_spoilers}"
     );
 
-    let character_result = AniListSource
-        .fetch_character(&search_term, allow_spoilers)
-        .await;
+    let source = AniListSource::new(&ctx.anilist);
+    let character_result = source.fetch_character(&search_term, allow_spoilers).await;
     let allow_adult_media = if character_result
         .as_ref()
         .is_some_and(Character::has_adult_media)

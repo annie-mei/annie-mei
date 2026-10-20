@@ -1,4 +1,5 @@
 use crate::{
+    commands::context::CommandContext,
     models::db::oauth_credential::OAuthCredential,
     utils::{
         database::get_pool_from_context,
@@ -10,7 +11,6 @@ use crate::{
 use serenity::{
     all::{CommandInteraction, CreateButton, EditInteractionResponse},
     builder::CreateCommand,
-    client::Context,
 };
 use tracing::{error, info, instrument};
 
@@ -84,7 +84,7 @@ fn handle_register_error(err: &OAuthContextError) -> RegisterResponse {
 }
 
 #[instrument(name = "command.register.run", skip(ctx, interaction))]
-pub async fn run(ctx: &Context, interaction: &mut CommandInteraction) {
+pub async fn run(ctx: &CommandContext, interaction: &mut CommandInteraction) {
     let _ = interaction.defer_ephemeral(&ctx.http).await;
 
     let discord_id = interaction.user.id;

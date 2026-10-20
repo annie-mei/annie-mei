@@ -1,4 +1,4 @@
-use crate::utils::privacy::configure_sentry_scope;
+use crate::{commands::context::CommandContext, utils::privacy::configure_sentry_scope};
 
 use super::response::CommandResponse;
 
@@ -6,7 +6,7 @@ use serenity::{
     all::{CommandInteraction, CreateInteractionResponse, CreateInteractionResponseMessage},
     builder::CreateCommand,
     http::Http,
-    prelude::*,
+    prelude::Mentionable,
 };
 
 pub fn register() -> CreateCommand {
@@ -27,14 +27,15 @@ pub fn handle_ping(user_mention: &str) -> CommandResponse {
 
 // ── Serenity adapter (thin wrapper) ─────────────────────────────────────
 
-pub async fn run(ctx: &Context, interaction: &CommandInteraction) {
+#[tracing::instrument(name = "command.ping.run", skip(ctx, interaction))]
+pub async fn run(ctx: &CommandContext, interaction: &CommandInteraction) {
     configure_sentry_scope("Ping", interaction.user.id.get(), None);
     let _ = run_with_http(&ctx.http, interaction).await;
 }
 
 /// Execute the Discord transport adapter with an explicit HTTP client.
 ///
-/// Keeping this boundary independent of [`Context`] allows protocol tests to
+/// Keeping this boundary independent of [`CommandContext`] allows protocol tests to
 /// exercise Serenity's real request serialization against a local server.
 pub async fn run_with_http(http: &Http, interaction: &CommandInteraction) -> serenity::Result<()> {
     let user = &interaction.user;

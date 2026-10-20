@@ -1,4 +1,4 @@
-use crate::utils::privacy::configure_sentry_scope;
+use crate::{commands::context::CommandContext, utils::privacy::configure_sentry_scope};
 
 use serenity::{
     all::{
@@ -6,7 +6,6 @@ use serenity::{
         CreateInteractionResponse, CreateInteractionResponseMessage, Timestamp,
     },
     builder::CreateCommand,
-    prelude::*,
 };
 use tracing::{error, instrument, warn};
 
@@ -15,7 +14,7 @@ pub fn register() -> CreateCommand {
 }
 
 #[instrument(name = "command.help.run", skip(ctx, interaction))]
-pub async fn run(ctx: &Context, interaction: &CommandInteraction) {
+pub async fn run(ctx: &CommandContext, interaction: &CommandInteraction) {
     let user = &interaction.user;
 
     configure_sentry_scope("Help", user.id.get(), None);

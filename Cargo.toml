@@ -66,4 +66,5 @@ uuid = { version = "1", features = ["v4"] }
 wana_kana = "5.0.0"
 
 [dev-dependencies]
+axum = { version = "0.8", default-features = false, features = ["http1", "json", "tokio"] }
 httpmock = "0.8.3"

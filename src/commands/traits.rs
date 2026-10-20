@@ -32,6 +32,7 @@ use crate::models::{
     anilist_anime::Anime, anilist_character::Character, anilist_common::TitleVariant,
     anilist_manga::Manga,
 };
+use crate::utils::requests::anilist::AniListClient;
 
 /// Abstraction over media-data retrieval (AniList today, pluggable tomorrow).
 ///
@@ -75,34 +76,46 @@ pub trait CharacterDataSource: Send + Sync {
 ///
 /// This delegates to the existing [`crate::utils::response_fetcher::fetcher`]
 /// pipeline, preserving current caching (Redis) and fuzzy-match behaviour.
-pub struct AniListSource;
+pub struct AniListSource<'a> {
+    client: &'a AniListClient,
+}
 
-impl MediaDataSource for AniListSource {
+impl<'a> AniListSource<'a> {
+    #[tracing::instrument(name = "anilist.source.new", skip(client))]
+    pub fn new(client: &'a AniListClient) -> Self {
+        Self { client }
+    }
+}
+
+impl MediaDataSource for AniListSource<'_> {
+    #[tracing::instrument(name = "anilist.source.anime", skip_all)]
     async fn fetch_anime(&self, search_term: &str) -> Option<(Anime, TitleVariant)> {
         use crate::models::media_type::MediaType;
         use crate::utils::response_fetcher::fetcher;
         use serenity::all::CommandDataOptionValue;
 
         let arg = CommandDataOptionValue::String(search_term.to_string());
-        fetcher::<Anime>(MediaType::Anime, arg).await
+        fetcher::<Anime>(self.client, MediaType::Anime, arg).await
     }
 
+    #[tracing::instrument(name = "anilist.source.manga", skip_all)]
     async fn fetch_manga(&self, search_term: &str) -> Option<(Manga, TitleVariant)> {
         use crate::models::media_type::MediaType;
         use crate::utils::response_fetcher::fetcher;
         use serenity::all::CommandDataOptionValue;
 
         let arg = CommandDataOptionValue::String(search_term.to_string());
-        fetcher::<Manga>(MediaType::Manga, arg).await
+        fetcher::<Manga>(self.client, MediaType::Manga, arg).await
     }
 }
 
-impl CharacterDataSource for AniListSource {
+impl CharacterDataSource for AniListSource<'_> {
+    #[tracing::instrument(name = "anilist.source.character", skip_all)]
     async fn fetch_character(&self, search_term: &str, allow_spoilers: bool) -> Option<Character> {
         use crate::utils::response_fetcher::character_fetcher;
         use serenity::all::CommandDataOptionValue;
 
         let arg = CommandDataOptionValue::String(search_term.to_string());
-        character_fetcher(arg, allow_spoilers).await
+        character_fetcher(self.client, arg, allow_spoilers).await
     }
 }

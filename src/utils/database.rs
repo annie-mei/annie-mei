@@ -1,6 +1,6 @@
-use crate::utils::statics::DATABASE_URL;
+use crate::{commands::context::CommandContext, utils::statics::DATABASE_URL};
 
-use serenity::{client::Context, prelude::TypeMapKey};
+use serenity::prelude::TypeMapKey;
 use sqlx::{Pool, Postgres, postgres::PgPoolOptions};
 use std::env;
 use std::time::Duration;
@@ -59,7 +59,7 @@ pub async fn run_migrations(pool: &DbPool) -> Result<(), sqlx::migrate::MigrateE
 }
 
 #[instrument(name = "db.pool_from_context", skip(ctx))]
-pub async fn get_pool_from_context(ctx: &Context) -> Option<DbPool> {
+pub async fn get_pool_from_context(ctx: &CommandContext) -> Option<DbPool> {
     let data = ctx.data.read().await;
     data.get::<DatabasePoolKey>().cloned()
 }

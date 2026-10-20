@@ -31,14 +31,17 @@ use std::time::{Duration, Instant};
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
-use serenity::{client::Context, prelude::TypeMapKey};
+use serenity::prelude::TypeMapKey;
 use tracing::{Instrument, info, instrument, warn};
 use uuid::Uuid;
 
-use crate::utils::{
-    posthog::{LlmTelemetryContext, PostHogClient},
-    statics::{GEMINI_API_KEY, LLM_BASE_URL, LLM_MODEL},
-    tls::install_rustls_crypto_provider,
+use crate::{
+    commands::context::CommandContext,
+    utils::{
+        posthog::{LlmTelemetryContext, PostHogClient},
+        statics::{GEMINI_API_KEY, LLM_BASE_URL, LLM_MODEL},
+        tls::install_rustls_crypto_provider,
+    },
 };
 
 const DEFAULT_BASE_URL: &str = "https://generativelanguage.googleapis.com/v1beta/openai";
@@ -58,7 +61,7 @@ impl TypeMapKey for GeminiClientKey {
 }
 
 #[instrument(name = "llm.client_from_context", skip(ctx))]
-pub async fn get_gemini_client_from_context(ctx: &Context) -> Option<Arc<GeminiClient>> {
+pub async fn get_gemini_client_from_context(ctx: &CommandContext) -> Option<Arc<GeminiClient>> {
     let data = ctx.data.read().await;
     data.get::<GeminiClientKey>().cloned()
 }
