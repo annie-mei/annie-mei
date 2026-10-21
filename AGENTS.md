@@ -1,16 +1,28 @@
 # Agent Instructions for Annie Mei
 
+<!-- BEGIN ANNIE MEI SHARED WORKFLOW -->
+<!-- Source: annie-mei/.github/AGENTS.md. Keep this block identical in all four repos. -->
+## Annie Mei organization workflow
+
+Applies to `annie-mei/annie-mei`, `annie-mei/auth`, `annie-mei/docs`, and `annie-mei/.github`.
+
+- Every work branch must have a Linear ticket and use the ticket's suggested branch name.
+- Check existing and recent tickets before proposing a new one. Ask the user before creating a ticket.
+- PR titles must use `[ANNIE-<ticket-number>]/<description>`.
+- Do not mention or link Linear tickets in PR descriptions; branch automation supplies the link.
+- Fill the repository's existing `.github/PULL_REQUEST_TEMPLATE.md`. Do not duplicate the template in agent guidance.
+- If the repository has no PR template, reuse the existing bot template: https://github.com/annie-mei/annie-mei/blob/main/.github/PULL_REQUEST_TEMPLATE.md
+- Remove placeholder comments and unused optional sections. Record validation actually performed and replace `MODEL_NAME` with the actual model.
+<!-- END ANNIE MEI SHARED WORKFLOW -->
+
 Annie Mei is a Rust Discord bot using Serenity 0.12, SQLx, Redis, Spotify, and external anime APIs. Sentry provides error reporting; the companion auth service owns OAuth schema and HTTP health endpoints.
 
 ## Permanent Git and PR Safety
 
 - Never commit or push directly to `main`; work on a feature branch.
-- Every branch must have a Linear ticket and use that ticket's suggested branch name (for example, `annie-123-description`).
-- Do not create a Linear ticket automatically. Check for a suitable existing ticket, then ask before creating one.
 - Never force-push without explicit approval.
 - Opening, updating, commenting on, reviewing, merging, and closing a pull request are six distinct shared-state actions. Each requires explicit authorization for that action; authorization for one does not authorize any other. Read-only PR inspection does not require approval.
-- PR titles must use `[ANNIE-<ticket-number>]/<description>`.
-- Load and follow the project `pull-request` skill for any PR creation, update, review, comment, readiness check, merge, or close workflow.
+- Read and follow `.agents/skills/pull-request/SKILL.md` for any PR creation, update, review, comment, readiness check, merge, or close workflow.
 - After a Git failure, explain what failed, present the available recovery options, and ask the user which option to take.
 
 ## Code Conventions
