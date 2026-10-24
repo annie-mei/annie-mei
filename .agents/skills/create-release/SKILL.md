@@ -41,8 +41,12 @@ for **new releases**: any existing local tag, remote tag, or GitHub release bloc
 this path. Reusing an existing release requires a separate explicit plan; do not
 delete or overwrite anything to make preflight pass.
 
-The checker pins Cargo metadata to the commit, compares remote `main`, checks tag
-absence and active inherited/repository tag rules, and checks workflow visibility.
+The checker requires every effective `origin` push URL (including separate push
+URLs and Git URL rewrites) to target `annie-mei/annie-mei` on GitHub. Standard
+HTTPS and Git SSH URLs are supported; aliases and other transports fail closed.
+It pins `Cargo.toml` and the matching `annie-mei` package in `Cargo.lock` to the
+commit, compares remote `main`, checks tag absence and active inherited/repository
+tag rules, and checks workflow visibility.
 If those prerequisites permit creating a tag, it signs and verifies an actual
 annotated tag in a temporary Git directory using the effective configured signer
 and existing hooks. The temporary tag is removed, never pushed. A signing prompt
@@ -59,7 +63,9 @@ The JSON report has scope `new-release-git-and-github-preflight` and exit codes:
 | `unknown` | 2 | Evidence is unavailable or unsupported; do not treat it as passing |
 
 Unsupported rules/signers and denied APIs fail closed. An admin exemption does
-not make a creation restriction pass. Never substitute a signer, register a key,
+not make a creation restriction pass. Known creation restrictions remain `blocked`
+even when other rules are unknown; the report retains both findings.
+Never substitute a signer, register a key,
 disable signing/hooks, retry a failed Git operation, or relax a rule automatically.
 
 ### Complete the release gate
@@ -106,7 +112,7 @@ approved fingerprint, not merely any locally trusted key, and confirm the peeled
 commit equals the approved SHA. Only then perform the authorized push:
 
 ```bash
-# Push the tag so GitHub Releases can point to it
+# Reconfirm origin's effective push URLs still target the checked repository.
 git push origin vX.X.X
 ```
 
@@ -121,8 +127,8 @@ do not recreate the tag as an automatic recovery step.
 ### Run Release Build and Deploy
 
 ```bash
-gh workflow run build-release.yml --ref main -f ref=vX.X.X
-gh run watch EXACT_DISPATCHED_RUN_ID --exit-status
+gh workflow run build-release.yml --repo github.com/annie-mei/annie-mei --ref main -f ref=vX.X.X
+gh run watch EXACT_DISPATCHED_RUN_ID --repo github.com/annie-mei/annie-mei --exit-status
 ```
 
 Capture the run URL/ID returned by dispatch. If unavailable, reconcile runs against
@@ -163,10 +169,10 @@ You can edit via CLI or directly in the GitHub UI.
 
 ```bash
 # Check the release was created with assets
-gh release view vX.X.X
+gh release view vX.X.X --repo github.com/annie-mei/annie-mei
 
 # Verify the workflow completed
-gh run view EXACT_DISPATCHED_RUN_ID
+gh run view EXACT_DISPATCHED_RUN_ID --repo github.com/annie-mei/annie-mei
 ```
 
 Also verify:
@@ -193,11 +199,12 @@ python3 .agents/skills/create-release/scripts/test_preflight.py -v
 
 Tests use disposable repositories and generated SSH keys with fixture GitHub reads.
 They do not require personal credentials or change real tags or remote state.
+The same command runs in `scripts/verify.sh` and the Cargo Test CI workflow.
 
 ## Notes
 
 - `main` pushes run `build-release.yml` as a cache warmer and do not create a release or deploy
-- Releases are manual: `gh workflow run build-release.yml --ref main -f ref=vX.X.X`
+- Releases are manual: `gh workflow run build-release.yml --repo github.com/annie-mei/annie-mei --ref main -f ref=vX.X.X`
 - Releases are built on ARM64 runners for Oracle Cloud deployment
 - Release runs restore cache but skip saving large caches on the critical deploy path
 - The binary is validated before deployment; if validation fails, the deploy auto-rolls back

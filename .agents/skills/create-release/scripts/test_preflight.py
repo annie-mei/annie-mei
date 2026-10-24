@@ -44,10 +44,20 @@ class PreflightTests(unittest.TestCase):
         ).split()[1]
         self.command("git", "config", "gpg.format", "ssh")
         self.command("git", "config", "user.signingkey", str(self.key))
+        self.command(
+            "git",
+            "remote",
+            "add",
+            "origin",
+            "https://github.com/annie-mei/annie-mei.git",
+        )
         (self.repo / "Cargo.toml").write_text(
             '[package]\nname = "annie-mei"\nversion = "3.10.18"\n'
         )
-        self.command("git", "add", "Cargo.toml")
+        (self.repo / "Cargo.lock").write_text(
+            'version = 3\n[[package]]\nname = "annie-mei"\nversion = "3.10.18"\n'
+        )
+        self.command("git", "add", "Cargo.toml", "Cargo.lock")
         self.command("git", "commit", "--quiet", "-m", "fixture")
         self.commit = self.command("git", "rev-parse", "HEAD").strip()
         self.responses = {
@@ -125,6 +135,98 @@ print(json.dumps(data))
         checks = self.preflight("ready")
         self.assertEqual(checks["tag_signing"]["fingerprint"], self.fingerprint)
         self.assertEqual(checks["source"]["commit"], self.commit)
+
+    def test_effective_push_destinations_must_all_match_checked_repository(self):
+        upstream = "https://github.com/annie-mei/annie-mei.git"
+        fork = "https://github.com/test-owner/annie-mei.git"
+        for url in (
+            upstream,
+            "git@github.com:annie-mei/annie-mei.git",
+            "ssh://git@github.com/annie-mei/annie-mei.git",
+        ):
+            with self.subTest(url=url):
+                self.command("git", "remote", "set-url", "origin", url)
+                self.preflight("ready")
+        for url in (
+            fork,
+            upstream + "/other",
+            upstream.replace("github.com", "github.com.evil.test"),
+        ):
+            with self.subTest(url=url):
+                self.command("git", "remote", "set-url", "origin", url)
+                self.assertEqual(
+                    self.preflight("blocked")["source"]["status"], "blocked"
+                )
+        self.command("git", "remote", "set-url", "origin", upstream)
+        for urls in ((fork,), (upstream, fork), (fork, upstream)):
+            with self.subTest(push_urls=urls):
+                for url in urls:
+                    self.command("git", "config", "--add", "remote.origin.pushurl", url)
+                self.assertEqual(
+                    self.preflight("blocked")["source"]["status"], "blocked"
+                )
+                self.command("git", "config", "--unset-all", "remote.origin.pushurl")
+        for rewrite in ("insteadOf", "pushInsteadOf"):
+            with self.subTest(rewrite=rewrite):
+                key = f"url.{fork}.{rewrite}"
+                self.command("git", "config", key, upstream)
+                self.assertEqual(
+                    self.preflight("blocked")["source"]["status"], "blocked"
+                )
+                self.command("git", "config", "--unset", key)
+
+    def test_lockfile_version_is_checked_at_the_pinned_commit(self):
+        lock = self.repo / "Cargo.lock"
+        matching = lock.read_text()
+        lock.write_text(matching.replace("3.10.18", "3.10.17"))
+        # Dirty working-tree content must not affect the pinned release candidate.
+        self.preflight("ready")
+        for content in (
+            matching.replace("3.10.18", "3.10.17"),
+            matching.replace('name = "annie-mei"', 'name = "another-package"'),
+        ):
+            with self.subTest(content=content):
+                lock.write_text(content)
+                self.command("git", "commit", "--quiet", "-am", "invalid lock version")
+                self.commit = self.command("git", "rev-parse", "HEAD").strip()
+                self.responses[f"{REPO}/git/ref/heads/main"] = {
+                    "object": {"sha": self.commit}
+                }
+                lock.write_text(matching)
+                self.assertEqual(
+                    self.preflight("blocked")["source"]["status"], "blocked"
+                )
+
+    def test_known_creation_blockers_survive_unknown_rules(self):
+        summaries = [
+            {"id": 42, "target": "tag", "enforcement": "active"},
+            {"id": 43, "target": "tag", "enforcement": "active"},
+        ]
+        self.responses[f"{REPO}/rulesets/42"] = {
+            "id": 42,
+            "conditions": {"ref_name": {"include": ["~ALL"], "exclude": []}},
+            "rules": [{"type": "creation"}, {"type": "required_signatures"}],
+        }
+        self.responses[f"{REPO}/rulesets?includes_parents=true"] = [[summaries[0]]]
+        checks = self.preflight("blocked")
+        self.assertEqual(checks["tag_rules"]["rulesets"], [42])
+        self.assertTrue(checks["tag_rules"]["unknowns"])
+        self.assertNotIn("tag_signing", checks)
+        self.responses[f"{REPO}/rulesets/42"]["rules"] = [{"type": "creation"}]
+        for unknown_rule in (
+            {"conditions": {"ref_name": {"include": ["refs/tags/**"], "exclude": []}}},
+            {"error": 403},
+            {},
+        ):
+            self.responses[f"{REPO}/rulesets/43"] = unknown_rule
+            for order in (summaries, list(reversed(summaries))):
+                with self.subTest(rule=unknown_rule, order=order):
+                    self.responses[f"{REPO}/rulesets?includes_parents=true"] = [order]
+                    rules = self.preflight("blocked")["tag_rules"]
+                    self.assertEqual(rules["rulesets"], [42])
+                    self.assertTrue(rules["unknowns"])
+        self.responses[f"{REPO}/rulesets?includes_parents=true"] = [[summaries[1]]]
+        self.assertTrue(self.preflight("unknown")["tag_rules"]["unknowns"])
 
     def test_existing_tag_or_release_blocks_without_replacement(self):
         for path in (f"{REPO}/git/ref/tags/v3.10.18", f"{REPO}/releases/tags/v3.10.18"):

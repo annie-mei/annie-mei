@@ -83,27 +83,43 @@ def matches(patterns, tag):
 
 def check_rules(tag):
     restricted = []
+    unknowns = []
     for summary in api(
         f"repos/{REPOSITORY}/rulesets?includes_parents=true", collection=True
     ):
-        if summary["target"] != "tag" or summary["enforcement"] != "active":
-            continue
-        rule = api(f"repos/{REPOSITORY}/rulesets/{summary['id']}")
-        conditions = rule["conditions"]["ref_name"]
-        if not matches(conditions["include"], tag) or matches(
-            conditions["exclude"], tag
-        ):
-            continue
-        types = {entry["type"] for entry in rule["rules"]}
-        if "creation" in types:
-            # A configured admin exemption is not permission to bypass the rule.
-            restricted.append(rule["id"])
-        if types - {"creation", "update", "deletion"}:
-            raise Unknown("Additional tag rules require manual evaluation")
+        try:
+            if summary["target"] != "tag" or summary["enforcement"] != "active":
+                continue
+            rule = api(f"repos/{REPOSITORY}/rulesets/{summary['id']}")
+            conditions = rule["conditions"]["ref_name"]
+            if not matches(conditions["include"], tag) or matches(
+                conditions["exclude"], tag
+            ):
+                continue
+            types = {entry["type"] for entry in rule["rules"]}
+            if "creation" in types:
+                # A configured admin exemption is not permission to bypass the rule.
+                restricted.append(rule["id"])
+            if types - {"creation", "update", "deletion"}:
+                raise Unknown("Additional tag rules require manual evaluation")
+        except (Unknown, KeyError, TypeError, ValueError) as error:
+            # Keep inspecting: uncertainty must not erase known creation blockers,
+            # regardless of the order in which GitHub returns rulesets.
+            unknowns.append(
+                str(error)
+                if isinstance(error, Unknown)
+                else "Unexpected ruleset format"
+            )
     if restricted:
         return "blocked", {
             "reason": "Tag creation is restricted, even for bypass actors",
             "rulesets": restricted,
+            "unknowns": unknowns,
+        }
+    if unknowns:
+        return "unknown", {
+            "reason": "Tag rules require manual evaluation",
+            "unknowns": unknowns,
         }
     return "ready", {"reason": "No applicable active tag-creation restriction found"}
 
@@ -249,11 +265,38 @@ def main():
             )
         if git("rev-parse", "--verify", f"{args.commit}^{{commit}}") != args.commit:
             return "blocked", {"reason": "Requested commit does not resolve exactly"}
+        # Git expands insteadOf/pushInsteadOf and includes separate push URLs.
+        # Inspect every destination without exposing potentially credentialed URLs.
+        destinations = git(
+            "remote", "get-url", "--push", "--all", "origin"
+        ).splitlines()
+        if not destinations or any(
+            not re.fullmatch(
+                rf"(?:https://github\.com/|ssh://git@github\.com/|git@github\.com:)"
+                rf"{re.escape(REPOSITORY)}(?:\.git)?/?",
+                destination,
+            )
+            for destination in destinations
+        ):
+            return "blocked", {
+                "reason": "Every effective origin push URL must target the checked GitHub repository"
+            }
         cargo = tomllib.loads(git("show", f"{args.commit}:Cargo.toml"))
         version = cargo["package"]["version"]
         if cargo["package"]["name"] != "annie-mei" or args.tag != f"v{version}":
             return "blocked", {
                 "reason": "Tag does not match the pinned Annie Mei Cargo version",
+                "version": version,
+            }
+        lock = tomllib.loads(git("show", f"{args.commit}:Cargo.lock"))
+        versions = [
+            package["version"]
+            for package in lock["package"]
+            if package["name"] == "annie-mei"
+        ]
+        if versions != [version]:
+            return "blocked", {
+                "reason": "Pinned Cargo.lock must contain one Annie Mei package matching Cargo.toml",
                 "version": version,
             }
         repository = api(f"repos/{REPOSITORY}")
