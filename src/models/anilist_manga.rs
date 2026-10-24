@@ -12,6 +12,7 @@ use crate::{
 use chrono::NaiveDate;
 use serde::Deserialize;
 use titlecase::titlecase;
+use tracing::instrument;
 
 #[derive(Deserialize, Debug, Clone)]
 #[serde(rename_all = "camelCase")]
@@ -70,22 +71,19 @@ pub struct StaffName {
 }
 
 impl Manga {
+    /// Renders serialization dates, validating each endpoint independently.
+    /// Missing or invalid endpoints are hidden instead of panicking, and the
+    /// `EMPTY_STR` sentinel is returned when neither endpoint is usable.
+    #[instrument(name = "anilist_manga.transform_date", skip(self))]
     pub fn transform_date(&self) -> String {
-        let start_date = self.start_date.as_ref().unwrap();
-        let formatted_start_date = get_formatted_date_string(start_date);
+        let formatted_start_date = self.start_date.as_ref().and_then(get_formatted_date_string);
+        let formatted_end_date = self.end_date.as_ref().and_then(get_formatted_date_string);
 
-        let is_end_date_available = if let Some(end_date) = &self.end_date {
-            end_date.year.is_some() && end_date.month.is_some()
-        } else {
-            false
-        };
-
-        if is_end_date_available {
-            let end_date = self.end_date.as_ref().unwrap();
-            let formatted_end_date = get_formatted_date_string(end_date);
-            format!("{formatted_start_date} - {formatted_end_date}")
-        } else {
-            formatted_start_date
+        match (formatted_start_date, formatted_end_date) {
+            (Some(start), Some(end)) => format!("{start} - {end}"),
+            (Some(start), None) => start,
+            (None, Some(end)) => end,
+            (None, None) => EMPTY_STR.to_string(),
         }
     }
 
@@ -152,48 +150,26 @@ impl Manga {
     }
 }
 
-fn get_formatted_date_string(date: &AnilistDate) -> String {
-    match date.day {
-        Some(day) => {
-            let date_string = NaiveDate::from_ymd_opt(
-                date.year.unwrap().try_into().unwrap(),
-                date.month.unwrap(),
-                day,
-            );
-            if let Some(date_string) = date_string {
-                date_string.format("%b %e %Y").to_string()
-            } else {
-                EMPTY_STR.to_string()
-            }
-        }
-        None => {
-            if let Some(month) = date.month {
-                let date_string = NaiveDate::from_ymd_opt(
-                    date.year.unwrap().try_into().unwrap(),
-                    month,
-                    // Need to use 1 as the day to give NaiveDate a valid date
-                    1,
-                );
-                if let Some(date_string) = date_string {
-                    date_string.format("%b %Y").to_string()
-                } else {
-                    EMPTY_STR.to_string()
-                }
-            } else {
-                let date_string = NaiveDate::from_ymd_opt(
-                    date.year.unwrap().try_into().unwrap(),
-                    // Need to use 1 as the month to give NaiveDate a valid date
-                    1,
-                    // Need to use 1 as the day to give NaiveDate a valid date
-                    1,
-                );
-                if let Some(date_string) = date_string {
-                    date_string.format("%Y").to_string()
-                } else {
-                    EMPTY_STR.to_string()
-                }
-            }
-        }
+/// Formats a single AniList date endpoint, returning `None` when the date is
+/// invalid rather than inventing missing precision. A year is required and a
+/// day without a month is invalid; valid dates keep the existing formats
+/// (`%b %e %Y`, `%b %Y`, and `%Y`).
+#[instrument(name = "anilist_manga.get_formatted_date_string", skip(date))]
+fn get_formatted_date_string(date: &AnilistDate) -> Option<String> {
+    let year = date.year?;
+    // AniList years arrive as `u32`, but Chrono only supports years that fit
+    // `i32`, so out-of-range values are invalid rather than a panic.
+    let year = i32::try_from(year).ok()?;
+
+    match (date.month, date.day) {
+        (Some(month), Some(day)) => NaiveDate::from_ymd_opt(year, month, day)
+            .map(|date_string| date_string.format("%b %e %Y").to_string()),
+        (Some(month), None) => NaiveDate::from_ymd_opt(year, month, 1)
+            .map(|date_string| date_string.format("%b %Y").to_string()),
+        (None, None) => NaiveDate::from_ymd_opt(year, 1, 1)
+            .map(|date_string| date_string.format("%Y").to_string()),
+        // A day without a month is invalid.
+        (None, Some(_)) => None,
     }
 }
 
@@ -323,10 +299,19 @@ impl Transformers for Manga {
 #[cfg(test)]
 mod tests {
     use super::Manga;
-    use crate::utils::statics::{ANILIST_STATUS_FINISHED, ANILIST_STATUS_RELEASING};
+    use crate::utils::statics::{ANILIST_STATUS_FINISHED, ANILIST_STATUS_RELEASING, EMPTY_STR};
     use serde_json::json;
 
     fn sample_manga(status: &str, chapters: Option<u32>) -> Manga {
+        sample_manga_with_dates(status, chapters, json!(null), json!(null))
+    }
+
+    fn sample_manga_with_dates(
+        status: &str,
+        chapters: Option<u32>,
+        start_date: serde_json::Value,
+        end_date: serde_json::Value,
+    ) -> Manga {
         serde_json::from_value(json!({
             "type": "MANGA",
             "id": 1,
@@ -338,8 +323,8 @@ mod tests {
                 "native": "サンプル"
             },
             "synonyms": null,
-            "startDate": null,
-            "endDate": null,
+            "startDate": start_date,
+            "endDate": end_date,
             "format": null,
             "status": status,
             "chapters": chapters,
@@ -373,5 +358,219 @@ mod tests {
         let manga = sample_manga(ANILIST_STATUS_FINISHED, Some(110));
 
         assert_eq!(manga.transform_chapters(), "110");
+    }
+
+    fn date_json(year: Option<u32>, month: Option<u32>, day: Option<u32>) -> serde_json::Value {
+        json!({ "year": year, "month": month, "day": day })
+    }
+
+    #[test]
+    fn transform_date_returns_sentinel_when_dates_absent() {
+        let manga = sample_manga(ANILIST_STATUS_FINISHED, Some(10));
+
+        assert_eq!(manga.transform_date(), EMPTY_STR);
+    }
+
+    #[test]
+    fn transform_date_returns_sentinel_when_dates_all_null() {
+        let manga = sample_manga_with_dates(
+            ANILIST_STATUS_FINISHED,
+            Some(10),
+            date_json(None, None, None),
+            date_json(None, None, None),
+        );
+
+        assert_eq!(manga.transform_date(), EMPTY_STR);
+    }
+
+    #[test]
+    fn transform_date_formats_year_only_start() {
+        let manga = sample_manga_with_dates(
+            ANILIST_STATUS_FINISHED,
+            Some(10),
+            date_json(Some(2024), None, None),
+            json!(null),
+        );
+
+        assert_eq!(manga.transform_date(), "2024");
+    }
+
+    #[test]
+    fn transform_date_formats_year_and_month() {
+        let manga = sample_manga_with_dates(
+            ANILIST_STATUS_FINISHED,
+            Some(10),
+            date_json(Some(2024), Some(3), None),
+            json!(null),
+        );
+
+        assert_eq!(manga.transform_date(), "Mar 2024");
+    }
+
+    #[test]
+    fn transform_date_formats_full_date() {
+        let manga = sample_manga_with_dates(
+            ANILIST_STATUS_FINISHED,
+            Some(10),
+            date_json(Some(2024), Some(3), Some(5)),
+            json!(null),
+        );
+
+        assert_eq!(manga.transform_date(), "Mar  5 2024");
+    }
+
+    #[test]
+    fn transform_date_returns_sentinel_for_month_without_year() {
+        let manga = sample_manga_with_dates(
+            ANILIST_STATUS_FINISHED,
+            Some(10),
+            date_json(None, Some(3), None),
+            json!(null),
+        );
+
+        assert_eq!(manga.transform_date(), EMPTY_STR);
+    }
+
+    #[test]
+    fn transform_date_returns_sentinel_for_day_without_month() {
+        let manga = sample_manga_with_dates(
+            ANILIST_STATUS_FINISHED,
+            Some(10),
+            date_json(Some(2024), None, Some(5)),
+            json!(null),
+        );
+
+        assert_eq!(manga.transform_date(), EMPTY_STR);
+    }
+
+    #[test]
+    fn transform_date_formats_leap_day_in_leap_year() {
+        let manga = sample_manga_with_dates(
+            ANILIST_STATUS_FINISHED,
+            Some(10),
+            date_json(Some(2024), Some(2), Some(29)),
+            json!(null),
+        );
+
+        assert_eq!(manga.transform_date(), "Feb 29 2024");
+    }
+
+    #[test]
+    fn transform_date_returns_sentinel_for_invalid_leap_day() {
+        let manga = sample_manga_with_dates(
+            ANILIST_STATUS_FINISHED,
+            Some(10),
+            date_json(Some(2023), Some(2), Some(29)),
+            json!(null),
+        );
+
+        assert_eq!(manga.transform_date(), EMPTY_STR);
+    }
+
+    #[test]
+    fn transform_date_returns_sentinel_for_invalid_month_and_day() {
+        let invalid_month = sample_manga_with_dates(
+            ANILIST_STATUS_FINISHED,
+            Some(10),
+            date_json(Some(2024), Some(13), Some(1)),
+            json!(null),
+        );
+        let invalid_day = sample_manga_with_dates(
+            ANILIST_STATUS_FINISHED,
+            Some(10),
+            date_json(Some(2024), Some(6), Some(32)),
+            json!(null),
+        );
+
+        assert_eq!(invalid_month.transform_date(), EMPTY_STR);
+        assert_eq!(invalid_day.transform_date(), EMPTY_STR);
+    }
+
+    #[test]
+    fn transform_date_returns_sentinel_for_unrepresentable_year() {
+        let full_precision = sample_manga_with_dates(
+            ANILIST_STATUS_FINISHED,
+            Some(10),
+            date_json(Some(u32::MAX), Some(3), Some(5)),
+            json!(null),
+        );
+        let year_only = sample_manga_with_dates(
+            ANILIST_STATUS_FINISHED,
+            Some(10),
+            date_json(Some(u32::MAX), None, None),
+            json!(null),
+        );
+
+        assert_eq!(full_precision.transform_date(), EMPTY_STR);
+        assert_eq!(year_only.transform_date(), EMPTY_STR);
+    }
+
+    #[test]
+    fn transform_date_joins_valid_start_and_end() {
+        let full_end = sample_manga_with_dates(
+            ANILIST_STATUS_FINISHED,
+            Some(10),
+            date_json(Some(2024), Some(3), Some(5)),
+            date_json(Some(2025), Some(6), Some(15)),
+        );
+        let year_month_end = sample_manga_with_dates(
+            ANILIST_STATUS_FINISHED,
+            Some(10),
+            date_json(Some(2024), Some(3), Some(5)),
+            date_json(Some(2025), Some(6), None),
+        );
+        let year_only_end = sample_manga_with_dates(
+            ANILIST_STATUS_FINISHED,
+            Some(10),
+            date_json(Some(2024), Some(3), Some(5)),
+            date_json(Some(2025), None, None),
+        );
+
+        assert_eq!(full_end.transform_date(), "Mar  5 2024 - Jun 15 2025");
+        assert_eq!(year_month_end.transform_date(), "Mar  5 2024 - Jun 2025");
+        assert_eq!(year_only_end.transform_date(), "Mar  5 2024 - 2025");
+    }
+
+    #[test]
+    fn transform_date_shows_valid_start_when_end_invalid() {
+        let missing_precision_end = sample_manga_with_dates(
+            ANILIST_STATUS_FINISHED,
+            Some(10),
+            date_json(Some(2024), Some(3), Some(5)),
+            date_json(None, Some(3), None),
+        );
+        let invalid_calendar_end = sample_manga_with_dates(
+            ANILIST_STATUS_FINISHED,
+            Some(10),
+            date_json(Some(2024), Some(3), Some(5)),
+            date_json(Some(2025), Some(2), Some(30)),
+        );
+
+        assert_eq!(missing_precision_end.transform_date(), "Mar  5 2024");
+        assert_eq!(invalid_calendar_end.transform_date(), "Mar  5 2024");
+    }
+
+    #[test]
+    fn transform_date_shows_valid_end_when_start_invalid() {
+        let manga = sample_manga_with_dates(
+            ANILIST_STATUS_FINISHED,
+            Some(10),
+            date_json(None, Some(3), Some(5)),
+            date_json(Some(2025), Some(6), Some(15)),
+        );
+
+        assert_eq!(manga.transform_date(), "Jun 15 2025");
+    }
+
+    #[test]
+    fn transform_date_returns_sentinel_when_neither_endpoint_valid() {
+        let manga = sample_manga_with_dates(
+            ANILIST_STATUS_FINISHED,
+            Some(10),
+            date_json(None, Some(3), Some(5)),
+            date_json(Some(2025), Some(2), Some(30)),
+        );
+
+        assert_eq!(manga.transform_date(), EMPTY_STR);
     }
 }
