@@ -57,7 +57,7 @@ Before a mutation, state the exact action and confirm the request authorizes it.
 ## Compose or Update
 
 - Use `[ANNIE-<ticket-number>]/<description>` for the title.
-- Read and fill [`reference/description-template.md`](reference/description-template.md). Remove placeholder comments and unused optional sections.
+- Read and fill the repository's `.github/PULL_REQUEST_TEMPLATE.md`. Remove placeholder comments and unused optional sections.
 - Build `## Changes` from the complete base-to-head commit range. Use one bullet per commit in chronological order, with the full 40-character SHA and a concise description; do not wrap SHAs in code formatting.
 - Check only type and validation boxes supported by the actual diff and executed evidence.
 - Name the actual model in the footer; never leave `MODEL_NAME`.
