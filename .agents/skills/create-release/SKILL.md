@@ -90,7 +90,14 @@ disable signing/hooks, retry a failed Git operation, or relax a rule automatical
    permission, validity of deployment secrets, or future service readiness. Record
    these untested capabilities explicitly as `unknown`; do not probe by dispatching,
    restarting production, or relaxing controls.
-4. Report repository, commit, version, tag, signer fingerprint, checks with their
+4. Before a factory deployment, verify and record the existing rollback method,
+   data compatibility, and previous known-good artifact/revision retained for the
+   entire observation and repair window. The current workflow deletes its local
+   startup backup after successful startup; that backup is not a post-deploy
+   rollback plan. Verify another retained artifact or reproducible redeployment
+   path without executing it. If no usable recovery path is established, block
+   deployment and report the missing prerequisite; this policy does not create one.
+5. Report repository, commit, version, tag, signer fingerprint, checks with their
    evidence/time, remaining unknowns, and current authorization. Overall preflight
    is `blocked` if any check fails, otherwise `unknown` if required evidence is
    missing, otherwise `ready`. Stop for unresolved blockers/unknowns. The owner may
