@@ -14,7 +14,8 @@ This skill guides you through creating a release for Annie Mei using trunk-based
 
 ## Phase 1: Preflight (no remote mutations)
 
-Do not fetch, switch branches, update versions, create real tags, publish releases,
+Use a scoped, recorded-authorized fetch only when needed to inspect the pinned
+candidate. Do not pull, switch branches, update versions, create real tags, publish releases,
 dispatch workflows, or change signing configuration/protection during preflight.
 Preserve existing work. Version changes belong on an authorized ticket branch,
 not on `main`. Apply semantic versioning before preparing the release candidate:
@@ -23,10 +24,14 @@ major for breaking changes, minor for compatible features, patch for fixes/refac
 ### Pin the candidate and approved signer
 
 Identify the owner-approved full commit SHA, `vX.Y.Z` tag, and allowed SSH signing
-fingerprint(s). Never infer approval from the keys available on a machine. Inspect
+fingerprint(s). For an assigned factory ticket, the standing delivery grant covers
+selecting and recording the candidate produced by that ticket's passed gates;
+it does not approve a new signer or a different repository. Preserve any narrower
+owner pin. Never infer signer approval from the keys available on a machine. Inspect
 remote `main` with `gh api repos/annie-mei/annie-mei/git/ref/heads/main`; a local
-`origin/main` may be stale. If the commit is missing locally, stop and request
-scoped fetch authorization rather than pulling or changing branches.
+`origin/main` may be stale. If the commit is missing locally, use the execution
+contract's scoped fetch authorization (factory policy or specific owner instruction).
+Ask only if that capability is absent; do not pull or switch branches implicitly.
 
 Run from the repository root, substituting the approved values:
 
@@ -78,7 +83,10 @@ disable signing/hooks, retry a failed Git operation, or relax a rule automatical
    health. Missing/denied telemetry is `unknown`; never print credentials or raw
    connection strings, and do not add a new token just to complete this check.
 3. Read the release workflow at the pinned revision and confirm the intended
-   release/deployment effects. Workflow visibility does **not** establish dispatch
+   release/deployment effects, including startup migrations. The factory grant
+   does not authorize shared-database writes/migrations or infrastructure changes
+   hidden inside a deployment; obtain specific approval for those effects.
+   Workflow visibility does **not** establish dispatch
    permission, validity of deployment secrets, or future service readiness. Record
    these untested capabilities explicitly as `unknown`; do not probe by dispatching,
    restarting production, or relaxing controls.
@@ -89,10 +97,12 @@ disable signing/hooks, retry a failed Git operation, or relax a rule automatical
    explicitly authorize proceeding with a named untestable capability; retain that
    limitation in the report rather than relabeling it verified.
 
-Permission to inspect is not permission to publish. Require explicit authorization
-for tag push, release publication/edit, workflow dispatch, and production deployment
-unless already unambiguously granted for this candidate. Preflight does not enforce
-GitHub access controls or install an unattended factory executor.
+Permission to inspect is not permission to publish. Record authorization for tag
+push, release publication/edit, workflow dispatch, and production deployment from
+the scoped **Factory authorization** in `AGENTS.md` or specific owner instructions.
+For an eligible assigned ticket, proceed when the gates pass without requesting
+the same permissions again. Do not release/deploy tooling-only changes. Preflight
+does not enforce GitHub access controls or install an unattended factory executor.
 
 ## Phase 2: Authorized execution
 
@@ -184,12 +194,21 @@ Also verify:
 - Sentry release creation and symbol upload succeeded, including steps marked
   `continue-on-error`; disclose gaps rather than relying on the overall green run
 
+For factory deployments, complete the shared policy's smoke tests and 30-minute
+Sentry observation against the recorded baseline before reporting healthy delivery.
+Use the existing monitoring mechanism and identify its owner; if unavailable,
+report the gap rather than claiming a monitor is running. Apply its two-repair
+limit and postmortem/prevention-ticket requirements to attributable regressions.
+
 ## Rollback Procedure
 
-Rollback, tag replacement/deletion, and protection changes require separate explicit
-approval. Deleting a GitHub release or tag does not roll back a running service.
-Stop and propose a recovery plan tied to the previous known-good deployment and
-any data-compatibility constraints; do not use destructive cleanup as a retry.
+The factory policy authorizes restoring the recorded previous known-good deployment
+through an existing, data-compatible rollback path after two failed repairs or when
+the bot is down. Verify recovery and notify the owner. Otherwise obtain specific
+rollback approval. Tag replacement/deletion, protection changes, destructive data
+operations, and incompatible rollbacks remain excluded and require a separate safe
+recovery decision. Deleting a release or tag does not roll back a running service;
+never use destructive cleanup as a retry.
 
 ## Validate this skill's checker
 

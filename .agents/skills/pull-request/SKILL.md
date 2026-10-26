@@ -13,9 +13,9 @@ Use this as the canonical agent workflow for Annie Mei pull requests.
 
 ## Authorization Boundary
 
-Treat these as separate shared-state actions: **open**, **update**, **comment**, **review**, **merge**, and **close**. Perform only the specific action the user explicitly authorized. Permission for one action never implies another; implementation, commit, push, or readiness requests do not authorize any PR mutation. Read-only inspection is allowed. Pushing also requires explicit authorization under repository Git safety rules.
+Treat **open**, **update**, **comment**, **review**, **merge**, and **close** as separate capabilities. Read **Factory authorization** in `AGENTS.md`: a verified owner-assigned factory ticket explicitly authorizes feature-branch pushes, PR creation/updates, review fixes, and gated merge together. Record that source in the execution contract and carry it forward; do not ask again for covered actions. The grant does not include PR comments, submitted reviews, or unrelated PR closure. Outside that policy, obtain specific authorization; an inspection or readiness request alone grants no mutation.
 
-Before a mutation, state the exact action and confirm the request authorizes it. If ambiguous, stop and ask.
+Before a mutation, confirm the recorded authorization still covers its ticket, repository, action, and current owner restrictions. State the action at meaningful milestones, not as a fresh approval question. If authorization or a required gate is missing, stop and explain the specific blocker.
 
 ## Prepare
 
@@ -27,7 +27,7 @@ Before a mutation, state the exact action and confirm the request authorizes it.
    gh pr view <number-or-url> --json number,url,title,body,baseRefName,baseRefOid,headRefName,headRefOid,isDraft,mergeable,mergeStateStatus,reviewDecision,statusCheckRollup
    ```
 
-4. Fetch only when the user explicitly authorizes fetching. When authorized, fetch the captured SHAs into dedicated refs and inspect that exact range, never local `HEAD` by assumption:
+4. Fetch only when the execution contract authorizes it through the factory policy or a specific owner instruction. When authorized, fetch the captured SHAs into dedicated refs and inspect that exact range, never local `HEAD` by assumption:
 
    ```bash
    PR=<number>
@@ -85,4 +85,4 @@ Readiness is a read-only assessment, not authorization to update, review, merge,
 5. Confirm selected local validation passed and the title/body follow this skill.
 6. Report blockers and uncertainty. Do not claim ready while verified findings, conflicts, required checks, required reviews, or stale-head uncertainty remain.
 
-Even when ready, merge only after explicit merge authorization. Never infer permission to comment, submit a review, close, or update the PR from a readiness request.
+When ready, use the recorded factory merge grant or specific owner merge approval; do not ask for both. Use the normal protected merge path with an exact-head guard, never an admin bypass. Never infer permission to comment, submit a review, close, or update a PR from a readiness request alone.
