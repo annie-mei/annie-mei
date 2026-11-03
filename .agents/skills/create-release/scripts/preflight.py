@@ -375,7 +375,7 @@ def main():
                 "remaining_checks": [
                     "Exact-commit CI and review evidence",
                     "Sentry organization/project access and pre-deploy error baseline",
-                    "Explicit approval for tag push, release publication and production workflow dispatch",
+                    "Recorded authorization for tag push, release publication and production workflow dispatch (eligible factory grant or specific owner approval)",
                 ],
                 "limitations": [
                     "Read access does not prove dispatch/write permission or deployment secret validity",
