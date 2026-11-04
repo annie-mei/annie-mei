@@ -13,14 +13,14 @@ Use this as the canonical agent workflow for Annie Mei pull requests.
 
 ## Authorization Boundary
 
-Treat these as separate shared-state actions: **open**, **update**, **comment**, **review**, **merge**, and **close**. Perform only the specific action the user explicitly authorized. Permission for one action never implies another; implementation, commit, push, or readiness requests do not authorize any PR mutation. Read-only inspection is allowed. Pushing also requires explicit authorization under repository Git safety rules.
+Treat these as separate shared-state actions: **open**, **update**, **comment**, **review**, **merge**, and **close**. **Update** means changing an existing PR's metadata, base, or draft state. Perform only the specific action the user explicitly authorized. Permission for one action never implies another; implementation, commit, push, or readiness requests do not authorize any PR mutation. An explicitly authorized push to an existing PR head does not also require PR-update authorization. Read-only inspection is allowed. Pushing also requires explicit authorization under repository Git safety rules.
 
 Before a mutation, state the exact action and confirm the request authorizes it. If ambiguous, stop and ask.
 
 ## Prepare
 
 1. Read `AGENTS.md` and identify the Linear ticket and its suggested branch.
-2. Read-only inspection and review may run from any checkout, including `main`. Authoring or mutating a PR must use its ticket branch; never author or mutate from `main`, and never discard unrelated changes.
+2. File edits, code pushes, and opening a new PR require a symbolic branch whose name exactly matches the Linear ticket's suggested branch. Read-only inspection and explicitly authorized existing-PR API actions (metadata/base/draft updates, comments, reviews, merges, and closes) may run from any checkout, including `main`, when the PR is addressed by number or URL and its current head is verified. Never discard unrelated changes.
 3. Inspect `git status --short --branch`. For an existing PR, capture its exact current base and head before inspecting the range:
 
    ```bash
@@ -36,13 +36,28 @@ Before a mutation, state the exact action and confirm the request authorizes it.
    HEAD_SHA=<headRefOid>
    BASE_REF="refs/remotes/origin/pr/$PR/base"
    HEAD_REF="refs/remotes/origin/pr/$PR/head"
-   git fetch origin "$BASE_NAME:$BASE_REF" "pull/$PR/head:$HEAD_REF"
+   if git fetch origin "$BASE_SHA"; then
+     git cat-file -e "$BASE_SHA^{commit}"
+     git update-ref "$BASE_REF" "$BASE_SHA"
+   else
+     git fetch origin "$BASE_NAME"
+     if ! git cat-file -e "$BASE_SHA^{commit}" &&
+        test "$(git rev-parse --is-shallow-repository)" = true; then
+       git fetch --unshallow origin "$BASE_NAME"
+     fi
+     git cat-file -e "$BASE_SHA^{commit}"
+     git update-ref "$BASE_REF" "$BASE_SHA"
+   fi
+   git update-ref -d "$HEAD_REF"
+   git fetch origin "pull/$PR/head:$HEAD_REF"
    test "$(git rev-parse "$BASE_REF")" = "$BASE_SHA"
    test "$(git rev-parse "$HEAD_REF")" = "$HEAD_SHA"
    git diff --stat "$BASE_REF...$HEAD_REF"
    git diff "$BASE_REF...$HEAD_REF"
    git log --reverse --format='%H%x09%s' "$BASE_REF..$HEAD_REF"
    ```
+
+   Direct captured-OID fetching is preferred. If the server does not allow it, fetch the base branch only to obtain enough history for the captured commit, verify `BASE_SHA` exists, and write that SHA to the disposable dedicated ref; do not equate the moving branch tip with the captured base. Delete the dedicated refs with `git update-ref -d` after the inspection.
 
    If fetching is not authorized, inspect the captured PR through read-only API data (`gh pr diff <number>`, `gh api repos/{owner}/{repo}/pulls/<number>/commits`, and API file contents at `HEAD_SHA`). Refresh `headRefOid` afterward; if it changed, discard the stale inspection and repeat. State when API data cannot provide an equivalent local check.
 
@@ -70,19 +85,19 @@ Before a mutation, state the exact action and confirm the request authorizes it.
 When reviewing a PR, responding to findings, or checking readiness, follow [`reference/review-threads.md`](reference/review-threads.md). It is mandatory to:
 
 1. Retrieve all PR feedback via paginated GraphQL: inline review threads and every nested comment (including resolved and outdated threads), top-level review bodies, and general conversation comments.
-2. Record `headRefOid` from every top-level feedback query and confirm all channels describe the same PR head.
+2. Record `headRefOid` and `timelineItems(first: 1) { updatedAt }` from every top-level feedback query. Confirm the feedback-generation token pair agrees across every page and channel.
 3. Verify each finding against code at that exact head SHA. Never treat comment position, resolution, or age as proof that the finding still applies.
-4. Re-read the PR head after retrieving and verifying all channels. If the SHA changed, discard the complete feedback snapshot and repeat retrieval and verification against the new head before reporting or mutating state.
+4. Immediately after verification and before reporting readiness or mutating state, refresh both token fields. If either changed, discard the complete feedback snapshot and repeat retrieval and verification against the new token. Describe completeness as of the final token pair.
 
 ## Readiness
 
 Readiness is a read-only assessment, not authorization to update, review, merge, or close. Immediately before reporting readiness:
 
-1. Confirm the assessed local or fetched commit equals the PR's current `headRefOid`.
+1. Refresh the feedback-generation token immediately before readiness. Confirm it matches the verified snapshot and that the assessed local or fetched commit equals its `headRefOid`; retry retrieval and verification if either token field changed.
 2. Review the complete base-to-head diff and commit list.
 3. Complete all-channel feedback retrieval and current-head finding verification.
 4. Inspect `isDraft`, `mergeable`, `mergeStateStatus`, `reviewDecision`, and every required check in `statusCheckRollup`.
 5. Confirm selected local validation passed and the title/body follow this skill.
-6. Report blockers and uncertainty. Do not claim ready while verified findings, conflicts, required checks, required reviews, or stale-head uncertainty remain.
+6. Report blockers and uncertainty, and describe feedback completeness as of the final `headRefOid` and timeline `updatedAt` token. Do not claim ready while verified findings, conflicts, required checks, required reviews, or stale-token uncertainty remain.
 
 Even when ready, merge only after explicit merge authorization. Never infer permission to comment, submit a review, close, or update the PR from a readiness request.
